@@ -1,13 +1,13 @@
 
-#COMPILER=gfortran# Gnu 
-#COMPILER=pgf90#    Portland
-COMPILER=ifort#     Intel
-#COMPILER=nagfor#      NAG 
+COMPILER=gfortran  # Gnu 
+#COMPILER=pgf90    # Portland
+#COMPILER=ifort    # Intel
+#COMPILER=nagfor   # NAG 
 
 VPATH = ./:./UM_source
 
 #NCPATH=/usr/local/netcdf/$(COMPILER)/
-NCPATH=/home/h01/lemdev/netcdf/$(COMPILER)/
+NCPATH=/usr/local/tools/netcdf-fortran-gnu-4.2
 
 TESTING=
 
@@ -53,7 +53,7 @@ F90=$(COMPILER) $(OPTS)
 LD=$(F90)   # Linker
 
 INCDF=-I$(NCPATH)/include
-LNCDF=-L$(NCPATH)/lib -lnetcdf
+LNCDF=-L$(NCPATH)/lib -lnetcdf -lnetcdff
 LDFLAGS=$(INCDF) $(LNCDF)
 
 EXECUTABLE=$(MODEL)_$(CASE).exe
