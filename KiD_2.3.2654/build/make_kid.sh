@@ -7,11 +7,11 @@
 # ==============================================================================
 
 # Set up LC enviornment
-# Note: May also need to update src/compiler_options.inc
+# Note: Also need to update src/compiler_options.inc
 # --------------------------------------------------------------------
 source /usr/global/tools/dotkit/init.sh # Enable dotkit packages
-use gcc                                 # Load GNU compiler
-use netcdf-fortran-gnu-4.2              # Load netcdf for output
+use icc-16.0.210                        # intel compiler
+use netcdf-intel-4.1.3                  # netcdf for output
 use python                              # Load python for use in makefile 
 PYTHONHOME=/usr/apps/python/bin
 

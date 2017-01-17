@@ -1,13 +1,14 @@
 
-COMPILER=gfortran  # Gnu 
+#COMPILER=gfortran  # Gnu 
 #COMPILER=pgf90    # Portland
-#COMPILER=ifort    # Intel
+COMPILER=ifort    # Intel
 #COMPILER=nagfor   # NAG 
 
 VPATH = ./:./UM_source
 
 #NCPATH=/usr/local/netcdf/$(COMPILER)/
-NCPATH=/usr/local/tools/netcdf-fortran-gnu-4.2
+#NCPATH=/usr/local/tools/netcdf-pgi-4.1.3 
+NCPATH=/usr/local/tools/netcdf-intel-4.1.3
 
 TESTING=
 
