@@ -213,6 +213,20 @@ real(r8)           :: micro_mg_berg_eff_factor     ! berg efficiency factor
 
 logical  :: allow_sed_supersat ! Allow supersaturated conditions after sedimentation loop
 
+! Generic interface for packing routines
+interface pack_array
+   module procedure pack_array_1Dr8
+   module procedure pack_array_2Dr8
+   module procedure pack_array_3Dr8
+end interface
+
+interface unpack_array
+   module procedure unpack_array_1Dr8
+   module procedure unpack_array_1Dr8_arrayfill
+   module procedure unpack_array_2Dr8
+   module procedure unpack_array_2Dr8_arrayfill
+end interface
+
 !===============================================================================
 contains
 !===============================================================================
@@ -342,58 +356,61 @@ end subroutine micro_mg_init
 !microphysics routine for each timestep goes here...
 
 subroutine micro_mg_tend ( &
-     mgncol,             nlev,               deltatin,           &
-     t,                            q,                            &
+     mgncol, mgcols,               nlev, top_lev,                &
+     deltatin,                                                   &
+     tn,                           qn,                           &
      qcn,                          qin,                          &
      ncn,                          nin,                          &
      qrn,                          qsn,                          &
      nrn,                          nsn,                          &
-     relvar,                       accre_enhan,                  &
-     p,                            pdel,                         &
-     cldn,               liqcldf,            icecldf,            &
+     relvarn,                      accre_enhann,                 &
+     pn,                           pdeln,                        &
+     cldn,                         liqcldf,             icecldf, &
      qcsinksum_rate1ord,                                         &
-     naai,                         npccn,                        &
-     rndst,                        nacon,                        &
-     tlat,                         qvlat,                        &
-     qctend,                       qitend,                       &
-     nctend,                       nitend,                       &
-     qrtend,                       qstend,                       &
-     nrtend,                       nstend,                       &
-     effc,               effc_fn,            effi,               &
-     prect,                        preci,                        &
-     nevapr,                       evapsnow,                     &
-     prain,                        prodsnow,                     &
-     cmeout,                       deffi,                        &
-     pgamrad,                      lamcrad,                      &
-     qsout,                        dsout,                        &
-     rflx,               sflx,               qrout,              &
-     reff_rain,                    reff_snow,                    &
-     qcsevap,            qisevap,            qvres,              &
-     cmeitot,            vtrmc,              vtrmi,              &
-     umr,                          ums,                          &
-     qcsedten,                     qisedten,                     &
-     qrsedten,                     qssedten,                     &
-     pratot,                       prctot,                       &
-     mnuccctot,          mnuccttot,          msacwitot,          &
-     psacwstot,          bergstot,           bergtot,            &
-     melttot,                      homotot,                      &
-     qcrestot,           prcitot,            praitot,            &
-     qirestot,           mnuccrtot,          pracstot,           &
-     meltsdttot,         frzrdttot,          mnuccdtot,          &
-     nrout,                        nsout,                        &
-     refl,               arefl,              areflz,             &
-     frefl,              csrfl,              acsrfl,             &
-     fcsrfl,                       rercld,                       &
-     ncai,                         ncal,                         &
-     qrout2,                       qsout2,                       &
-     nrout2,                       nsout2,                       &
-     drout2,                       dsout2,                       &
-     freqs,                        freqr,                        &
-     nfice,                        qcrat,                        &
-     errstring, & ! Below arguments are "optional" (pass null pointers to omit).
-     tnd_qsnow,          tnd_nsnow,          re_ice,             &
-     prer_evap,                                                      &
-     frzimm,             frzcnt,             frzdep)
+     naain,                        npccnin,                      &
+     rndstn,                       naconin,                      &
+! outputs
+     tlato,                        qvlato,                       &
+     qctendo,                      qitendo,                      &
+     nctendo,                      nitendo,                      &
+     qrtendo,                      qstendo,                      &
+     nrtendo,                      nstendo,                      &
+     effco,                        effco_fn,            effio,   &
+     precto,                       precio,                       &
+     nevapro,                      evapsnowo,                    &
+     praino,                       prodsnowo,                    &
+     cmeouto,                      deffio,                       &
+     pgamrado,                     lamcrado,                     &
+     qsouto,                       dsouto,                       &
+     rflxo,                        sflxo,               qrouto,  &
+     reff_raino,                   reff_snowo,                   &
+     qcsevapo,                     qisevapo,            qvreso,  &
+     cmeiout,                      vtrmco,              vtrmio,  &
+     umso,                         umro,                         &
+     qcsedteno,                    qisedteno,                    &
+     qrsedteno,                    qssedteno,                    &
+     prao,                         prco,                         &
+     mnuccco,                      mnuccto,             msacwio, &
+     psacwso,                      bergso,              bergo,   &
+     melto,                        homoo,                        &
+     qcreso,                       prcio,               praio,   &
+     qireso,                       mnuccro,             pracso,  &
+     meltsdto,                     frzrdto,             mnuccdo, &
+     nrouto,                       nsouto,                       &
+     reflo,                        areflo,              areflzo, &
+     freflo,                       csrflo,              acsrflo, &
+     fcsrflo,                      rercldo,                      &
+     ncaio,                        ncalo,                        &
+     qrouto2,                      qsouto2,                      &
+     nrouto2,                      nsouto2,                      &
+     drouto2,                      dsouto2,                      &
+     freqso,                       freqro,                       &
+     nficeo,                       qcrato,                       &
+! Below arguments are "optional" (pass null pointers to omit).
+     tnd_qsnown,                   tnd_nsnown,          re_icen, &
+     errstring,                                                  &
+     prer_evapo,                                                 &
+     frzimmn,                      frzcntn,             frzdepn)
 
   ! Constituent properties.
   use micro_mg_utils, only: &
@@ -434,10 +451,12 @@ subroutine micro_mg_tend ( &
 
   ! input arguments
   integer,  intent(in) :: mgncol         ! number of microphysics columns
+  integer,  intent(in) :: mgcols(:)      ! list of microphysics columns
   integer,  intent(in) :: nlev           ! number of layers
+  integer,  intent(in) :: top_lev        ! top level to do microphysics
   real(r8), intent(in) :: deltatin       ! time step (s)
-  real(r8), intent(in) :: t(:,:)        ! input temperature (K)
-  real(r8), intent(in) :: q(:,:)        ! input h20 vapor mixing ratio (kg/kg)
+  real(r8), intent(in) :: tn(:,:)        ! input temperature (K)
+  real(r8), intent(in) :: qn(:,:)        ! input h20 vapor mixing ratio (kg/kg)
 
   ! note: all input cloud variables are grid-averaged
   real(r8), intent(in) :: qcn(:,:)       ! cloud water mixing ratio (kg/kg)
@@ -450,119 +469,119 @@ subroutine micro_mg_tend ( &
   real(r8), intent(in) :: nrn(:,:)       ! rain number conc (1/kg)
   real(r8), intent(in) :: nsn(:,:)       ! snow number conc (1/kg)
 
-  real(r8), intent(in) :: relvar(:,:)   ! cloud water relative variance (-)
-  real(r8), intent(in) :: accre_enhan(:,:)  ! optional accretion
+  real(r8), intent(in) :: relvarn(:,:)       ! cloud water relative variance (-)
+  real(r8), intent(in) :: accre_enhann(:,:)  ! optional accretion
                                              ! enhancement factor (-)
 
-  real(r8), intent(in) :: p(:,:)        ! air pressure (pa)
-  real(r8), intent(in) :: pdel(:,:)     ! pressure difference across level (pa)
+  real(r8), intent(in) :: pn(:,:)        ! air pressure (pa)
+  real(r8), intent(in) :: pdeln(:,:)     ! pressure difference across level (pa)
 
   real(r8), intent(in) :: cldn(:,:)      ! cloud fraction (no units)
   real(r8), intent(in) :: liqcldf(:,:)   ! liquid cloud fraction (no units)
   real(r8), intent(in) :: icecldf(:,:)   ! ice cloud fraction (no units)
   ! used for scavenging
   ! Inputs for aerosol activation
-  real(r8), intent(in) :: naai(:,:)     ! ice nucleation number (from microp_aero_ts) (1/kg)
-  real(r8), intent(in) :: npccn(:,:)   ! ccn activated number tendency (from microp_aero_ts) (1/kg*s)
+  real(r8), intent(in) :: naain(:,:)     ! ice nucleation number (from microp_aero_ts) (1/kg)
+  real(r8), intent(in) :: npccnin(:,:)   ! ccn activated number tendency (from microp_aero_ts) (1/kg*s)
 
   ! Note that for these variables, the dust bin is assumed to be the last index.
   ! (For example, in CAM, the last dimension is always size 4.)
-  real(r8), intent(in) :: rndst(:,:,:)  ! radius of each dust bin, for contact freezing (from microp_aero_ts) (m)
-  real(r8), intent(in) :: nacon(:,:,:) ! number in each dust bin, for contact freezing  (from microp_aero_ts) (1/m^3)
-  
+  real(r8), intent(in) :: rndstn(:,:,:)  ! radius of each dust bin, for contact freezing (from microp_aero_ts) (m)
+  real(r8), intent(in) :: naconin(:,:,:) ! number in each dust bin, for contact freezing  (from microp_aero_ts) (1/m^3)
+
   ! output arguments
 
   real(r8), intent(out) :: qcsinksum_rate1ord(:,:)    ! 1st order rate for
   ! direct cw to precip conversion
-  real(r8), intent(out) :: tlat(:,:)         ! latent heating rate       (W/kg)
-  real(r8), intent(out) :: qvlat(:,:)        ! microphysical tendency qv (1/s)
-  real(r8), intent(out) :: qctend(:,:)       ! microphysical tendency qc (1/s)
-  real(r8), intent(out) :: qitend(:,:)       ! microphysical tendency qi (1/s)
-  real(r8), intent(out) :: nctend(:,:)       ! microphysical tendency nc (1/(kg*s))
-  real(r8), intent(out) :: nitend(:,:)       ! microphysical tendency ni (1/(kg*s))
+  real(r8), intent(out) :: tlato(:,:)         ! latent heating rate       (W/kg)
+  real(r8), intent(out) :: qvlato(:,:)        ! microphysical tendency qv (1/s)
+  real(r8), intent(out) :: qctendo(:,:)       ! microphysical tendency qc (1/s)
+  real(r8), intent(out) :: qitendo(:,:)       ! microphysical tendency qi (1/s)
+  real(r8), intent(out) :: nctendo(:,:)       ! microphysical tendency nc (1/(kg*s))
+  real(r8), intent(out) :: nitendo(:,:)       ! microphysical tendency ni (1/(kg*s))
 
-  real(r8), intent(out) :: qrtend(:,:)       ! microphysical tendency qr (1/s)
-  real(r8), intent(out) :: qstend(:,:)       ! microphysical tendency qs (1/s)
-  real(r8), intent(out) :: nrtend(:,:)       ! microphysical tendency nr (1/(kg*s))
-  real(r8), intent(out) :: nstend(:,:)       ! microphysical tendency ns (1/(kg*s))
+  real(r8), intent(out) :: qrtendo(:,:)       ! microphysical tendency qr (1/s)
+  real(r8), intent(out) :: qstendo(:,:)       ! microphysical tendency qs (1/s)
+  real(r8), intent(out) :: nrtendo(:,:)       ! microphysical tendency nr (1/(kg*s))
+  real(r8), intent(out) :: nstendo(:,:)       ! microphysical tendency ns (1/(kg*s))
 
-  real(r8), intent(out) :: effc(:,:)         ! droplet effective radius (micron)
-  real(r8), intent(out) :: effc_fn(:,:)      ! droplet effective radius, assuming nc = 1.e8 kg-1
-  real(r8), intent(out) :: effi(:,:)         ! cloud ice effective radius (micron)
-  real(r8), intent(out) :: prect(:)          ! surface precip rate (m/s)
-  real(r8), intent(out) :: preci(:)          ! cloud ice/snow precip rate (m/s)
-  real(r8), intent(out) :: nevapr(:,:)       ! evaporation rate of rain + snow (1/s)
-  real(r8), intent(out) :: evapsnow(:,:)     ! sublimation rate of snow (1/s)
-  real(r8), intent(out) :: prain(:,:)        ! production of rain + snow (1/s)
-  real(r8), intent(out) :: prodsnow(:,:)     ! production of snow (1/s)
-  real(r8), intent(out) :: cmeout(:,:)       ! evap/sub of cloud (1/s)
-  real(r8), intent(out) :: deffi(:,:)        ! ice effective diameter for optics (radiation) (micron)
-  real(r8), intent(out) :: pgamrad(:,:)      ! ice gamma parameter for optics (radiation) (no units)
-  real(r8), intent(out) :: lamcrad(:,:)      ! slope of droplet distribution for optics (radiation) (1/m)
-  real(r8), intent(out) :: qsout(:,:)        ! snow mixing ratio (kg/kg)
-  real(r8), intent(out) :: dsout(:,:)        ! snow diameter (m)
-  real(r8), intent(out) :: rflx(:,:)         ! grid-box average rain flux (kg m^-2 s^-1)
-  real(r8), intent(out) :: sflx(:,:)         ! grid-box average snow flux (kg m^-2 s^-1)
-  real(r8), intent(out) :: qrout(:,:)        ! grid-box average rain mixing ratio (kg/kg)
-  real(r8), intent(out) :: reff_rain(:,:)    ! rain effective radius (micron)
-  real(r8), intent(out) :: reff_snow(:,:)    ! snow effective radius (micron)
-  real(r8), intent(out) :: qcsevap(:,:)      ! cloud water evaporation due to sedimentation (1/s)
-  real(r8), intent(out) :: qisevap(:,:)      ! cloud ice sublimation due to sublimation (1/s)
-  real(r8), intent(out) :: qvres(:,:)        ! residual condensation term to ensure RH < 100% (1/s)
-  real(r8), intent(out) :: cmeitot(:,:)       ! grid-mean cloud ice sub/dep (1/s)
-  real(r8), intent(out) :: vtrmc(:,:)        ! mass-weighted cloud water fallspeed (m/s)
-  real(r8), intent(out) :: vtrmi(:,:)        ! mass-weighted cloud ice fallspeed (m/s)
-  real(r8), intent(out) :: umr(:,:)          ! mass weighted rain fallspeed (m/s)
-  real(r8), intent(out) :: ums(:,:)          ! mass weighted snow fallspeed (m/s)
-  real(r8), intent(out) :: qcsedten(:,:)     ! qc sedimentation tendency (1/s)
-  real(r8), intent(out) :: qisedten(:,:)     ! qi sedimentation tendency (1/s)
-  real(r8), intent(out) :: qrsedten(:,:)     ! qr sedimentation tendency (1/s)
-  real(r8), intent(out) :: qssedten(:,:)     ! qs sedimentation tendency (1/s)
+  real(r8), intent(out) :: effco(:,:)         ! droplet effective radius (micron)
+  real(r8), intent(out) :: effco_fn(:,:)      ! droplet effective radius, assuming nc = 1.e8 kg-1
+  real(r8), intent(out) :: effio(:,:)         ! cloud ice effective radius (micron)
+  real(r8), intent(out) :: precto(:)          ! surface precip rate (m/s)
+  real(r8), intent(out) :: precio(:)          ! cloud ice/snow precip rate (m/s)
+  real(r8), intent(out) :: nevapro(:,:)       ! evaporation rate of rain + snow (1/s)
+  real(r8), intent(out) :: evapsnowo(:,:)     ! sublimation rate of snow (1/s)
+  real(r8), intent(out) :: praino(:,:)        ! production of rain + snow (1/s)
+  real(r8), intent(out) :: prodsnowo(:,:)     ! production of snow (1/s)
+  real(r8), intent(out) :: cmeouto(:,:)       ! evap/sub of cloud (1/s)
+  real(r8), intent(out) :: deffio(:,:)        ! ice effective diameter for optics (radiation) (micron)
+  real(r8), intent(out) :: pgamrado(:,:)      ! ice gamma parameter for optics (radiation) (no units)
+  real(r8), intent(out) :: lamcrado(:,:)      ! slope of droplet distribution for optics (radiation) (1/m)
+  real(r8), intent(out) :: qsouto(:,:)        ! snow mixing ratio (kg/kg)
+  real(r8), intent(out) :: dsouto(:,:)        ! snow diameter (m)
+  real(r8), intent(out) :: rflxo(:,:)         ! grid-box average rain flux (kg m^-2 s^-1)
+  real(r8), intent(out) :: sflxo(:,:)         ! grid-box average snow flux (kg m^-2 s^-1)
+  real(r8), intent(out) :: qrouto(:,:)        ! grid-box average rain mixing ratio (kg/kg)
+  real(r8), intent(out) :: reff_raino(:,:)    ! rain effective radius (micron)
+  real(r8), intent(out) :: reff_snowo(:,:)    ! snow effective radius (micron)
+  real(r8), intent(out) :: qcsevapo(:,:)      ! cloud water evaporation due to sedimentation (1/s)
+  real(r8), intent(out) :: qisevapo(:,:)      ! cloud ice sublimation due to sublimation (1/s)
+  real(r8), intent(out) :: qvreso(:,:)        ! residual condensation term to ensure RH < 100% (1/s)
+  real(r8), intent(out) :: cmeiout(:,:)       ! grid-mean cloud ice sub/dep (1/s)
+  real(r8), intent(out) :: vtrmco(:,:)        ! mass-weighted cloud water fallspeed (m/s)
+  real(r8), intent(out) :: vtrmio(:,:)        ! mass-weighted cloud ice fallspeed (m/s)
+  real(r8), intent(out) :: umso(:,:)          ! mass weighted snow fallspeed (m/s)
+  real(r8), intent(out) :: umro(:,:)          ! mass weighted rain fallspeed (m/s)
+  real(r8), intent(out) :: qcsedteno(:,:)     ! qc sedimentation tendency (1/s)
+  real(r8), intent(out) :: qisedteno(:,:)     ! qi sedimentation tendency (1/s)
+  real(r8), intent(out) :: qrsedteno(:,:)     ! qr sedimentation tendency (1/s)
+  real(r8), intent(out) :: qssedteno(:,:)     ! qs sedimentation tendency (1/s)
 
   ! microphysical process rates for output (mixing ratio tendencies) (all have units of 1/s)
-  real(r8), intent(out) :: pratot(:,:)          ! accretion of cloud by rain
-  real(r8), intent(out) :: prctot(:,:)          ! autoconversion of cloud to rain
-  real(r8), intent(out) :: mnuccctot(:,:)       ! mixing ratio tend due to immersion freezing
-  real(r8), intent(out) :: mnuccttot(:,:)       ! mixing ratio tend due to contact freezing
-  real(r8), intent(out) :: msacwitot(:,:)       ! mixing ratio tend due to H-M splintering
-  real(r8), intent(out) :: psacwstot(:,:)       ! collection of cloud water by snow
-  real(r8), intent(out) :: bergstot(:,:)        ! bergeron process on snow
-  real(r8), intent(out) :: bergtot(:,:)         ! bergeron process on cloud ice
-  real(r8), intent(out) :: melttot(:,:)         ! melting of cloud ice
-  real(r8), intent(out) :: homotot(:,:)         ! homogeneous freezing cloud water
-  real(r8), intent(out) :: qcrestot(:,:)        ! residual cloud condensation due to removal of excess supersat
-  real(r8), intent(out) :: prcitot(:,:)         ! autoconversion of cloud ice to snow
-  real(r8), intent(out) :: praitot(:,:)         ! accretion of cloud ice by snow
-  real(r8), intent(out) :: qirestot(:,:)        ! residual ice deposition due to removal of excess supersat
-  real(r8), intent(out) :: mnuccrtot(:,:)       ! mixing ratio tendency due to heterogeneous freezing of rain to snow (1/s)
-  real(r8), intent(out) :: pracstot(:,:)        ! mixing ratio tendency due to accretion of rain by snow (1/s)
-  real(r8), intent(out) :: meltsdttot(:,:)      ! latent heating rate due to melting of snow  (W/kg)
-  real(r8), intent(out) :: frzrdttot(:,:)       ! latent heating rate due to homogeneous freezing of rain (W/kg)
-  real(r8), intent(out) :: mnuccdtot(:,:)       ! mass tendency from ice nucleation
-  real(r8), intent(out) :: nrout(:,:)        ! rain number concentration (1/m3)
-  real(r8), intent(out) :: nsout(:,:)        ! snow number concentration (1/m3)
-  real(r8), intent(out) :: refl(:,:)         ! analytic radar reflectivity
-  real(r8), intent(out) :: arefl(:,:)        ! average reflectivity will zero points outside valid range
-  real(r8), intent(out) :: areflz(:,:)       ! average reflectivity in z.
-  real(r8), intent(out) :: frefl(:,:)        ! fractional occurrence of radar reflectivity
-  real(r8), intent(out) :: csrfl(:,:)        ! cloudsat reflectivity
-  real(r8), intent(out) :: acsrfl(:,:)       ! cloudsat average
-  real(r8), intent(out) :: fcsrfl(:,:)       ! cloudsat fractional occurrence of radar reflectivity
-  real(r8), intent(out) :: rercld(:,:)       ! effective radius calculation for rain + cloud
-  real(r8), intent(out) :: ncai(:,:)         ! output number conc of ice nuclei available (1/m3)
-  real(r8), intent(out) :: ncal(:,:)         ! output number conc of CCN (1/m3)
-  real(r8), intent(out) :: qrout2(:,:)       ! copy of qrout as used to compute drout2
-  real(r8), intent(out) :: qsout2(:,:)       ! copy of qsout as used to compute dsout2
-  real(r8), intent(out) :: nrout2(:,:)       ! copy of nrout as used to compute drout2
-  real(r8), intent(out) :: nsout2(:,:)       ! copy of nsout as used to compute dsout2
-  real(r8), intent(out) :: drout2(:,:)       ! mean rain particle diameter (m)
-  real(r8), intent(out) :: dsout2(:,:)       ! mean snow particle diameter (m)
-  real(r8), intent(out) :: freqs(:,:)        ! fractional occurrence of snow
-  real(r8), intent(out) :: freqr(:,:)        ! fractional occurrence of rain
-  real(r8), intent(out) :: nfice(:,:)        ! fractional occurrence of ice
-  real(r8), intent(out) :: qcrat(:,:)        ! limiter for qc process rates (1=no limit --> 0. no qc)
+  real(r8), intent(out) :: prao(:,:)          ! accretion of cloud by rain
+  real(r8), intent(out) :: prco(:,:)          ! autoconversion of cloud to rain
+  real(r8), intent(out) :: mnuccco(:,:)       ! mixing ratio tend due to immersion freezing
+  real(r8), intent(out) :: mnuccto(:,:)       ! mixing ratio tend due to contact freezing
+  real(r8), intent(out) :: msacwio(:,:)       ! mixing ratio tend due to H-M splintering
+  real(r8), intent(out) :: psacwso(:,:)       ! collection of cloud water by snow
+  real(r8), intent(out) :: bergso(:,:)        ! bergeron process on snow
+  real(r8), intent(out) :: bergo(:,:)         ! bergeron process on cloud ice
+  real(r8), intent(out) :: melto(:,:)         ! melting of cloud ice
+  real(r8), intent(out) :: homoo(:,:)         ! homogeneous freezing cloud water
+  real(r8), intent(out) :: qcreso(:,:)        ! residual cloud condensation due to removal of excess supersat
+  real(r8), intent(out) :: prcio(:,:)         ! autoconversion of cloud ice to snow
+  real(r8), intent(out) :: praio(:,:)         ! accretion of cloud ice by snow
+  real(r8), intent(out) :: qireso(:,:)        ! residual ice deposition due to removal of excess supersat
+  real(r8), intent(out) :: mnuccro(:,:)       ! mixing ratio tendency due to heterogeneous freezing of rain to snow (1/s)
+  real(r8), intent(out) :: pracso(:,:)        ! mixing ratio tendency due to accretion of rain by snow (1/s)
+  real(r8), intent(out) :: meltsdto(:,:)      ! latent heating rate due to melting of snow  (W/kg)
+  real(r8), intent(out) :: frzrdto(:,:)       ! latent heating rate due to homogeneous freezing of rain (W/kg)
+  real(r8), intent(out) :: mnuccdo(:,:)       ! mass tendency from ice nucleation
+  real(r8), intent(out) :: nrouto(:,:)        ! rain number concentration (1/m3)
+  real(r8), intent(out) :: nsouto(:,:)        ! snow number concentration (1/m3)
+  real(r8), intent(out) :: reflo(:,:)         ! analytic radar reflectivity
+  real(r8), intent(out) :: areflo(:,:)        ! average reflectivity will zero points outside valid range
+  real(r8), intent(out) :: areflzo(:,:)       ! average reflectivity in z.
+  real(r8), intent(out) :: freflo(:,:)        ! fractional occurrence of radar reflectivity
+  real(r8), intent(out) :: csrflo(:,:)        ! cloudsat reflectivity
+  real(r8), intent(out) :: acsrflo(:,:)       ! cloudsat average
+  real(r8), intent(out) :: fcsrflo(:,:)       ! cloudsat fractional occurrence of radar reflectivity
+  real(r8), intent(out) :: rercldo(:,:)       ! effective radius calculation for rain + cloud
+  real(r8), intent(out) :: ncaio(:,:)         ! output number conc of ice nuclei available (1/m3)
+  real(r8), intent(out) :: ncalo(:,:)         ! output number conc of CCN (1/m3)
+  real(r8), intent(out) :: qrouto2(:,:)       ! copy of qrout as used to compute drout2
+  real(r8), intent(out) :: qsouto2(:,:)       ! copy of qsout as used to compute dsout2
+  real(r8), intent(out) :: nrouto2(:,:)       ! copy of nrout as used to compute drout2
+  real(r8), intent(out) :: nsouto2(:,:)       ! copy of nsout as used to compute dsout2
+  real(r8), intent(out) :: drouto2(:,:)       ! mean rain particle diameter (m)
+  real(r8), intent(out) :: dsouto2(:,:)       ! mean snow particle diameter (m)
+  real(r8), intent(out) :: freqso(:,:)        ! fractional occurrence of snow
+  real(r8), intent(out) :: freqro(:,:)        ! fractional occurrence of rain
+  real(r8), intent(out) :: nficeo(:,:)        ! fractional occurrence of ice
+  real(r8), intent(out) :: qcrato(:,:)        ! limiter for qc process rates (1=no limit --> 0. no qc)
 
-  real(r8), intent(out) :: prer_evap(:,:)
+  real(r8), intent(out) :: prer_evapo(:,:)
 
   character(128),   intent(out) :: errstring  ! output status (non-blank for error return)
 
@@ -571,19 +590,21 @@ subroutine micro_mg_tend ( &
 
   ! Used with CARMA cirrus microphysics
   ! (or similar external microphysics model)
-  real(r8), intent(in), pointer :: tnd_qsnow(:,:) ! snow mass tendency (kg/kg/s)
-  real(r8), intent(in), pointer :: tnd_nsnow(:,:) ! snow number tendency (#/kg/s)
-  real(r8), intent(in), pointer :: re_ice(:,:)    ! ice effective radius (m)
+  real(r8), intent(in) :: tnd_qsnown(:,:) ! snow mass tendency (kg/kg/s)
+  real(r8), intent(in) :: tnd_nsnown(:,:) ! snow number tendency (#/kg/s)
+  real(r8), intent(in) :: re_icen(:,:)    ! ice effective radius (m)
 
   ! From external ice nucleation.
-  real(r8), intent(in), pointer :: frzimm(:,:) ! Number tendency due to immersion freezing (1/cm3)
-  real(r8), intent(in), pointer :: frzcnt(:,:) ! Number tendency due to contact freezing (1/cm3)
-  real(r8), intent(in), pointer :: frzdep(:,:) ! Number tendency due to deposition nucleation (1/cm3)
+  real(r8), intent(in) :: frzimmn(:,:) ! Number tendency due to immersion freezing (1/cm3)
+  real(r8), intent(in) :: frzcntn(:,:) ! Number tendency due to contact freezing (1/cm3)
+  real(r8), intent(in) :: frzdepn(:,:) ! Number tendency due to deposition nucleation (1/cm3)
 
   ! local workspace
   ! all units mks unless otherwise stated
 
   ! local copies of input variables
+  real(r8) :: q(mgncol,nlev)       ! water vapor mixing ratio (kg/kg)
+  real(r8) :: t(mgncol,nlev)       ! temperature (K)
   real(r8) :: qc(mgncol,nlev)      ! cloud liquid mixing ratio (kg/kg)
   real(r8) :: qi(mgncol,nlev)      ! cloud ice mixing ratio (kg/kg)
   real(r8) :: nc(mgncol,nlev)      ! cloud liquid number concentration (1/kg)
@@ -592,6 +613,122 @@ subroutine micro_mg_tend ( &
   real(r8) :: qs(mgncol,nlev)      ! snow mixing ratio (kg/kg)
   real(r8) :: nr(mgncol,nlev)      ! rain number concentration (1/kg)
   real(r8) :: ns(mgncol,nlev)      ! snow number concentration (1/kg)
+
+  real(r8) :: p(mgncol,nlev)       ! pressure (Pa)
+  real(r8) :: pdel(mgncol,nlev)    ! pressure difference across level (Pa)
+
+  real(r8) :: naai(mgncol,nlev)    ! ice nucleation number (from microp_aero_ts) (1/kg)
+  real(r8) :: npccn(mgncol,nlev)   ! ccn activated number tendency (from microp_aero_ts) (1/kg*s)
+
+  real(r8) :: relvar(mgncol,nlev)      ! cloud water relative variance (-)
+  real(r8) :: accre_enhan(mgncol,nlev) ! optional accretion enhancement factor (-)
+
+  ! These were made allocatable because of a problem on PGI (possibly
+  ! exceeding the stack size limit on some machines).
+  real(r8), allocatable :: rndst(:,:,:)
+  real(r8), allocatable :: nacon(:,:,:)
+
+  real(r8) :: tnd_qsnow(mgncol,nlev) ! snow mass tendency (kg/kg/s)
+  real(r8) :: tnd_nsnow(mgncol,nlev) ! snow number tendency (#/kg/s)
+  real(r8) :: re_ice(mgncol,nlev)    ! ice effective radius (m)
+
+  real(r8) :: frzimm(mgncol,nlev) ! Number tendency due to immersion freezing (1/cm3)
+  real(r8) :: frzcnt(mgncol,nlev) ! Number tendency due to contact freezing (1/cm3)
+  real(r8) :: frzdep(mgncol,nlev) ! Number tendency due to deposition nucleation (1/cm3)
+
+
+  ! Packed copies of output variables
+  real(r8) :: tlat(mgncol,nlev)      ! latent heating rate       (W/kg)
+  real(r8) :: qvlat(mgncol,nlev)     ! microphysical tendency qv (1/s)
+  real(r8) :: qctend(mgncol,nlev)    ! microphysical tendency qc (1/s)
+  real(r8) :: qitend(mgncol,nlev)    ! microphysical tendency qi (1/s)
+  real(r8) :: nctend(mgncol,nlev)    ! microphysical tendency nc (1/(kg*s))
+  real(r8) :: nitend(mgncol,nlev)    ! microphysical tendency ni (1/(kg*s))
+
+  real(r8) :: effc(mgncol,nlev)      ! droplet effective radius (micron)
+  real(r8) :: effc_fn(mgncol,nlev)   ! droplet effective radius, assuming nc = 1.e8 kg-1
+  real(r8) :: effi(mgncol,nlev)      ! cloud ice effective radius (micron)
+
+  real(r8) :: prect(mgncol)          ! surface precip rate (m/s)
+  real(r8) :: preci(mgncol)          ! cloud ice/snow precip rate (m/s)
+
+  real(r8) :: nevapr(mgncol,nlev)    ! evaporation rate of rain + snow (1/s)
+  real(r8) :: evapsnow(mgncol,nlev)  ! sublimation rate of snow (1/s)
+  real(r8) :: prain(mgncol,nlev)     ! production of rain + snow (1/s)
+  real(r8) :: prodsnow(mgncol,nlev)  ! production of snow (1/s)
+  real(r8) :: cmeout(mgncol,nlev)    ! evap/sub of cloud (1/s)
+  real(r8) :: deffi(mgncol,nlev)     ! ice effective diameter for optics (radiation) (micron)
+  real(r8) :: pgamrad(mgncol,nlev)   ! ice gamma parameter for optics (radiation) (no units)
+  real(r8) :: lamcrad(mgncol,nlev)   ! slope of droplet distribution for optics (radiation) (1/m)
+
+
+  real(r8) :: qsout(mgncol,nlev)     ! snow mixing ratio (kg/kg)
+  real(r8) :: qsout2(mgncol,nlev)    ! copy of qsout as used to compute dsout2
+  real(r8) :: nsout(mgncol,nlev)     ! snow number concentration (1/m3)
+  real(r8) :: nsout2(mgncol,nlev)    ! copy of nsout as used to compute dsout2
+  real(r8) :: dsout(mgncol,nlev)     ! snow diameter (m)
+  real(r8) :: dsout2(mgncol,nlev)    ! mean snow particle diameter (m)
+
+  real(r8) :: qrout(mgncol,nlev)     ! grid-box average rain mixing ratio (kg/kg)
+  real(r8) :: qrout2(mgncol,nlev)    ! copy of qrout as used to compute drout2
+  real(r8) :: nrout(mgncol,nlev)     ! rain number concentration (1/m3)
+  real(r8) :: nrout2(mgncol,nlev)    ! copy of nrout as used to compute drout2
+  real(r8) :: drout2(mgncol,nlev)    ! mean rain particle diameter (m)
+
+  real(r8) :: reff_rain(mgncol,nlev) ! rain effective radius (micron)
+  real(r8) :: reff_snow(mgncol,nlev) ! snow effective radius (micron)
+
+  real(r8) :: freqs(mgncol,nlev)     ! fractional occurrence of snow
+  real(r8) :: freqr(mgncol,nlev)     ! fractional occurrence of rain
+
+  real(r8) :: rflx(mgncol,nlev+1)    ! grid-box average rain flux (kg m^-2 s^-1)
+  real(r8) :: sflx(mgncol,nlev+1)    ! grid-box average snow flux (kg m^-2 s^-1)
+
+  real(r8) :: qcsevap(mgncol,nlev)   ! cloud water evaporation due to sedimentation (1/s)
+  real(r8) :: qisevap(mgncol,nlev)   ! cloud ice sublimation due to sublimation (1/s)
+  real(r8) :: qvres(mgncol,nlev)     ! residual condensation term to ensure RH < 100% (1/s)
+  real(r8) :: cmeitot(mgncol,nlev)   ! grid-mean cloud ice sub/dep (1/s)
+  real(r8) :: vtrmc(mgncol,nlev)     ! mass-weighted cloud water fallspeed (m/s)
+  real(r8) :: vtrmi(mgncol,nlev)     ! mass-weighted cloud ice fallspeed (m/s)
+  real(r8) :: qcsedten(mgncol,nlev)  ! qc sedimentation tendency (1/s)
+  real(r8) :: qisedten(mgncol,nlev)  ! qi sedimentation tendency (1/s)
+  real(r8) :: qrsedten(mgncol,nlev)  ! qr sedimentation tendency (1/s)
+  real(r8) :: qssedten(mgncol,nlev)          ! qs sedimentation tendency (1/s)
+
+  real(r8) :: pratot(mgncol,nlev)    ! accretion of cloud by rain
+  real(r8) :: prctot(mgncol,nlev)    ! autoconversion of cloud to rain
+  real(r8) :: mnuccctot(mgncol,nlev) ! mixing ratio tend due to immersion freezing
+  real(r8) :: mnuccttot(mgncol,nlev) ! mixing ratio tend due to contact freezing
+  real(r8) :: msacwitot(mgncol,nlev) ! mixing ratio tend due to H-M splintering
+  real(r8) :: psacwstot(mgncol,nlev) ! collection of cloud water by snow
+  real(r8) :: bergstot(mgncol,nlev)  ! bergeron process on snow
+  real(r8) :: bergtot(mgncol,nlev)   ! bergeron process on cloud ice
+  real(r8) :: melttot(mgncol,nlev)   ! melting of cloud ice
+  real(r8) :: homotot(mgncol,nlev)   ! homogeneous freezing cloud water
+  real(r8) :: qcrestot(mgncol,nlev)  ! residual cloud condensation due to removal of excess supersat
+  real(r8) :: prcitot(mgncol,nlev)   ! autoconversion of cloud ice to snow
+  real(r8) :: praitot(mgncol,nlev)   ! accretion of cloud ice by snow
+  real(r8) :: qirestot(mgncol,nlev)  ! residual ice deposition due to removal of excess supersat
+  real(r8) :: mnuccrtot(mgncol,nlev) ! mixing ratio tendency due to heterogeneous freezing of rain to snow (1/s)
+  real(r8) :: pracstot(mgncol,nlev)  ! mixing ratio tendency due to accretion of rain by snow (1/s)
+  real(r8) :: mnuccdtot(mgncol,nlev) ! mass tendency from ice nucleation
+  real(r8) :: meltsdttot(mgncol,nlev)! latent heating rate due to melting of snow  (W/kg)
+  real(r8) :: frzrdttot(mgncol,nlev) ! latent heating rate due to homogeneous freezing of rain (W/kg)
+
+  real(r8) :: refl(mgncol,nlev)      ! analytic radar reflectivity
+  real(r8) :: arefl(mgncol,nlev)     ! average reflectivity will zero points outside valid range
+  real(r8) :: areflz(mgncol,nlev)    ! average reflectivity in z.
+  real(r8) :: frefl(mgncol,nlev)     ! fractional occurrence of radar reflectivity
+  real(r8) :: csrfl(mgncol,nlev)     ! cloudsat reflectivity
+  real(r8) :: acsrfl(mgncol,nlev)    ! cloudsat average
+  real(r8) :: fcsrfl(mgncol,nlev)    ! cloudsat fractional occurrence of radar reflectivity
+
+  real(r8) :: rercld(mgncol,nlev)    ! effective radius calculation for rain + cloud
+
+  real(r8) :: nfice(mgncol,nlev)     ! fractional occurrence of ice
+
+  real(r8) :: ncai(mgncol,nlev)      ! output number conc of ice nuclei available (1/m3)
+  real(r8) :: ncal(mgncol,nlev)      ! output number conc of CCN (1/m3)
 
   ! general purpose variables
   real(r8) :: deltat            ! sub-time step (s)
@@ -708,11 +845,17 @@ subroutine micro_mg_tend ( &
   real(r8) :: berg(mgncol,nlev)   ! mass mixing ratio (cloud ice)
   real(r8) :: bergs(mgncol,nlev)  ! mass mixing ratio (snow)
 
+  real(r8) :: qcrat(mgncol,nlev)  ! ratio for qc limiter
+
+  real(r8) :: prer_evap(mgncol,nlev)
 
   ! fallspeeds
   ! number-weighted
   real(r8) :: uns(mgncol,nlev)    ! snow
   real(r8) :: unr(mgncol,nlev)    ! rain
+  ! mass-weighted
+  real(r8) :: ums(mgncol,nlev)    ! snow
+  real(r8) :: umr(mgncol,nlev)    ! rain
   ! air density corrected fallspeed parameters
   real(r8) :: arn(mgncol,nlev)    ! rain
   real(r8) :: asn(mgncol,nlev)    ! snow
@@ -772,6 +915,12 @@ subroutine micro_mg_tend ( &
   real(r8) :: faltnds
   real(r8) :: faltndns
 
+  ! sum of source/sink terms for diagnostic precip
+  real(r8) :: qstend(mgncol,nlev)     ! snow mixing ratio
+  real(r8) :: nstend(mgncol,nlev)     ! snow number concentration
+  real(r8) :: qrtend(mgncol,nlev)     ! rain mixing ratio
+  real(r8) :: nrtend(mgncol,nlev)     ! rain number concentration
+
   real(r8) :: rainrt(mgncol,nlev)     ! rain rate for reflectivity calculation
 
   ! dummy variables
@@ -809,32 +958,72 @@ subroutine micro_mg_tend ( &
   ! default return error message
   errstring = ' '
 
-  if (.not. (do_cldice .or. &
-       (associated(tnd_qsnow) .and. associated(tnd_nsnow) .and. associated(re_ice)))) then
-     errstring = "MG's native cloud ice processes are disabled, but &
-          &no replacement values were passed in."
-  end if
-
-  if (use_hetfrz_classnuc .and. (.not. &
-       (associated(frzimm) .and. associated(frzcnt) .and. associated(frzdep)))) then
-     errstring = "External heterogeneous freezing is enabled, but the &
-          &required tendencies were not all passed in."
-  end if
-
   ! Process inputs
 
   ! assign variable deltat to deltatin
   deltat = deltatin
 
+  call pack_array(     qn, mgcols, top_lev,     q)
+  call pack_array(     tn, mgcols, top_lev,     t)
+  call pack_array(    qcn, mgcols, top_lev,    qc)
+  call pack_array(    qin, mgcols, top_lev,    qi)
+  call pack_array(    ncn, mgcols, top_lev,    nc)
+  call pack_array(    nin, mgcols, top_lev,    ni)
+  call pack_array(    qrn, mgcols, top_lev,    qr)
+  call pack_array(    qsn, mgcols, top_lev,    qs)
+  call pack_array(    nrn, mgcols, top_lev,    nr)
+  call pack_array(    nsn, mgcols, top_lev,    ns)
+
+  ! Relative variance used only if microp_uniform = .false.
+  call pack_array(relvarn, mgcols, top_lev,relvar)
+  call pack_array(accre_enhann, mgcols, top_lev, accre_enhan)
+
+  call pack_array(     pn, mgcols, top_lev,     p)
+  call pack_array(  pdeln, mgcols, top_lev,  pdel)
+
+  call pack_array(  naain, mgcols, top_lev,  naai)
+  call pack_array(npccnin, mgcols, top_lev, npccn)
+
+  ! These are allocated instead of used as automatic arrays
+  ! purely to work around a PGI bug.
+  allocate(rndst(mgncol,nlev,size(rndstn,3)))
+  allocate(nacon(mgncol,nlev,size(rndstn,3)))
+  call pack_array( rndstn, mgcols, top_lev, rndst)
+  call pack_array(naconin, mgcols, top_lev, nacon)
+
+  if (.not. do_cldice) then
+     call pack_array(tnd_qsnown, mgcols, top_lev, tnd_qsnow)
+     call pack_array(tnd_nsnown, mgcols, top_lev, tnd_nsnow)
+     call pack_array(   re_icen, mgcols, top_lev,    re_ice)
+  end if
+
+  if (use_hetfrz_classnuc) then
+     call pack_array(frzimmn, mgcols, top_lev, frzimm)
+     call pack_array(frzcntn, mgcols, top_lev, frzcnt)
+     call pack_array(frzdepn, mgcols, top_lev, frzdep)
+  end if
+
+  ! if (.not. (do_cldice .or. &
+  !      (associated(tnd_qsnow) .and. associated(tnd_nsnow) .and. associated(re_ice)))) then
+  !    errstring = "MG's native cloud ice processes are disabled, but &
+  !         &no replacement values were passed in."
+  ! end if
+
+  ! if (use_hetfrz_classnuc .and. (.not. &
+  !      (associated(frzimm) .and. associated(frzcnt) .and. associated(frzdep)))) then
+  !    errstring = "External heterogeneous freezing is enabled, but the &
+  !         &required tendencies were not all passed in."
+  ! end if
+
   ! Copies of input concentrations that may be changed internally.
-  qc = qcn
-  nc = ncn
-  qi = qin
-  ni = nin
-  qr = qrn
-  nr = nrn
-  qs = qsn
-  ns = nsn
+  ! qc = qcn
+  ! nc = ncn
+  ! qi = qin
+  ! ni = nin
+  ! qr = qrn
+  ! nr = nrn
+  ! qs = qsn
+  ! ns = nsn
 
 !!== KZ_DCS
   call get_dcst(mgncol,nlev,t,dcst)
@@ -1982,24 +2171,24 @@ subroutine micro_mg_tend ( &
   !================================================================================
 
   ! Re-apply droplet activation tendency
-  nc = ncn
+  call pack_array(ncn, mgcols, top_lev, nc)
   nctend = nctend + npccn
 
   ! Re-apply rain freezing and snow melting.
   dum_2D = qs
-  qs = qsn
+  call pack_array(qsn, mgcols, top_lev, qs)
   qstend = qstend + (dum_2D-qs)/deltat
 
   dum_2D = ns
-  ns = nsn
+  call pack_array(nsn, mgcols, top_lev, ns)
   nstend = nstend + (dum_2D-ns)/deltat
 
   dum_2D = qr
-  qr = qrn
+  call pack_array(qrn, mgcols, top_lev, qr)
   qrtend = qrtend + (dum_2D-qr)/deltat
 
   dum_2D = nr
-  nr = nrn
+  call pack_array(nrn, mgcols, top_lev, nr)
   nrtend = nrtend + (dum_2D-nr)/deltat
 
   !.............................................................................
@@ -2917,6 +3106,132 @@ subroutine micro_mg_tend ( &
      nfice=0._r8
   end where
 
+
+  ! Unpack all outputs
+
+  ! Avoid zero/near-zero division.
+  ! qcsinksum_rate1ord = qcsinksum_rate1ord/max(qcsum_rate1ord,1.0e-30_r8)
+
+  ! call unpack_array(qcsinksum_rate1ord, mgcols, top_lev, 0._r8, rate1ord_cw2pr_st)
+
+  call unpack_array(tlat, mgcols, top_lev, 0._r8, tlato)
+  call unpack_array(qvlat, mgcols, top_lev, 0._r8, qvlato)
+
+  call unpack_array(qctend, mgcols, top_lev, 0._r8, qctendo)
+  call unpack_array(qitend, mgcols, top_lev, 0._r8, qitendo)
+
+  ! hm mg2******
+  call unpack_array(qrtend, mgcols, top_lev, 0._r8, qrtendo)
+  call unpack_array(qstend, mgcols, top_lev, 0._r8, qstendo)
+
+  ! Note that where there is no water, we set nctend and nitend to remove number
+  ! concentration as well.
+  call unpack_array(nctend, mgcols, top_lev, -ncn/deltat, nctendo)
+  if (do_cldice) then
+     call unpack_array(nitend, mgcols, top_lev, -nin/deltat, nitendo)
+  else
+     call unpack_array(nitend, mgcols, top_lev, 0._r8, nitendo)
+  end if
+
+  ! hm mg2 ****note we should apply a similar logic to unpacking of precip number
+  ! as employed for cloud water and ice above
+  call unpack_array(nrtend, mgcols, top_lev, -nrn/deltat, nrtendo)
+  call unpack_array(nstend, mgcols, top_lev, -nsn/deltat, nstendo)
+
+  call unpack_array(effc,    mgcols, top_lev, 10._r8, effco)
+  call unpack_array(effc_fn, mgcols, top_lev, 10._r8, effco_fn)
+  call unpack_array(effi,    mgcols, top_lev, 25._r8, effio)
+
+  call unpack_array(prect, mgcols, 0._r8, precto)
+  call unpack_array(preci, mgcols, 0._r8, precio)
+
+  call unpack_array(nevapr,   mgcols, top_lev, 0._r8, nevapro)
+  call unpack_array(evapsnow, mgcols, top_lev, 0._r8, evapsnowo)
+  call unpack_array(prain,    mgcols, top_lev, 0._r8, praino)
+  call unpack_array(prodsnow, mgcols, top_lev, 0._r8, prodsnowo)
+  call unpack_array(cmeout,   mgcols, top_lev, 0._r8, cmeouto)
+
+  call unpack_array(lamcrad, mgcols, top_lev, 0._r8, lamcrado)
+  call unpack_array(pgamrad, mgcols, top_lev, 0._r8, pgamrado)
+  call unpack_array(deffi,   mgcols, top_lev, 0._r8, deffio)
+
+  call unpack_array(qsout,  mgcols, top_lev, 0._r8, qsouto)
+  call unpack_array(qsout2, mgcols, top_lev, 0._r8, qsouto2)
+  call unpack_array(nsout,  mgcols, top_lev, 0._r8, nsouto)
+  call unpack_array(nsout2, mgcols, top_lev, 0._r8, nsouto2)
+  call unpack_array(dsout,  mgcols, top_lev, 0._r8, dsouto)
+  call unpack_array(dsout2, mgcols, top_lev, 0._r8, dsouto2)
+
+  call unpack_array(qrout,  mgcols, top_lev, 0._r8, qrouto)
+  call unpack_array(qrout2, mgcols, top_lev, 0._r8, qrouto2)
+  call unpack_array(nrout,  mgcols, top_lev, 0._r8, nrouto)
+  call unpack_array(nrout2, mgcols, top_lev, 0._r8, nrouto2)
+  call unpack_array(drout2, mgcols, top_lev, 0._r8, drouto2)
+
+  call unpack_array(reff_rain, mgcols, top_lev, 0._r8, reff_raino)
+  call unpack_array(reff_snow, mgcols, top_lev, 0._r8, reff_snowo)
+
+  call unpack_array(freqs, mgcols, top_lev, 0._r8, freqso)
+  call unpack_array(freqr, mgcols, top_lev, 0._r8, freqro)
+
+  call unpack_array(rflx, mgcols, top_lev, 0._r8, rflxo)
+  call unpack_array(sflx, mgcols, top_lev, 0._r8, sflxo)
+
+  call unpack_array(qcsevap, mgcols, top_lev, 0._r8, qcsevapo)
+  call unpack_array(qisevap, mgcols, top_lev, 0._r8, qisevapo)
+  call unpack_array(qvres,   mgcols, top_lev, 0._r8, qvreso)
+  call unpack_array(cmeitot, mgcols, top_lev, 0._r8, cmeiout)
+  call unpack_array(vtrmc,   mgcols, top_lev, 0._r8, vtrmco)
+  call unpack_array(vtrmi,   mgcols, top_lev, 0._r8, vtrmio)
+  !++ag
+  call unpack_array(ums, mgcols, top_lev, 0._r8, umso)
+  call unpack_array(umr, mgcols, top_lev, 0._r8, umro)
+  !--ag
+  call unpack_array(qcsedten, mgcols, top_lev, 0._r8, qcsedteno)
+  call unpack_array(qisedten, mgcols, top_lev, 0._r8, qisedteno)
+  call unpack_array(qrsedten, mgcols, top_lev, 0._r8, qrsedteno)
+  call unpack_array(qssedten, mgcols, top_lev, 0._r8, qssedteno)
+
+  call unpack_array(pratot,     mgcols,top_lev, 0._r8, prao)
+  call unpack_array(prctot,     mgcols,top_lev, 0._r8, prco)
+  call unpack_array(mnuccctot,  mgcols,top_lev, 0._r8, mnuccco)
+  call unpack_array(mnuccttot,  mgcols,top_lev, 0._r8, mnuccto)
+  call unpack_array(msacwitot,  mgcols,top_lev, 0._r8, msacwio)
+  call unpack_array(psacwstot,  mgcols,top_lev, 0._r8, psacwso)
+  call unpack_array(bergstot,   mgcols,top_lev, 0._r8, bergso)
+  call unpack_array(bergtot,    mgcols,top_lev, 0._r8, bergo)
+  call unpack_array(melttot,    mgcols,top_lev, 0._r8, melto)
+  call unpack_array(homotot,    mgcols,top_lev, 0._r8, homoo)
+  call unpack_array(qcrestot,   mgcols,top_lev, 0._r8, qcreso)
+  call unpack_array(prcitot,    mgcols,top_lev, 0._r8, prcio)
+  call unpack_array(praitot,    mgcols,top_lev, 0._r8, praio)
+  call unpack_array(qirestot,   mgcols,top_lev, 0._r8, qireso)
+  call unpack_array(mnuccrtot,  mgcols,top_lev, 0._r8, mnuccro)
+  call unpack_array(pracstot,   mgcols,top_lev, 0._r8, pracso)
+  call unpack_array(mnuccdtot,  mgcols,top_lev, 0._r8, mnuccdo)
+  call unpack_array(meltsdttot, mgcols,top_lev, 0._r8, meltsdto)
+  call unpack_array(frzrdttot,  mgcols,top_lev, 0._r8, frzrdto)
+
+  call unpack_array(refl,   mgcols, top_lev, -9999._r8, reflo)
+  call unpack_array(arefl,  mgcols, top_lev, 0._r8, areflo)
+  call unpack_array(areflz, mgcols, top_lev, 0._r8, areflzo)
+  call unpack_array(frefl,  mgcols, top_lev, 0._r8, freflo)
+  call unpack_array(csrfl,  mgcols, top_lev, -9999._r8, csrflo)
+  call unpack_array(acsrfl, mgcols, top_lev, 0._r8, acsrflo)
+  call unpack_array(fcsrfl, mgcols, top_lev, 0._r8, fcsrflo)
+
+  call unpack_array(rercld, mgcols, top_lev, 0._r8, rercldo)
+
+  call unpack_array(nfice, mgcols, top_lev, 0._r8, nficeo)
+
+  call unpack_array(qcrat, mgcols, top_lev, 1._r8, qcrato)
+
+  call unpack_array(ncai, mgcols, top_lev, 0._r8, ncaio)
+  call unpack_array(ncal, mgcols, top_lev, 0._r8, ncalo)
+
+  call unpack_array(prer_evap, mgcols, top_lev, 1._r8, prer_evapo)
+
+
 end subroutine micro_mg_tend
 
 !========================================================================
@@ -3010,6 +3325,157 @@ pure subroutine micro_mg_get_cols(ncol, nlev, top_lev, qcn, qin, &
   end do
 
 end subroutine micro_mg_get_cols
+
+! Subroutines to pack arrays into smaller, contiguous pieces
+!========================================================================
+! Rank 1 array of reals, columns only
+pure subroutine pack_array_1Dr8(old_array, cols, new_array)
+  ! Inputs
+  real(r8), intent(in)  :: old_array(:)   ! Array to be packed
+  integer,  intent(in)  :: cols(:)        ! List of columns to include
+
+  ! Output
+  real(r8), intent(out) :: new_array(:)
+
+  ! Attempt to speed up packing if it is unnecessary.
+  if (size(new_array) == size(old_array)) then
+     new_array = old_array
+  else
+     new_array = old_array(cols)
+  end if
+
+end subroutine pack_array_1Dr8
+
+! Rank 2 array of reals, columns and levels
+pure subroutine pack_array_2Dr8(old_array, cols, top_lev, new_array)
+  ! Inputs
+  real(r8), intent(in)  :: old_array(:,:) ! Array to be packed
+  integer,  intent(in)  :: cols(:)        ! List of columns to include
+  integer,  intent(in)  :: top_lev        ! First level to use
+
+  ! Output
+  real(r8), intent(out) :: new_array(:,:)
+
+  ! Attempt to speed up packing if it is unnecessary.
+  if (size(new_array) == size(old_array)) then
+     new_array = old_array
+  else
+     new_array = old_array(cols, top_lev:)
+  end if
+
+end subroutine pack_array_2Dr8
+
+! Rank 3 array of reals, assume last index is extra
+pure subroutine pack_array_3Dr8(old_array, cols, top_lev, new_array)
+  ! Inputs
+  real(r8), intent(in)  :: old_array(:,:,:) ! Array to be packed
+  integer,  intent(in)  :: cols(:)          ! List of columns to include
+  integer,  intent(in)  :: top_lev          ! First level to use
+
+  ! Output
+  real(r8), intent(out) :: new_array(:,:,:)
+
+  ! Attempt to speed up packing if it is unnecessary.
+  if (size(new_array) == size(old_array)) then
+     new_array = old_array
+  else
+     new_array = old_array(cols, top_lev:,:)
+  end if
+
+end subroutine pack_array_3Dr8
+
+! Subroutines to unpack arrays for output
+!========================================================================
+! Rank 1 array of reals, columns only
+pure subroutine unpack_array_1Dr8(old_array, cols, fill, new_array)
+  ! Inputs
+  real(r8), intent(in)  :: old_array(:)   ! Array to be packed
+  integer,  intent(in)  :: cols(:)        ! List of columns to include
+  real(r8), intent(in)  :: fill           ! Value with which to fill unused
+  ! sections of new_array.
+
+  ! Output
+  real(r8), intent(out) :: new_array(:)
+
+  ! Attempt to speed up packing if it is unnecessary.
+  if (size(new_array) == size(old_array)) then
+     new_array = old_array
+  else
+     new_array = fill
+
+     new_array(cols) = old_array
+  end if
+
+end subroutine unpack_array_1Dr8
+
+! Rank 1 array of reals, columns only, "fill" value is an array
+pure subroutine unpack_array_1Dr8_arrayfill(old_array, cols, fill, new_array)
+  ! Inputs
+  real(r8), intent(in)  :: old_array(:)   ! Array to be packed
+  integer,  intent(in)  :: cols(:)        ! List of columns to include
+  real(r8), intent(in)  :: fill(:)        ! Value with which to fill unused
+  ! sections of new_array.
+
+  ! Output
+  real(r8), intent(out) :: new_array(:)
+
+  ! Attempt to speed up packing if it is unnecessary.
+  if (size(new_array) == size(old_array)) then
+     new_array = old_array
+  else
+     new_array = fill
+
+     new_array(cols) = old_array
+  end if
+
+end subroutine unpack_array_1Dr8_arrayfill
+
+! Rank 2 array of reals, columns and levels
+pure subroutine unpack_array_2Dr8(old_array, cols, top_lev, fill, new_array)
+  ! Inputs
+  real(r8), intent(in)  :: old_array(:,:) ! Array to be packed
+  integer,  intent(in)  :: cols(:)        ! List of columns to include
+  integer,  intent(in)  :: top_lev        ! First level to use
+  real(r8), intent(in)  :: fill           ! Value with which to fill unused
+  ! sections of new_array.
+
+  ! Output
+  real(r8), intent(out) :: new_array(:,:)
+
+  ! Attempt to speed up packing if it is unnecessary.
+  if (size(new_array) == size(old_array)) then
+     new_array = old_array
+  else
+     new_array = fill
+
+     new_array(cols, top_lev:) = old_array
+  end if
+
+end subroutine unpack_array_2Dr8
+
+! Rank 2 array of reals, columns and levels, "fill" value is an array
+pure subroutine unpack_array_2Dr8_arrayfill(old_array, cols, top_lev, fill, new_array)
+  ! Inputs
+  real(r8), intent(in)  :: old_array(:,:) ! Array to be packed
+  integer,  intent(in)  :: cols(:)        ! List of columns to include
+  integer,  intent(in)  :: top_lev        ! First level to use
+  real(r8), intent(in)  :: fill(:,:)      ! Value with which to fill unused
+  ! sections of new_array.
+
+  ! Output
+  real(r8), intent(out) :: new_array(:,:)
+
+  ! Attempt to speed up packing if it is unnecessary.
+  if (size(new_array) == size(old_array)) then
+     new_array = old_array
+  else
+     new_array = fill
+
+     new_array(cols, top_lev:) = old_array
+  end if
+
+end subroutine unpack_array_2Dr8_arrayfill
+
 
 
 !!== KZ_DCS
