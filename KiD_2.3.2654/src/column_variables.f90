@@ -43,6 +43,11 @@
          ,x_half(0:nx+1) & ! horizontal half levels (m)
          ,v_half(nz,0:nx+1)   ! horizontal winds on half horiz. grid (m/s)
           
+    ! extra interface level variables    
+    real(kind=wp) :: &
+          exner_half(0:nz, 0:nx+1) &          ! exner pressure
+         ,pmb_half(0:nz, 0:nx+1) = unset_real ! Pressure in mb on interface
+
     !grid spacing
     real(kind=wp) ::      &
           dz(nz)          &   ! dz (m)

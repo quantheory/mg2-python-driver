@@ -13,7 +13,7 @@ Module derived_fields
   Use column_variables
   Use interpolation, only: interpolate, make_wgrid, make_vgrid &
        ,interpolate_x
-  Use physconst, only : r_on_cp, g, p0, pi
+  Use physconst, only : r_on_cp, g, p0, pi, cp
 
   Implicit none
 
@@ -25,6 +25,9 @@ contains
     ! in column_variables for use in some 
     ! microphysics schemes
     integer :: k,j
+
+    real(wp) :: dexner_column ! delta exner across column
+    real(wp) :: dexner(nz)    ! delta exner across grid levels
 
     TdegK(:,:)=exner(:,:)*theta(:,:)
     pmb(:,:)=.01*p0*exner(:,:)**(1./r_on_cp)
@@ -68,6 +71,24 @@ contains
        dx_half(:) = 1.
     endif
        
+    ! interface pressures
+    dexner(1)=g*z_half(1)/(cp*theta_ref(1))
+    do k=2,nz
+       ! calculate exner difference
+       dexner(k)=g*(z_half(k)-z_half(k-1))/(cp*.5*(theta_ref(k-1)))
+    end do
+ 
+    dexner_column=sum(dexner)
+    
+    exner_half(0,:)=(p_surf/p0)**r_on_cp
+    exner_half(nz,:)=exner_half(0,:)-dexner_column
+    do k=nz-1,1,-1
+       exner_half(k,:)=exner_half(k+1,:)+dexner(k)
+    end do
+ 
+    pmb_half(:,:)=.01*p0*exner_half(:,:)**(1./r_on_cp)
+
+
     
   end subroutine calc_derived_fields
 

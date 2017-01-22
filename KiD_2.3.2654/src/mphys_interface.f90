@@ -8,7 +8,7 @@
 !
 
 module mphys_interface
-
+  
   Use mphys_thompson07, only: mphys_thompson07_interface
   Use mphys_thompson09, only: mphys_thompson09_interface
   Use mphys_morr_two_moment, only: mphys_morrison_interface
@@ -19,16 +19,18 @@ module mphys_interface
 #if SHIPWAY_MICRO == 1
   Use mphys_4A, only: mphys_4A_interface
 #endif
+  Use micro_mg2_0_interface_mod, only: micro_mg2_0_interface
   Use switches
-
+  
 contains
-
+  
   subroutine mphys_column(scheme_id)
     
     integer, intent(in) :: scheme_id
-
+    
     select case (scheme_id)
-   case(imphys_thompson09) ! Greg Thompson's mphys scheme
+
+    case(imphys_thompson09) ! Greg Thompson's mphys scheme
        call mphys_thompson09_interface
     case(imphys_thompson07) ! Greg Thompson's mphys scheme
        call mphys_thompson07_interface
@@ -44,6 +46,9 @@ contains
     case(imphys_4A)         ! Shipway 4A scheme
        call mphys_4A_interface
 #endif
+    case(imphys_mg2_0)
+       call micro_mg2_0_interface ! Morrison Gettelman, v2.0
+       
     end select
 
   end subroutine mphys_column

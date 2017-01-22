@@ -18,7 +18,7 @@ Module switches
       ,l_advect=.True.           &   ! Switch to use advection
       ,l_diverge=.False.         &   ! Switch to use separate
                                      ! divergence code
-      ,l_diverge_advection=.False.    ! Switch to add divergent 
+      ,l_diverge_advection=.False.   ! Switch to add divergent 
                                      ! u velocity to advection calculation
   
   ! Switches to allow/prevent feedback onto background field  
@@ -96,8 +96,8 @@ Module switches
        ,imphys_um7_3            =9  & ! UM test: Jonathan Wilkinson
        ,imphys_wsm6             =10 & ! WSM6 scheme
        ,imphys_wdm6             =11 & ! WDM6 scheme
-       ,imphys_4A               =12   ! Shipway scheme
-      
+       ,imphys_4A               =12 & ! Shipway scheme
+       ,imphys_mg2_0            =13   ! Morrison Gettelman, v2.0
   ! Integer switches to choose input data type and/or test case
   integer, parameter ::    & 
         iukmo_lem     =1   &  ! From UKMO LEM
@@ -105,7 +105,7 @@ Module switches
        ,iecmwf        =3   &  ! From ECMWF
        ,iarm          =4      ! From ARM
 
-       ! GCSS Warm rain cases
+  ! GCSS Warm rain cases
   integer, parameter ::    & 
         igcss_warm1   =101 &  
        ,igcss_warm2   =102 &  
@@ -114,7 +114,7 @@ Module switches
        ,igcss_warm5   =105 &  
        ,igcss_warm6   =106 &  
        ,igcss_warm7   =107 &  
-       ,igcss_warm8   =108   
+       ,igcss_warm8   =108 
        ! GCSS mixed-phase cases
   integer, parameter ::    & 
         igcss_mixed1  =201 &  
@@ -122,21 +122,24 @@ Module switches
        ,igcss_mixed3  =203 &
        ,igcss_mixed4  =204
    
-       ! GCSS Deep cases
+  ! GCSS Deep cases
   integer, parameter ::    & 
         igcss_deep1   =301 &  
        ,igcss_deep2   =302 &  
        ,igcss_deep3   =303
-       ! Other cases 
+
+  ! Other cases 
   integer, parameter ::    & 
         iicel         =401 &  ! ICE-L-type case
        ,itest_case    =998 &  ! Test case
        ,itest_case1   =999    ! Test case 2 
+
   integer, parameter :: &
         ipassive_sed_bulk1 = 501 & ! Passive sedimentation
        ,ipassive_sed_bulk2 = 502   ! Passive sedimentation
+
   integer, parameter :: &
-       itest_2D = 600       &
+        itest_2D = 600      &
        ,igcss_2d_Cu = 601   &  ! 2-D Cu case based on Morrison & Grabowski 06
        ,igcss_2d_Sc = 602   &  ! 2-D Sc case based on modified Morrison & Grabowski 06
        ,igcss_2d_ISDAC = 604 &  ! 2-D ISDAC case based on modified Morrison & Grabowski 06
@@ -180,7 +183,6 @@ Module switches
   integer :: iforce_method=0 ! Method of applying forcing
                              !  0 = tendencies applied
                              !  1 = relaxation applied
-
   
   logical :: l_cu_cold=.false. ! make the cumulus case 20C colder
 

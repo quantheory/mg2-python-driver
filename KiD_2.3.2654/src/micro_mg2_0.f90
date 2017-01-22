@@ -366,7 +366,7 @@ subroutine micro_mg_tend ( &
      relvarn,                      accre_enhann,                 &
      pn,                           pdeln,                        &
      cldn,                         liqcldf,             icecldf, &
-     qcsinksum_rate1ord,                                         &
+     qcsinksum_rate1ordo,                                        & ! output
      naain,                        npccnin,                      &
      rndstn,                       naconin,                      &
 ! outputs
@@ -491,8 +491,7 @@ subroutine micro_mg_tend ( &
 
   ! output arguments
 
-  real(r8), intent(out) :: qcsinksum_rate1ord(:,:)    ! 1st order rate for
-  ! direct cw to precip conversion
+  real(r8), intent(out) :: qcsinksum_rate1ordo(:,:)    ! 1st order rate for direct cw to precip conversion
   real(r8), intent(out) :: tlato(:,:)         ! latent heating rate       (W/kg)
   real(r8), intent(out) :: qvlato(:,:)        ! microphysical tendency qv (1/s)
   real(r8), intent(out) :: qctendo(:,:)       ! microphysical tendency qc (1/s)
@@ -638,6 +637,7 @@ subroutine micro_mg_tend ( &
 
 
   ! Packed copies of output variables
+  real(r8) :: qcsinksum_rate1ord(mgncol,nlev) ! 1st order rate for direct cw to precip conversion
   real(r8) :: tlat(mgncol,nlev)      ! latent heating rate       (W/kg)
   real(r8) :: qvlat(mgncol,nlev)     ! microphysical tendency qv (1/s)
   real(r8) :: qctend(mgncol,nlev)    ! microphysical tendency qc (1/s)
@@ -3113,6 +3113,8 @@ subroutine micro_mg_tend ( &
   ! qcsinksum_rate1ord = qcsinksum_rate1ord/max(qcsum_rate1ord,1.0e-30_r8)
 
   ! call unpack_array(qcsinksum_rate1ord, mgcols, top_lev, 0._r8, rate1ord_cw2pr_st)
+
+  call unpack_array(qcsinksum_rate1ord, mgcols, top_lev, 0._r8, qcsinksum_rate1ordo)
 
   call unpack_array(tlat, mgcols, top_lev, 0._r8, tlato)
   call unpack_array(qvlat, mgcols, top_lev, 0._r8, qvlato)
