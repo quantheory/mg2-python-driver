@@ -1,4 +1,4 @@
-module micro_mg2_0
+module module_mp_mg2_acme_v1beta
 
 !---------------------------------------------------------------------------------
 ! Purpose:
@@ -118,9 +118,9 @@ private
 save
 
 public :: &
-     micro_mg_init, &
-     micro_mg_get_cols, &
-     micro_mg_tend
+     micro_mg2_acme_v1beta_init, &
+     micro_mg2_acme_v1beta_get_cols, &
+     micro_mg2_acme_v1beta_tend
 
 ! switch for specification rather than prediction of droplet and crystal number
 ! note: number will be adjusted as needed to keep mean size within bounds,
@@ -231,7 +231,7 @@ end interface
 contains
 !===============================================================================
 
-subroutine micro_mg_init( &
+subroutine micro_mg2_acme_v1beta_init( &
      kind, gravit, rair, rh2o, cpair,    &
      tmelt_in, latvap, latice,           &
 !!== KZ_DCS 
@@ -350,12 +350,12 @@ subroutine micro_mg_init( &
   xxlv_squared=xxlv**2
   xxls_squared=xxls**2
 
-end subroutine micro_mg_init
+end subroutine micro_mg2_acme_v1beta_init
 
 !===============================================================================
 !microphysics routine for each timestep goes here...
 
-subroutine micro_mg_tend ( &
+subroutine micro_mg2_acme_v1beta_tend ( &
      mgncol, mgcols,               nlev, top_lev,                &
      deltatin,                                                   &
      tn,                           qn,                           &
@@ -3234,7 +3234,7 @@ subroutine micro_mg_tend ( &
   call unpack_array(prer_evap, mgcols, top_lev, 1._r8, prer_evapo)
 
 
-end subroutine micro_mg_tend
+end subroutine micro_mg2_acme_v1beta_tend
 
 !========================================================================
 !OUTPUT CALCULATIONS
@@ -3278,7 +3278,7 @@ end subroutine calc_rercld
 !UTILITIES
 !========================================================================
 
-pure subroutine micro_mg_get_cols(ncol, nlev, top_lev, qcn, qin, &
+pure subroutine micro_mg2_acme_v1beta_get_cols(ncol, nlev, top_lev, qcn, qin, &
      qrn, qsn, mgncol, mgcols)
 
   ! Determines which columns microphysics should operate over by
@@ -3326,7 +3326,7 @@ pure subroutine micro_mg_get_cols(ncol, nlev, top_lev, qcn, qin, &
      end if
   end do
 
-end subroutine micro_mg_get_cols
+end subroutine micro_mg2_acme_v1beta_get_cols
 
 ! Subroutines to pack arrays into smaller, contiguous pieces
 !========================================================================
@@ -3516,4 +3516,4 @@ end subroutine get_dcst
 
 
 
-end module micro_mg2_0
+end module module_mp_mg2_acme_v1beta

@@ -6,18 +6,20 @@
 !  Andrew Gettelman, February 2013
 !  Updated May 2013 for MG2 code in MG2_dev_n07_CAM5_3_01
 
-module micro_mg2_0_interface_mod
+module mphys_mg2_acme_v1beta
 
   use parameters, only : num_h_moments, num_h_bins, nspecies, nz, dt, &
        h_names, mom_units, max_char_len, mom_names, nx
   use column_variables
   use physconst, only : p0, r_on_cp, pi
 
-  use micro_mg2_0, only: micro_mg_init, micro_mg_tend
   use diagnostics, only: save_dg, i_dgtime
   use common_physics, only : qsaturation, qisaturation
   
   use wv_sat_methods, only: wv_sat_qsat_water, wv_sat_qsat_ice, wv_sat_methods_init
+
+  use module_mp_mg2_acme_v1beta, only: micro_mg2_acme_v1beta_init, &
+       micro_mg2_acme_v1beta_tend
   
   implicit none
   
@@ -28,7 +30,7 @@ module micro_mg2_0_interface_mod
 
 contains
 
-  subroutine micro_mg2_0_interface
+  subroutine mphys_mg2_acme_v1beta_interface
 
     real :: t1d(nz), p1d(nz), dz1d(nz),qv1d(nz),qc1d(nz) &
          , qi1d(nz), ni1d(nz) & 
@@ -510,7 +512,7 @@ contains
        call wv_sat_methods_init(kind, tmelt_in, h2otrip_in, tboil_in, &
             ttrice_in, epsilo_in, errstring)
 
-       call micro_mg_init( &
+       call micro_mg2_acme_v1beta_init( &
             kind, gravit, rair, rh2o, cpair,    &
             tmelt_in, latvap, latice,           &
             rhmini_in, micro_mg_dcs, micro_mg_dcs_tdep, &
@@ -577,7 +579,7 @@ contains
     !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
     ! e-mail: morrison@ucar.edu, andrew@ucar.edu, caldwell19@llnl.gov
 
-    call micro_mg_tend ( &
+    call micro_mg2_acme_v1beta_tend ( &
          ! Input 
          mgncol, mgcols,               nlev, top_lev,                    &
          deltatin,                                                       &
@@ -1056,6 +1058,6 @@ contains
        call save_dg(qctendo(1:nx,:), name, i_dgtime,  units, dim='z')
     endif
 
-  end Subroutine micro_mg2_0_interface
+  end Subroutine mphys_mg2_acme_v1beta_interface
 
-end module micro_mg2_0_interface_mod
+end module mphys_mg2_acme_v1beta

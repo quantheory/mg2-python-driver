@@ -167,9 +167,9 @@ contains
     case('4A')
        imphys=imphys_4A
        mphys_id='4A'
-    case('mg2_0')
-       imphys=imphys_mg2_0
-       mphys_id='mg2_0'
+    case('mg2_acme_v1beta')
+       imphys=imphys_mg2_acme_v1beta
+       mphys_id='mg2_acme_v1beta'
     case default
        print*, 'Mphys scheme not recognized: ', mphys_scheme
        print*, 'Did you mean:' 
@@ -181,7 +181,7 @@ contains
        print*, '   morr_two_moment?'
        print*, '   wsm6?'
        print*, '   4A?'
-       print*, '   mg2_0?'
+       print*, '   mg2_acme_v1beta?'
        print*, '(NB not all available in release version)'
        stop
     end select

@@ -19,7 +19,7 @@ module mphys_interface
 #if SHIPWAY_MICRO == 1
   Use mphys_4A, only: mphys_4A_interface
 #endif
-  Use micro_mg2_0_interface_mod, only: micro_mg2_0_interface
+  Use mphys_mg2_acme_v1beta, only: mphys_mg2_acme_v1beta_interface
   Use switches
   
 contains
@@ -46,8 +46,8 @@ contains
     case(imphys_4A)         ! Shipway 4A scheme
        call mphys_4A_interface
 #endif
-    case(imphys_mg2_0)
-       call micro_mg2_0_interface ! Morrison Gettelman, v2.0
+    case(imphys_mg2_acme_v1beta)
+       call mphys_mg2_acme_v1beta_interface ! Morrison Gettelman, v2.0
        
     end select
 
