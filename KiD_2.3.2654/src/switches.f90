@@ -97,7 +97,9 @@ Module switches
        ,imphys_wsm6             =10 & ! WSM6 scheme
        ,imphys_wdm6             =11 & ! WDM6 scheme
        ,imphys_4A               =12 & ! Shipway scheme
-       ,imphys_mg2_acme_v1beta  =13   ! Morrison Gettelman, v2.0
+       ,imphys_mg2              =13 & ! Morrison Gettelman, v2.0
+       ,imphys_mg2_acme_v1beta  =14   ! Morrison Gettelman, v2.0
+
   ! Integer switches to choose input data type and/or test case
   integer, parameter ::    & 
         iukmo_lem     =1   &  ! From UKMO LEM

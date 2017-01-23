@@ -167,6 +167,9 @@ contains
     case('4A')
        imphys=imphys_4A
        mphys_id='4A'
+    case('mg2')
+       imphys=imphys_mg2
+       mphys_id='mg2'
     case('mg2_acme_v1beta')
        imphys=imphys_mg2_acme_v1beta
        mphys_id='mg2_acme_v1beta'
@@ -181,6 +184,7 @@ contains
        print*, '   morr_two_moment?'
        print*, '   wsm6?'
        print*, '   4A?'
+       print*, '   mg2?'
        print*, '   mg2_acme_v1beta?'
        print*, '(NB not all available in release version)'
        stop
