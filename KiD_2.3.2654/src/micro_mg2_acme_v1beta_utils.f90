@@ -1,4 +1,4 @@
-module micro_mg_utils
+module micro_mg2_acme_v1beta_utils
 
 !--------------------------------------------------------------------------
 !
@@ -44,7 +44,7 @@ private
 save
 
 public :: &
-     micro_mg_utils_init, &
+     micro_mg2_acme_v1beta_utils_init, &
      size_dist_param_liq, &
 !!== KZ_DCS
      size_dist_param_ice, &
@@ -127,7 +127,7 @@ real(r8), parameter, public :: bc = 2._r8
 real(r8), parameter, public :: as = 11.72_r8
 real(r8), parameter, public :: bs = 0.41_r8
 ! cloud ice
-real(r8), public :: ai = huge(1.0_r8)                    !Fall speed parameter for cloud ice (micro_mg_utils_init should assign it a valid value)
+real(r8), public :: ai = huge(1.0_r8)                    !Fall speed parameter for cloud ice (micro_mg2_acme_v1beta_utils_init should assign it a valid value)
 real(r8), parameter, public :: bi = 1._r8
 ! rain
 real(r8), parameter, public :: ar = 841.99667_r8
@@ -227,7 +227,7 @@ contains
 !
 ! Check the list at the top of this module for descriptions of all other
 ! arguments.
-subroutine micro_mg_utils_init( kind, rh2o, cpair, tmelt_in, latvap, &
+subroutine micro_mg2_acme_v1beta_utils_init( kind, rh2o, cpair, tmelt_in, latvap, &
      latice, dcs, ice_sed_ai, errstring)
 
   integer,  intent(in)  :: kind
@@ -286,7 +286,7 @@ subroutine micro_mg_utils_init( kind, rh2o, cpair, tmelt_in, latvap, &
   mg_rain_props = MGHydrometeorProps(rhow, dsph, lam_bnd_rain)
   mg_snow_props = MGHydrometeorProps(rhosn, dsph, lam_bnd_snow)
 
-end subroutine micro_mg_utils_init
+end subroutine micro_mg2_acme_v1beta_utils_init
 
 ! Constructor for a constituent property object.
 function NewMGHydrometeorProps(rho, eff_dim, lambda_bounds, min_mean_mass) &
@@ -1434,4 +1434,4 @@ pure function limiter_is_on(lim)
 
 end function limiter_is_on
 
-end module micro_mg_utils
+end module micro_mg2_acme_v1beta_utils

@@ -96,7 +96,7 @@ use wv_sat_methods, only: &
      qsat_ice => wv_sat_qsat_ice
 
 ! Parameters from the utilities module.
-use micro_mg_utils, only: &
+use micro_mg2_acme_v1beta_utils, only: &
      r8, &
      pi, &
      omsm, &
@@ -242,7 +242,7 @@ subroutine micro_mg2_acme_v1beta_init( &
      allow_sed_supersat_in, ice_sed_ai, prc_coef1_in,prc_exp_in,  &
      prc_exp1_in, cld_sed_in, mg_prc_coeff_fix_in, errstring)
 
-  use micro_mg_utils, only: micro_mg_utils_init
+  use micro_mg2_acme_v1beta_utils, only: micro_mg2_acme_v1beta_utils_init
 
   !-----------------------------------------------------------------------
   !
@@ -300,7 +300,7 @@ subroutine micro_mg2_acme_v1beta_init( &
  mg_prc_coeff_fix = mg_prc_coeff_fix_in
 
   ! Initialize subordinate utilities module.
-  call micro_mg_utils_init(kind, rh2o, cpair, tmelt_in, latvap, latice, &
+  call micro_mg2_acme_v1beta_utils_init(kind, rh2o, cpair, tmelt_in, latvap, latice, &
        dcs, ice_sed_ai, errstring)
 
   if (trim(errstring) /= "") return
@@ -413,14 +413,14 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      frzimmn,                      frzcntn,             frzdepn)
 
   ! Constituent properties.
-  use micro_mg_utils, only: &
+  use micro_mg2_acme_v1beta_utils, only: &
        mg_liq_props, &
        mg_ice_props, &
        mg_rain_props, &
        mg_snow_props
 
   ! Size calculation functions.
-  use micro_mg_utils, only: &
+  use micro_mg2_acme_v1beta_utils, only: &
        size_dist_param_liq, &
 !!== KZ_DCS 
        size_dist_param_ice, &
@@ -429,7 +429,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        avg_diameter
 
   ! Microphysical processes.
-  use micro_mg_utils, only: &
+  use micro_mg2_acme_v1beta_utils, only: &
        ice_deposition_sublimation, &
        kk2000_liq_autoconversion, &
        ice_autoconversion, &
