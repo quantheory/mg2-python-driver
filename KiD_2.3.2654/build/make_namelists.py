@@ -20,17 +20,14 @@ import numpy as np # math functions
 import os          # operating system functions
 
 wrkdir   = '/p/lscratchd/dgardner/KiD'
-casename = 'warm1_test'
+casename = 'warm00_test'
 
-icase   = 101     # KiD case
-mphys   = 'mg2'   # Microphysics option
+icase   = 198     # KiD case
+mphys   = 'mg2_0' # Microphysics option
 dg_dt   = 1.0     # diagnostic output time
-final_t = 14400.0 # final simulation time (tctrl(1) in KiD)
 
 # time step sizes
-dt_vals = [0.25, 0.5, 1.0, 5.0, 10.0,
-           15.0, 30.0, 60.0, 90.0, 120.0,
-           300.0, 600.0, 900.0, 1200.0, 1800.0]
+dt_vals = [1.0]
 
 # iterate over step sizes dt
 for dt in dt_vals:
@@ -75,11 +72,12 @@ for dt in dt_vals:
                     'dg_dt   = '+ str(dg_dt)+'d0 \n'
                     '! scaling factor for updraft \n'
                     'wctrl(1) = 0.0d0 \n'
-                    '! final time \n'
-                    'tctrl(1) = '+str(final_t)+'\n'
                     '! half period of forcing \n'
                     'tctrl(2) = 0.0d0 \n'
                     '/ \n\n')
+
+       # '! final time \n'
+       # 'tctrl(1) = '+str(final_t)+'\n'
        
        # Switch Namelist 
        nml = nml + ('&switch \n'

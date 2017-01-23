@@ -20,7 +20,7 @@ use
 # Working directory and case name
 # --------------------------------------------------------------------
 WRKDIR=/p/lscratchd/${USER}/KiD
-CASENAME='warm1_test'
+CASENAME='warm00_test'
 
 # compile source code
 # --------------------------------------------------------------------

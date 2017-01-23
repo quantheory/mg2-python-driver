@@ -9,7 +9,7 @@
 #MUSB -e KiD.%j.err         # stderr file (%j is jobID)                         
 
 source /usr/global/tools/dotkit/init.sh  
-use netcdf-fortran-gnu-4.2               
+use netcdf-intel-4.1.3
 
 echo 'running KiD tests'
 for f in *.nml; do
