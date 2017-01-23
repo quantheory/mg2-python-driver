@@ -483,21 +483,23 @@ contains
     if (micro_unset)then
 
        rhmini_in         = 0.7_wp          ! Minimum rh for ice cloud fraction > 0.
-       micro_mg_dcs      = 0.0_wp          ! ???
-       micro_mg_dcs_tdep = .false.         ! ???
+
+       ! values from micro_mg_cam.f90
+       micro_mg_dcs      = -1.0_wp         !
+       micro_mg_dcs_tdep = .false.         !
 
        microp_uniform_in      = .true.
        do_cldice_in           = .false.
        use_hetfrz_classnuc_in = .false.
 
-       micro_mg_precip_frac_method_in = 'none'  ! ??? unused in code
-       micro_mg_berg_eff_factor_in    = 0.0_wp  ! ???
-       allow_sed_supersat_in          = .false. ! ???
-       ice_sed_ai                     = 0.0_wp  ! ???
-       prc_coef1_in                   = 0.0_wp  ! ???
-       prc_exp_in                     = 0.0_wp  ! ???
-       prc_exp1_in                    = 0.0_wp  ! ???
-       cld_sed_in                     = 0.0_wp  ! ???
+       micro_mg_precip_frac_method_in = 'max_overlap'
+       micro_mg_berg_eff_factor_in    = 1.0_wp  
+       allow_sed_supersat_in          = .true.  
+       ice_sed_ai                     = 700.0_wp
+       prc_coef1_in                   = 1.0_wp ! ???
+       prc_exp_in                     = 1.0_wp
+       prc_exp1_in                    = 1.0_wp
+       cld_sed_in                     = 1.0_wp
        mg_prc_coeff_fix_in            = .false.
 
        h2otrip_in = 273.16_wp

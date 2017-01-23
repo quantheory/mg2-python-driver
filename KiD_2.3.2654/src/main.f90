@@ -35,11 +35,25 @@ contains
   subroutine main_loop
     
     integer :: itime      ! loop counter for time
+
+    real(wp) :: dtm        ! microphysics time step size
+    real(wp) :: dt_orig    ! temporary var for time step
+    integer  :: mcount     ! PMC in namelist now: ,mstep
+    logical  :: call_micro ! flag to track if microphysics was computed this dynamics step
+    
     !
     ! Start by reading in namelists
     !
 
     if (l_namelists) call read_namelist
+
+    !+++PMC: put macro stepping where dt is actually known.
+    ! now in namelist:    mstep = 2  ! call micro every mstep (an integer) dynamics calls
+    mcount = 0               ! just need to initialize the counter which is incremented below
+    dtm    = dt*float(mstep) ! what is the micro timestep if only call every mstep dynamics steps?
+    
+    write(*,*) 'mstep, dtm = ', mstep, dtm
+    !---PMC
 
     ! Set up the initial fields and forcing
     if (l_input_file)then
@@ -83,11 +97,35 @@ contains
           call diverge_column
        end if
 
-       if (l_mphys)then
-          call mphys_column(scheme_id=imphys)
+       call_micro=.false.
+
+       if (mod(mcount,mstep) == 0) then
+
+          call_micro=.true.
+
+          ! set microphysics timestep
+          dt_orig = dt
+          dt      = dtm
+
+          ! call microphysics
+          if (l_mphys) then
+             call mphys_column(scheme_id=imphys)
+          end if
+
+          ! reset time step for dynamics
+          dt = dt_orig
+
+          ! reset mphys step counter (move outsize fp iter) !!!
+          mcount = 0
+
        end if
 
-       call step_column
+       ! update mphys step counter (move outsize fp iter) !!!
+       mcount = mcount+1
+
+       call step_column(.true., dt)
+
+       if (time > end_time) exit
        
        if ( nx == 1 ) then
           call save_diagnostics_1d

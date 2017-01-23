@@ -119,6 +119,172 @@ contains
              end if
           end if
        end do
+
+    case(igcss_warm0)
+       !==============================================
+       ! GCSS microphysics intercomparison Warm Rain 0: NO updraft
+       !==============================================
+       ! Set default control values
+       if (all(zctrl==0.))zctrl(1)=3000.
+       if (all(wctrl==0.))wctrl(1)=0.0
+       if (all(tctrl==0.))tctrl(1:2)=(/21600., 600./)
+       if (ipctrl==0)ipctrl=1  !use different profile...
+
+       maxZ=zctrl(1)
+       maxT=tctrl(1)
+       n_times=int(maxT/dt)
+
+       call set_standard_profile(ipctrl,maxZ)
+
+       call allocate_forcing(nz,nx,n_times)
+
+       do itime=1,n_times
+          t=itime*dt
+          time_in(itime)=t
+          w_t(:,:,itime)=0
+          do j = 0, nx+1 
+            call interpolate(z,w_t(:,j,itime),z_half,w_t_half(:,j,itime),scheme_id=1) 
+          enddo
+       end do
+
+       do ih=1,naerosol
+         indices(ih)=ih
+         if (aero_N_init(ih) > 0)lainits(ih) = .true.
+         Nds(ih)    = aero_N_init(ih)
+         sigmas(ih) = aero_sig_init(ih)
+         rds(ih)    = aero_rd_init(ih)
+       end do
+       densitys(:) = 1777.
+       fscale(:) = 1.
+
+       call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale)
+
+    case(igcss_warm00)
+       !==============================================
+       ! GCSS microphysics intercomparison Warm Rain 0: NO updraft
+       !==============================================
+       ! Set default control values
+       if (all(zctrl==0.))zctrl(1)=3000.
+       if (all(wctrl==0.))wctrl(1)=0.0
+       if (all(tctrl==0.))tctrl(1:2)=(/28800., 600./)
+       if (ipctrl==0)ipctrl=1  !use different profile...
+
+       maxZ=zctrl(1)
+       maxT=tctrl(1)
+       n_times=int(maxT/dt)
+
+       call set_standard_profile(ipctrl,maxZ)
+
+       call allocate_forcing(nz,nx,n_times)
+
+       do itime=1,n_times
+          t=itime*dt
+          time_in(itime)=t
+          w_t(:,:,itime)=0
+          do j = 0, nx+1 
+            call interpolate(z,w_t(:,j,itime),z_half,w_t_half(:,j,itime),scheme_id=1) 
+          enddo
+       end do
+
+       do ih=1,naerosol
+         indices(ih)=ih
+         if (aero_N_init(ih) > 0)lainits(ih) = .true.
+         Nds(ih)    = aero_N_init(ih)
+         sigmas(ih) = aero_sig_init(ih)
+         rds(ih)    = aero_rd_init(ih)
+       end do
+       densitys(:) = 1777.
+       fscale(:) = 1.
+
+       call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale)
+
+    case(igcss_warm00A)
+       !==============================================
+       ! GCSS microphysics intercomparison Warm Rain 0: NO updraft
+       !==============================================
+       ! Set default control values
+       if (all(zctrl==0.))zctrl(1)=3000.
+       if (all(wctrl==0.))wctrl(1)=0.0
+       if (all(tctrl==0.))tctrl(1:2)=(/28800., 600./)
+       if (ipctrl==0)ipctrl=1  !use different profile...
+
+       maxZ=zctrl(1)
+       maxT=tctrl(1)
+       n_times=int(maxT/dt)
+
+       call set_standard_profile(ipctrl,maxZ)
+
+       call allocate_forcing(nz,nx,n_times)
+
+       do itime=1,n_times
+          t=itime*dt
+          time_in(itime)=t
+
+          w_t(:,:,itime)=0
+          do j = 0, nx+1 
+            call interpolate(z,w_t(:,j,itime),z_half,w_t_half(:,j,itime),scheme_id=1) 
+          enddo
+             
+          ! constant forcing on qv
+          qforce_in(:,:,itime) = 5.0d-7
+
+       end do
+
+       do ih=1,naerosol
+         indices(ih)=ih
+         if (aero_N_init(ih) > 0)lainits(ih) = .true.
+         Nds(ih)    = aero_N_init(ih)
+         sigmas(ih) = aero_sig_init(ih)
+         rds(ih)    = aero_rd_init(ih)
+       end do
+       densitys(:) = 1777.
+       fscale(:) = 1.
+
+       call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale)
+
+    case(igcss_warm00B)
+       !==============================================
+       ! GCSS microphysics intercomparison Warm Rain 0: NO updraft
+       !==============================================
+       ! Set default control values
+       if (all(zctrl==0.))zctrl(1)=3000.
+       if (all(wctrl==0.))wctrl(1)=0.0
+       if (all(tctrl==0.))tctrl(1:2)=(/28800., 600./)
+       if (ipctrl==0)ipctrl=1  !use different profile...
+
+       maxZ=zctrl(1)
+       maxT=tctrl(1)
+       n_times=int(maxT/dt)
+
+       call set_standard_profile(ipctrl,maxZ)
+
+       call allocate_forcing(nz,nx,n_times)
+
+       do itime=1,n_times
+          t=itime*dt
+          time_in(itime)=t
+
+          w_t(:,:,itime)=0
+          do j = 0, nx+1 
+            call interpolate(z,w_t(:,j,itime),z_half,w_t_half(:,j,itime),scheme_id=1) 
+          enddo
+             
+          ! constant forcing on qv
+          qforce_in(:,:,itime) = 5.0d-7 / dt
+
+       end do
+
+       do ih=1,naerosol
+         indices(ih)=ih
+         if (aero_N_init(ih) > 0)lainits(ih) = .true.
+         Nds(ih)    = aero_N_init(ih)
+         sigmas(ih) = aero_sig_init(ih)
+         rds(ih)    = aero_rd_init(ih)
+       end do
+       densitys(:) = 1777.
+       fscale(:) = 1.
+
+       call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale)
     
     case(igcss_warm1)
        !==============================================
@@ -201,6 +367,7 @@ contains
        fscale(:) = 1.
 
        call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale) 
+
     case(igcss_warm3)
        !==============================================
        ! GCSS microphysics intercomparison Warm Rain 3
@@ -228,7 +395,6 @@ contains
           enddo
        end do       
 
-
        do ih=1,naerosol
          indices(ih)=ih
          if (aero_N_init(ih) > 0)lainits(ih) = .true.
@@ -240,6 +406,7 @@ contains
        fscale(:) = 1.
 
        call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale) 
+
 !    case(igcss_warm4)
 !       !==============================================
 !       ! GCSS microphysics intercomparison Warm Rain 4
@@ -306,6 +473,7 @@ contains
        fscale(:) = 1.
 
        call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale) 
+
     case(igcss_warm6)
        !==============================================
        ! GCSS microphysics intercomparison Warm Rain 6
@@ -366,7 +534,6 @@ contains
        fscale(:) = 1.
 
        call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale) 
-
 
     case(igcss_warm7)
        !==============================================
@@ -487,6 +654,7 @@ contains
        fscale(:) = 1.
 
        call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale) 
+
     case(igcss_deep2)
        !================================================
        ! GCSS microphysics intercomparison Deep 2
@@ -537,6 +705,7 @@ contains
        fscale(:) = 1.
 
        call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale) 
+
     case(igcss_mixed1)
        !================================================
        ! GCSS microphysics intercomparison Mixed Phase 1
@@ -577,7 +746,6 @@ contains
        fscale(:) = 1.
 
        call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale) 
-
 
     case(igcss_mixed3)
        !================================================
@@ -642,6 +810,7 @@ contains
        fscale(:) = 1.
 
        call set_aerosol(Ninit, indices, lainits, Nds, sigmas, rds, densitys, fscale) 
+
     case(iicel)
        !================================================
        ! ICE-L like simulation

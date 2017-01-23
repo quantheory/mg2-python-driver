@@ -10,7 +10,9 @@ VPATH = ./:./UM_source
 #NCPATH=/usr/local/tools/netcdf-pgi-4.1.3 
 NCPATH=/usr/local/tools/netcdf-intel-4.1.3
 
-TESTING=
+#blank ver doesn't test, other does
+TESTING=True #PMC for testing.
+#TESTING=
 
 ifeq ($(COMPILER), gfortran)
 FPP= -x f95-cpp-input

@@ -114,8 +114,15 @@ Module switches
        ,igcss_warm5   =105 &  
        ,igcss_warm6   =106 &  
        ,igcss_warm7   =107 &  
-       ,igcss_warm8   =108 
-       ! GCSS mixed-phase cases
+       ,igcss_warm8   =108 &   
+       ,igcss_warmX   =109 &   
+       ,igcss_warm1A  =110 &
+       ,igcss_warm00  =198 &
+       ,igcss_warm0   =199 &
+       ,igcss_warm00A =1980&
+       ,igcss_warm00B =1981 
+
+  ! GCSS mixed-phase cases
   integer, parameter ::    & 
         igcss_mixed1  =201 &  
 !       ,igcss_mixed2  =202 &  !removed - now use 201 with different namelist
@@ -212,6 +219,10 @@ Module switches
   real(wp):: set_sp3=-999. ! set sp2
   logical :: set_l_abelshipway=.false. ! use abelshipway fallspeed
   logical :: set_l_cons=.false. ! conserve number
+
+  integer :: mstep=1 !# of micro steps for each dynamics step
+
+  real(wp) :: end_time = 2.592d6 ! end at 30 days
 
 
 end Module switches

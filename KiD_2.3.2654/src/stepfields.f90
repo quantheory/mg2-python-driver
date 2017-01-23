@@ -18,22 +18,25 @@ module stepfields
 
  contains 
    
-   subroutine step_column
+   subroutine step_column(call_micro, dtm)
      Use parameters, only : dt, nspecies, &
-          num_h_moments, num_h_bins, num_aero_moments, num_aero_bins, nz, &
-          nx
+          num_h_moments, num_h_bins, num_aero_moments, num_aero_bins, nz, nx
      Use physconst, only : Ru => R, p0, r_on_cp
      Use switches
 
      Use column_variables
 
+     implicit none
 
-     !local variables
-     integer :: ih, imom, ibin
-     real(wp) :: pos_tmp, srf_tmp(0:nx+1) ! temporary storage
-     logical :: sp_test ! test for rounding error
-     character(100) :: fmt ! format string
-     real :: field(nz,0:nx+1)
+     ! local variables
+     integer        :: ih, imom, ibin
+     real(wp)       :: pos_tmp, srf_tmp(0:nx+1) ! temporary storage
+     logical        :: sp_test                  ! test for rounding error
+     character(100) :: fmt                      ! format string
+     real(wp)       :: field(nz,0:nx+1)
+
+     real     :: dtm
+     logical  :: call_micro
 
      !------------------------------
      ! Manipulate mask if necessary
@@ -50,27 +53,39 @@ module stepfields
      !theta
      !-----
      if (.not. l_fix_theta)then
+
         srf_tmp(:)=theta(1,:)
+
         ! Advective part
         if (.not. l_noadv_theta) then
            theta(:,:)=theta(:,:)+dtheta_adv(:,:)*field_mask(:,:)*dt
         endif
+
         ! mphys part
-        if (.not. l_nomphys_theta) then
-           theta(:,:)=theta(:,:)+dtheta_mphys(:,:)*field_mask(:,:)*dt
+
+        if (call_micro) then
+           if (.not. l_nomphys_theta) then
+              theta(:,:)=theta(:,:)+dtheta_mphys(:,:)*field_mask(:,:)*dtm
+           endif
         endif
+
         ! divergence part
         theta(:,:)=theta(:,:)+dtheta_div(:,:)*field_mask(:,:)*dt
+
         ! forced part
         theta(:,:)=theta(:,:)+Tforce(:,:)*exner(:,:)*field_mask(:,:)*dt
+
         ! surface value
         if (isurface_fixed==isurface_fixed)theta(1,:)=srf_tmp(:)
      end if
+
      !-----
      !qv
      !-----
      if (.not. l_fix_qv)then
+        
         srf_tmp(:)=qv(1,:)
+
         ! Advective part
         if (.not. l_noadv_qv)then
            if (l_posadv_qv)then
@@ -79,21 +94,29 @@ module stepfields
               qv(:,:)=qv(:,:)+dqv_adv(:,:)*field_mask(:,:)*dt
            end if
         end if
+
         ! mphys part
-        if (.not. l_nomphys_qv) then
-           qv(:,:)=qv(:,:)+dqv_mphys(:,:)*field_mask(:,:)*dt
+        if (call_micro) then
+           if (.not. l_nomphys_qv) then
+              qv(:,:)=qv(:,:)+dqv_mphys(:,:)*field_mask(:,:)*dtm
+           endif
         endif
+
         ! divergence part
         qv(:,:)=qv(:,:)+dqv_div(:,:)*field_mask(:,:)*dt
+
         ! forced part
         qv(:,:)=qv(:,:)+qforce(:,:)*field_mask(:,:)*dt
+
         ! surface value
         if (isurface_fixed==isurface_fixed)qv(1,:)=srf_tmp(:)
 
      end if
+
      !------------
      !aerosol
      !------------
+
      ! Advective part
      if (.not. l_fix_aerosols)then
         do ih=1,naerosol
@@ -111,38 +134,43 @@ module stepfields
            end do
         end do
      end if
+
      ! mphys part
-     do ih=1,naerosol
-        do imom=1,num_aero_moments(ih)
-           do ibin=1,num_aero_bins(ih)
-              do j=1,nx
-              do k=1,nz
-                 aerosol(k,j,ih)%moments(ibin,imom)=              &
-                      aerosol(k,j,ih)%moments(ibin,imom) + (      &
-                      + daerosol_mphys(k,j,ih)%moments(ibin,imom) &
-                      )*field_mask(k,j)*dt
-              end do
+     if (call_micro) then
+        do ih=1,naerosol
+           do imom=1,num_aero_moments(ih)
+              do ibin=1,num_aero_bins(ih)
+                 do j=1,nx
+                    do k=1,nz
+                       aerosol(k,j,ih)%moments(ibin,imom)=              &
+                            aerosol(k,j,ih)%moments(ibin,imom) + (      &
+                            daerosol_mphys(k,j,ih)%moments(ibin,imom) &
+                            )*field_mask(k,j)*dtm
+                    end do
+                 end do
               end do
            end do
         end do
-     end do
+     end if
+
      ! divergence part
      if (.not. l_fix_aerosols)then
         do ih=1,naerosol
            do imom=1,num_aero_moments(ih)
               do ibin=1,num_aero_bins(ih)
                  do j=1,nx
-                 do k=1,nz
-                    aerosol(k,j,ih)%moments(ibin,imom)=            &
-                         aerosol(k,j,ih)%moments(ibin,imom) + (    &
-                         + daerosol_div(k,j,ih)%moments(ibin,imom) &
-                         )*field_mask(k,j)*dt
-                 end do
+                    do k=1,nz
+                       aerosol(k,j,ih)%moments(ibin,imom)=            &
+                            aerosol(k,j,ih)%moments(ibin,imom) + (    &
+                            daerosol_div(k,j,ih)%moments(ibin,imom) &
+                            )*field_mask(k,j)*dt
+                    end do
                  end do
               end do
            end do
         end do
      end if
+
      !------------
      !hydrometeors
      !------------
@@ -152,56 +180,61 @@ module stepfields
            do imom=1,num_h_moments(ih)
               do ibin=1,num_h_bins(ih)
                  do j=1,nx
-                 do k=1,nz
-                    hydrometeors(k,j,ih)%moments(ibin,imom)=           &
-                         hydrometeors(k,j,ih)%moments(ibin,imom) + (   &
-                         dhydrometeors_adv(k,j,ih)%moments(ibin,imom)  &
-                         )*field_mask(k,j)*dt
-                 end do
+                    do k=1,nz
+                       hydrometeors(k,j,ih)%moments(ibin,imom)=           &
+                            hydrometeors(k,j,ih)%moments(ibin,imom) + (   &
+                            dhydrometeors_adv(k,j,ih)%moments(ibin,imom)  &
+                            )*field_mask(k,j)*dt
+                    end do
                  end do
               end do
            end do
         end do
      end if
+     
      ! mphys part
-     do ih=1,nspecies
-        do imom=1,num_h_moments(ih)
-           do ibin=1,num_h_bins(ih)
-              do j=1,nx
-              do k=1,nz
-                 hydrometeors(k,j,ih)%moments(ibin,imom)=              &
-                      hydrometeors(k,j,ih)%moments(ibin,imom) + (      &
-                      + dhydrometeors_mphys(k,j,ih)%moments(ibin,imom) &
-                      )*field_mask(k,j)*dt
-              end do
+     if (call_micro) then
+        do ih=1,nspecies
+           do imom=1,num_h_moments(ih)
+              do ibin=1,num_h_bins(ih)
+                 do j=1,nx
+                    do k=1,nz
+                       hydrometeors(k,j,ih)%moments(ibin,imom)=              &
+                            hydrometeors(k,j,ih)%moments(ibin,imom) + (      &
+                            dhydrometeors_mphys(k,j,ih)%moments(ibin,imom) &
+                            )*field_mask(k,j)*dtm
+                    end do
+                 end do
               end do
            end do
         end do
-     end do
+     end if
+     
      ! divergence part
      if (.not. l_nodiv_hydrometeors)then
         do ih=1,nspecies
            do imom=1,num_h_moments(ih)
               do ibin=1,num_h_bins(ih)
                  do j=1,nx
-                 do k=1,nz
-                    hydrometeors(k,j,ih)%moments(ibin,imom)=            &
-                         hydrometeors(k,j,ih)%moments(ibin,imom) + (    &
-                         + dhydrometeors_div(k,j,ih)%moments(ibin,imom) &
-                         )*field_mask(k,j)*dt 
-                 end do
+                    do k=1,nz
+                       hydrometeors(k,j,ih)%moments(ibin,imom)=            &
+                            hydrometeors(k,j,ih)%moments(ibin,imom) + (    &
+                            dhydrometeors_div(k,j,ih)%moments(ibin,imom) &
+                            )*field_mask(k,j)*dt 
+                    end do
                  end do
               end do
            end do
         end do
      end if
+     
      !      ! forced part - not yet implemented
      !         do ih=1,nspecies
      !            do imom=1,num_h_moments(ih)
      !               do ibin=1,num_h_bins(ih)
      !                  hydrometeors(k,ih)%moments(ibin,imom)=              &
      !                       hydrometeors(k,ih)%moments(ibin,imom) + (      &
-     !                       + dhydrometeors_force(k,ih)%moments(ibin,imom) &
+     !                       dhydrometeors_force(k,ih)%moments(ibin,imom) &
      !                       )*field_mask(k,j)*dt
      !               end do
      !            end do
@@ -274,6 +307,7 @@ module stepfields
         end do
      end do
      end if
+     
      !----------------
      ! update pressure
      !----------------

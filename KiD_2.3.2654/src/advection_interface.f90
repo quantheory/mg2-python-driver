@@ -42,10 +42,12 @@ module advection_interface
     allocate(field(nz,0:nx+1))
     allocate(field_adv(nz,0:nx+1))
 
+    ! Potential temperature
     if (.not. l_fix_theta)then
   
        field(:,:)=theta(:,:)
-    ! Temperature perturbation
+
+       ! Temperature perturbation
        call generic_advection(  &
             &  field            &
             & ,field_adv        &
@@ -58,7 +60,7 @@ module advection_interface
        dtheta_adv(:,:)=0.0
     endif
 
-    ! vapour
+    ! water vapour
     if (.not. l_fix_qv)then
        
        field(:,:)=qv(:,:)
@@ -81,6 +83,7 @@ module advection_interface
        dqv_adv(:,:)=0.0
     endif
 
+    ! Supersaturation
     field(:,:)=ss(:,:)
     call generic_advection(      &
          &  field                &

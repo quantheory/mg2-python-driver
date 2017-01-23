@@ -64,7 +64,9 @@ module namelists
      , l_active_inarg2000, iopt_inuc, l_cu_cold, l_oneway, l_newoptions &
 #endif
      ! Thompson 09...
-     , l_reuse_thompson_lookup
+     , l_reuse_thompson_lookup &
+     , mstep &
+     , end_time
 
   ! Namelist input...
 
@@ -165,7 +167,10 @@ contains
     case('4A')
        imphys=imphys_4A
        mphys_id='4A'
-     case default
+    case('mg2_0')
+       imphys=imphys_mg2_0
+       mphys_id='mg2_0'
+    case default
        print*, 'Mphys scheme not recognized: ', mphys_scheme
        print*, 'Did you mean:' 
        print*, '   lem2.4?'
@@ -176,6 +181,7 @@ contains
        print*, '   morr_two_moment?'
        print*, '   wsm6?'
        print*, '   4A?'
+       print*, '   mg2_0?'
        print*, '(NB not all available in release version)'
        stop
     end select
