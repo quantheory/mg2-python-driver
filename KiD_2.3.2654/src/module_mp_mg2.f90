@@ -1,5 +1,3 @@
-!++ag
-!module micro_mg2_0
 module module_mp_mg2
 
 #define HAVE_GAMMA_INTRINSICS
@@ -106,7 +104,7 @@ use wv_sat_methods, only: &
      qsat_ice => wv_sat_qsat_ice
 
 ! Parameters from the utilities module.
-use micro_mg_utils, only: &
+use micro_mg2_utils, only: &
      r8, &
      pi, &
      omsm, &
@@ -230,7 +228,7 @@ subroutine micro_mg2_init( &
      rhmini_in, microp_uniform_in, do_cldice_in, &
      errstring)
 
-  use micro_mg_utils, only: micro_mg_utils_init
+  use micro_mg2_utils, only: micro_mg2_utils_init
 
   !-----------------------------------------------------------------------
   !
@@ -262,7 +260,7 @@ subroutine micro_mg2_init( &
   !-----------------------------------------------------------------------
 
   ! Initialize subordinate utilities module.
-  call micro_mg_utils_init(kind, rh2o, cpair, tmelt_in, latvap, latice, &
+  call micro_mg2_utils_init(kind, rh2o, cpair, tmelt_in, latvap, latice, &
        errstring)
 
   if (trim(errstring) /= "") return
@@ -317,52 +315,73 @@ end subroutine micro_mg2_init
 !++ag
 pure subroutine micro_mg2_tend ( &
 !--ag
-     mgncol,   mgcols,   nlev,     top_lev,  deltatin,           &
-     tn,                 qn,                                     &
+     mgncol, mgcols,               nlev, top_lev,                &
+     deltatin,                                                   &
+     tn,                           qn,                           &
      qcn,                          qin,                          &
      ncn,                          nin,                          &
      qrn,                          qsn,                          &
-     nrn,                          nsn,                          & ! hm mg2
-     relvarn,            accre_enhann,                           &
+     nrn,                          nsn,                          &
+     relvarn,                      accre_enhann,                 &
      pn,                           pdeln,                        &
-     cldn,               liqcldf,            icecldf,            &
-     rate1ord_cw2pr_st,  naain,    npccnin,  rndstn,   naconin,  &
-     tlato,    qvlato,   qctendo,  qitendo,  nctendo,  nitendo,  &
-     qrtendo,  qstendo,  nrtendo,  nstendo,                      & ! hm mg2
-     effco,    effco_fn, effio,              precto,   precio,   &
-     nevapro, evapsnowo, praino,  prodsnowo, cmeouto,  deffio,   &
-     pgamrado, lamcrado, qsouto,   dsouto,   rflxo,    sflxo,    &
-     qrouto,             reff_raino,         reff_snowo,         &
-     qcsevapo, qisevapo, qvreso,   cmeiout,  vtrmco,   vtrmio,   &
-!++ag
-     umso    , umro    ,                                         &
-!--ag     
-     qcsedteno,qisedteno,prao,     prco,     mnuccco,  mnuccto,  &
-     msacwio,  psacwso,  bergso,   bergo,    melto,    homoo,    &
-     qcreso,             prcio,    praio,    qireso,             &
-     mnuccro,  pracso,   meltsdto, frzrdto,  mnuccdo,            &
-     nrouto,   nsouto,   reflo,    areflo,   areflzo,  freflo,   &
-     csrflo,   acsrflo,  fcsrflo,            rercldo,            &
-     ncaio,    ncalo,    qrouto2,  qsouto2,  nrouto2,  nsouto2,  &
-     drouto2,  dsouto2,  freqso,   freqro,   nficeo,   qcrato,   &
-     tnd_qsnown,         tnd_nsnown,         re_icen,            &
+     cldn,                         liqcldf,             icecldf, &
+     rate1ord_cw2pr_st,                                          & ! output
+     naain,                        npccnin,                      &
+     rndstn,                       naconin,                      &
+! outputs
+     tlato,                        qvlato,                       &
+     qctendo,                      qitendo,                      &
+     nctendo,                      nitendo,                      &
+     qrtendo,                      qstendo,                      &
+     nrtendo,                      nstendo,                      &
+     effco,                        effco_fn,            effio,   &
+     precto,                       precio,                       &
+     nevapro,                      evapsnowo,                    &
+     praino,                       prodsnowo,                    &
+     cmeouto,                      deffio,                       &
+     pgamrado,                     lamcrado,                     &
+     qsouto,                       dsouto,                       &
+     rflxo,                        sflxo,               qrouto,  &
+     reff_raino,                   reff_snowo,                   &
+     qcsevapo,                     qisevapo,            qvreso,  &
+     cmeiout,                      vtrmco,              vtrmio,  &
+     umso,                         umro,                         &
+     qcsedteno,                    qisedteno,                    &
+     prao,                         prco,                         &
+     mnuccco,                      mnuccto,             msacwio, &
+     psacwso,                      bergso,              bergo,   &
+     melto,                        homoo,                        &
+     qcreso,                       prcio,               praio,   &
+     qireso,                       mnuccro,             pracso,  &
+     meltsdto,                     frzrdto,             mnuccdo, &
+     nrouto,                       nsouto,                       &
+     reflo,                        areflo,              areflzo, &
+     freflo,                       csrflo,              acsrflo, &
+     fcsrflo,                      rercldo,                      &
+     ncaio,                        ncalo,                        &
+     qrouto2,                      qsouto2,                      &
+     nrouto2,                      nsouto2,                      &
+     drouto2,                      dsouto2,                      &
+     freqso,                       freqro,                       &
+     nficeo,                       qcrato,                       &
+     tnd_qsnown,                   tnd_nsnown,          re_icen, &
      errstring)
 
   ! Constituent properties.
-  use micro_mg_utils, only: &
+  use micro_mg2_utils, only: &
        mg_liq_props, &
        mg_ice_props, &
        mg_rain_props, &
        mg_snow_props
 
   ! Size calculation functions.
-  use micro_mg_utils, only: &
+  use micro_mg2_utils, only: &
        size_dist_param_liq, &
        size_dist_param_basic, &
        avg_diameter
 
   ! Microphysical processes.
-  use micro_mg_utils, only: &
+  use micro_mg2_utils, only: &
        ice_deposition_sublimation, &
        kk2000_liq_autoconversion, &
        ice_autoconversion, &
@@ -397,13 +416,12 @@ pure subroutine micro_mg2_tend ( &
   real(r8), intent(in) :: ncn(:,:)       ! cloud water number conc (1/kg)
   real(r8), intent(in) :: nin(:,:)       ! cloud ice number conc (1/kg)
 
-  ! hm mg2
   real(r8), intent(in) :: qrn(:,:)       ! rain mixing ratio (kg/kg)
   real(r8), intent(in) :: qsn(:,:)       ! snow mixing ratio (kg/kg)
   real(r8), intent(in) :: nrn(:,:)       ! rain number conc (1/kg)
   real(r8), intent(in) :: nsn(:,:)       ! snow number conc (1/kg)
 
-  real(r8), intent(in) :: relvarn(:,:)   ! cloud water relative variance (-)
+  real(r8), intent(in) :: relvarn(:,:)       ! cloud water relative variance (-)
   real(r8), intent(in) :: accre_enhann(:,:)  ! optional accretion
                                              ! enhancement factor (-)
 
@@ -431,8 +449,7 @@ pure subroutine micro_mg2_tend ( &
 
   ! output arguments
 
-  real(r8), intent(out) :: rate1ord_cw2pr_st(:,:)    ! 1st order rate for
-  ! direct cw to precip conversion
+  real(r8), intent(out) :: rate1ord_cw2pr_st(:,:)    ! 1st order rate for direct cw to precip conversion
   real(r8), intent(out) :: tlato(:,:)         ! latent heating rate       (W/kg)
   real(r8), intent(out) :: qvlato(:,:)        ! microphysical tendency qv (1/s)
   real(r8), intent(out) :: qctendo(:,:)       ! microphysical tendency qc (1/s)
@@ -440,7 +457,6 @@ pure subroutine micro_mg2_tend ( &
   real(r8), intent(out) :: nctendo(:,:)       ! microphysical tendency nc (1/(kg*s))
   real(r8), intent(out) :: nitendo(:,:)       ! microphysical tendency ni (1/(kg*s))
 
-  ! hm mg2
   real(r8), intent(out) :: qrtendo(:,:)       ! microphysical tendency qr (1/s)
   real(r8), intent(out) :: qstendo(:,:)       ! microphysical tendency qs (1/s)
   real(r8), intent(out) :: nrtendo(:,:)       ! microphysical tendency nr (1/(kg*s))
@@ -472,10 +488,8 @@ pure subroutine micro_mg2_tend ( &
   real(r8), intent(out) :: cmeiout(:,:)       ! grid-mean cloud ice sub/dep (1/s)
   real(r8), intent(out) :: vtrmco(:,:)        ! mass-weighted cloud water fallspeed (m/s)
   real(r8), intent(out) :: vtrmio(:,:)        ! mass-weighted cloud ice fallspeed (m/s)
-!++ag
- real(r8), intent(out) :: umso(:,:)   !mass weighted snow fallspeed (m/s) 
- real(r8), intent(out) :: umro(:,:)   !mass weighted rain fallspeed (m/s)
-!--ag
+  real(r8), intent(out) :: umso(:,:)          ! mass weighted snow fallspeed (m/s)
+  real(r8), intent(out) :: umro(:,:)          ! mass weighted rain fallspeed (m/s)
   real(r8), intent(out) :: qcsedteno(:,:)     ! qc sedimentation tendency (1/s)
   real(r8), intent(out) :: qisedteno(:,:)     ! qi sedimentation tendency (1/s)
 
@@ -549,10 +563,8 @@ pure subroutine micro_mg2_tend ( &
   real(r8) :: naai(mgncol,nlev)    ! ice nucleation number (from microp_aero_ts) (1/kg)
   real(r8) :: npccn(mgncol,nlev)   ! ccn activated number tendency (from microp_aero_ts) (1/kg*s)
 
-  ! cloud water relative variance (-)
-  real(r8) :: relvar(mgncol,nlev)
-  ! optional accretion enhancement factor (-)
-  real(r8) :: accre_enhan(mgncol,nlev)
+  real(r8) :: relvar(mgncol,nlev)      ! cloud water relative variance (-)
+  real(r8) :: accre_enhan(mgncol,nlev) ! optional accretion enhancement factor (-)
 
   ! These were made allocatable because of a problem on PGI (possibly
   ! exceeding the stack size limit on some machines).
@@ -724,7 +736,7 @@ pure subroutine micro_mg2_tend ( &
   real(r8) :: nnucct(mgncol,nlev) ! number concentration
   ! HM ice multiplication
   real(r8) :: msacwi(mgncol,nlev) ! mass mixing ratio
-  real(r8) :: nsacwi(mgncol,nlev) ! number conc
+  real(r8) :: nsacwi(mgncol,nlev) ! number concentration
   ! autoconversion of cloud droplets
   real(r8) :: prc(mgncol,nlev)    ! mass mixing ratio
   real(r8) :: nprc(mgncol,nlev)   ! number concentration (rain)
@@ -801,7 +813,6 @@ pure subroutine micro_mg2_tend ( &
   real(r8) :: fi(nlev)
   real(r8) :: fni(nlev)
 
-  ! hm mg2
   real(r8) :: fr(nlev)
   real(r8) :: fnr(nlev)
   real(r8) :: fs(nlev)
@@ -812,7 +823,6 @@ pure subroutine micro_mg2_tend ( &
   real(r8) :: falouti(nlev)
   real(r8) :: faloutni(nlev)
 
-  ! hm mg2
   real(r8) :: faloutr(nlev)
   real(r8) :: faloutnr(nlev)
   real(r8) :: falouts(nlev)
@@ -825,7 +835,6 @@ pure subroutine micro_mg2_tend ( &
   real(r8) :: faltndqie
   real(r8) :: faltndqce
 
-  ! hm mg2
   real(r8) :: faltndr
   real(r8) :: faltndnr
   real(r8) :: faltnds
@@ -859,7 +868,6 @@ pure subroutine micro_mg2_tend ( &
   real(r8) :: dumni(mgncol,nlev)  ! ni
   real(r8) :: dumr(mgncol,nlev)   ! rain mixing ratio
   real(r8) :: dumnr(mgncol,nlev)  ! rain number concentration
-  ! hm mg2
   real(r8) :: dums(mgncol,nlev)   ! snow mixing ratio
   real(r8) :: dumns(mgncol,nlev)  ! snow number concentration
   ! Array dummy variable
@@ -890,7 +898,6 @@ pure subroutine micro_mg2_tend ( &
   call pack_array(    qin, mgcols, top_lev,    qi)
   call pack_array(    ncn, mgcols, top_lev,    nc)
   call pack_array(    nin, mgcols, top_lev,    ni)
-  ! mg2
   call pack_array(    qrn, mgcols, top_lev,    qr)
   call pack_array(    qsn, mgcols, top_lev,    qs)
   call pack_array(    nrn, mgcols, top_lev,    nr)
@@ -985,7 +992,7 @@ pure subroutine micro_mg2_tend ( &
 
         call qsat_water(t(i,k), p(i,k), esl(i,k), qvl(i,k))
 
-        ! hm fix, make sure when above freezing that esi=esl, not active yet
+        ! make sure when above freezing that esi=esl, not active yet
         if (t(i,k) >= tmelt) then
            esi(i,k)=esl(i,k)
            qvi(i,k)=qvl(i,k)
@@ -1000,7 +1007,7 @@ pure subroutine micro_mg2_tend ( &
 
   !===============================================
 
-  ! hm, set mtime here to avoid answer-changing
+  ! set mtime here to avoid answer-changing
   mtime=deltat
 
   ! initialize microphysics output
@@ -1103,7 +1110,6 @@ pure subroutine micro_mg2_tend ( &
 
   !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
   ! droplet activation
-  ! hm, modify 5/12/11
   ! get provisional droplet number after activation. This is used for
   ! all microphysical process calculations, for consistency with update of
   ! droplet mass before microphysics
@@ -1161,7 +1167,7 @@ pure subroutine micro_mg2_tend ( &
 
      pre_col_loop: do i=1,mgncol
 
-        ! hm mg2, calculate instantaneous precip processes (melting and homogeneous freezing)
+        ! calculate instantaneous precip processes (melting and homogeneous freezing)
 
         ! melting of snow at +2 C
 
@@ -1236,7 +1242,7 @@ pure subroutine micro_mg2_tend ( &
            qcic(i,k)=min(qc(i,k)/lcldm(i,k),5.e-3_r8)
            ncic(i,k)=max(nc(i,k)/lcldm(i,k),0._r8)
 
-           ! hm add 6/2/11 specify droplet concentration
+           ! specify droplet concentration
            if (nccons) then
               ncic(i,k)=ncnst/rho(i,k)
            end if
@@ -1250,7 +1256,7 @@ pure subroutine micro_mg2_tend ( &
            qiic(i,k)=min(qi(i,k)/icldm(i,k),5.e-3_r8)
            niic(i,k)=max(ni(i,k)/icldm(i,k),0._r8)
 
-           ! hm add 6/2/11 switch for specification of cloud ice number
+           ! switch for specification of cloud ice number
            if (nicons) then
               niic(i,k)=ninst/rho(i,k)
            end if
@@ -1321,7 +1327,7 @@ pure subroutine micro_mg2_tend ( &
      qric(:,k) = qr(:,k)/cldmax(:,k)
      nric(:,k) = nr(:,k)/cldmax(:,k)
 
-     ! mg2, limit in-precip mixing ratios to 10 g/kg
+     ! limit in-precip mixing ratios to 10 g/kg
      qric(:,k)=min(qric(:,k),0.01_r8)
 
      ! add autoconversion to precip from above to get provisional rain mixing ratio
@@ -1356,14 +1362,14 @@ pure subroutine micro_mg2_tend ( &
         nprci(:,k) = tnd_nsnow(:,k) / cldm(:,k)
      end if
 
-     ! hm mg2, note, currently we don't have this
+     ! note, currently we don't have this
      ! inside the do_cloudice block, should be changed later
-     ! mg2, assign qsic based on prognostic qs, using assumed precip fraction
+     ! assign qsic based on prognostic qs, using assumed precip fraction
      ! ********note: need to get indexing correct for "i" column with packing/unpacking --> ask Sean
      qsic(:,k) = qs(:,k)/cldmax(:,k)
      nsic(:,k) = ns(:,k)/cldmax(:,k)
 
-     ! mg2, limit in-precip mixing ratios to 10 g/kg
+     ! limit in-precip mixing ratios to 10 g/kg
      qsic(:,k)=min(qsic(:,k),0.01_r8)
 
      ! if precip mix ratio is zero so should number concentration
@@ -1648,8 +1654,8 @@ pure subroutine micro_mg2_tend ( &
 
         if (do_cldice) then
 
-           ! hm add 4/26/13, freezing of rain to produce ice if mean rain size is smaller than Dcs
-           if (lamr(i,k) > qsmall .and. 1./lamr(i,k) < Dcs) then
+           ! freezing of rain to produce ice if mean rain size is smaller than Dcs
+           if (lamr(i,k) > qsmall .and. 1._r8/lamr(i,k) < Dcs) then
               mnuccri(i,k)=mnuccr(i,k)
               nnuccri(i,k)=nnuccr(i,k)
               mnuccr(i,k)=0._r8
@@ -1662,7 +1668,7 @@ pure subroutine micro_mg2_tend ( &
         dum = ((-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k))*cldmax(i,k)- &
              (pra(i,k)+prc(i,k))*lcldm(i,k))*deltat
 
-        ! hm, note that qrtend is included below because of instantaneous freezing/melt
+        ! note that qrtend is included below because of instantaneous freezing/melt
         if (dum.gt.qr(i,k).and. &
              (-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k)).ge.qsmall) then
            ratio = (qr(i,k)/deltat+(pra(i,k)+prc(i,k))*lcldm(i,k))/   &
@@ -1962,19 +1968,18 @@ pure subroutine micro_mg2_tend ( &
         dumnc(i,k) = max((nc(i,k)+nctend(i,k)*deltat)/lcldm(i,k),0._r8)
         dumni(i,k) = max((ni(i,k)+nitend(i,k)*deltat)/icldm(i,k),0._r8)
 
-        ! hm mg2
         dumr(i,k) = (qr(i,k)+qrtend(i,k)*deltat)/cldmax(i,k)
         dumnr(i,k) = max((nr(i,k)+nrtend(i,k)*deltat)/cldmax(i,k),0._r8)
         dums(i,k) = (qs(i,k)+qstend(i,k)*deltat)/cldmax(i,k)
         dumns(i,k) = max((ns(i,k)+nstend(i,k)*deltat)/cldmax(i,k),0._r8)
 
 
-        ! hm add 6/2/11 switch for specification of droplet and crystal number
+        ! switch for specification of droplet and crystal number
         if (nccons) then
            dumnc(i,k)=ncnst/rho(i,k)
         end if
 
-        ! hm add 6/2/11 switch for specification of cloud ice number
+        ! switch for specification of cloud ice number
         if (nicons) then
            dumni(i,k)=ninst/rho(i,k)
         end if
@@ -2021,7 +2026,6 @@ pure subroutine micro_mg2_tend ( &
            fni(k)= 0._r8
         end if
 
-        ! hm mg2
         ! fallspeed for rain
 
         call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), &
@@ -2065,10 +2069,9 @@ pure subroutine micro_mg2_tend ( &
         ! quantities to ensure conservation
 
         dumc(i,k) = (qc(i,k)+qctend(i,k)*deltat)
-        dumi(i,k) = (qi(i,k)+qitend(i,k)*deltat)
         dumnc(i,k) = max((nc(i,k)+nctend(i,k)*deltat),0._r8)
+        dumi(i,k) = (qi(i,k)+qitend(i,k)*deltat)
         dumni(i,k) = max((ni(i,k)+nitend(i,k)*deltat),0._r8)
-        ! mg2
         dumr(i,k) = (qr(i,k)+qrtend(i,k)*deltat)
         dumnr(i,k) = max((nr(i,k)+nrtend(i,k)*deltat),0._r8)
         dums(i,k) = (qs(i,k)+qstend(i,k)*deltat)
@@ -2076,7 +2079,6 @@ pure subroutine micro_mg2_tend ( &
 
         if (dumc(i,k).lt.qsmall) dumnc(i,k)=0._r8
         if (dumi(i,k).lt.qsmall) dumni(i,k)=0._r8
-        ! mg2
         if (dumr(i,k).lt.qsmall) dumnr(i,k)=0._r8
         if (dums(i,k).lt.qsmall) dumns(i,k)=0._r8
 
@@ -2261,32 +2263,29 @@ pure subroutine micro_mg2_tend ( &
         dumnc(i,k) = max(nc(i,k)+nctend(i,k)*deltat,0._r8)
         dumni(i,k) = max(ni(i,k)+nitend(i,k)*deltat,0._r8)
 
-        ! mg2
         dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat,0._r8)
         dumnr(i,k) = max(nr(i,k)+nrtend(i,k)*deltat,0._r8)
         dums(i,k) = max(qs(i,k)+qstend(i,k)*deltat,0._r8)
         dumns(i,k) = max(ns(i,k)+nstend(i,k)*deltat,0._r8)
 
-        ! hm add 6/2/11 switch for specification of droplet and crystal number
+        ! switch for specification of droplet and crystal number
         if (nccons) then
            dumnc(i,k)=ncnst/rho(i,k)*lcldm(i,k)
         end if
 
-        ! hm add 6/2/11 switch for specification of cloud ice number
+        ! switch for specification of cloud ice number
         if (nicons) then
            dumni(i,k)=ninst/rho(i,k)*icldm(i,k)
         end if
 
         if (dumc(i,k).lt.qsmall) dumnc(i,k)=0._r8
         if (dumi(i,k).lt.qsmall) dumni(i,k)=0._r8
-        ! mg2
         if (dumr(i,k).lt.qsmall) dumnr(i,k)=0._r8
         if (dums(i,k).lt.qsmall) dumns(i,k)=0._r8
 
         ! calculate instantaneous processes (melting, homogeneous freezing)
         !====================================================================
 
-        ! mg2
         ! melting of snow at +2 C
 
         if (t(i,k)+tlat(i,k)/cpp*deltat > snowmelt) then
@@ -2475,27 +2474,25 @@ pure subroutine micro_mg2_tend ( &
         dumnc(i,k) = max(nc(i,k)+nctend(i,k)*deltat,0._r8)/lcldm(i,k)
         dumni(i,k) = max(ni(i,k)+nitend(i,k)*deltat,0._r8)/icldm(i,k)
 
-        ! mg2
         dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat,0._r8)/cldmax(i,k)
         dumnr(i,k) = max(nr(i,k)+nrtend(i,k)*deltat,0._r8)/cldmax(i,k)
         dums(i,k) = max(qs(i,k)+qstend(i,k)*deltat,0._r8)/cldmax(i,k)
         dumns(i,k) = max(ns(i,k)+nstend(i,k)*deltat,0._r8)/cldmax(i,k)
 
-        ! hm add 6/2/11 switch for specification of droplet and crystal number
+        ! switch for specification of droplet and crystal number
         if (nccons) then
            dumnc(i,k)=ncnst/rho(i,k)
         end if
 
-        ! hm add 6/2/11 switch for specification of cloud ice number
+        ! switch for specification of cloud ice number
         if (nicons) then
            dumni(i,k)=ninst/rho(i,k)
         end if
 
         ! limit in-cloud mixing ratio to reasonable value of 5 g kg-1
-
         dumc(i,k)=min(dumc(i,k),5.e-3_r8)
         dumi(i,k)=min(dumi(i,k),5.e-3_r8)
-        ! mg2, limit in-precip mixing ratios
+        ! limit in-precip mixing ratios
         dumr(i,k)=min(dumr(i,k),10.e-3_r8)
         dums(i,k)=min(dums(i,k),10.e-3_r8)
 
@@ -2534,7 +2531,7 @@ pure subroutine micro_mg2_tend ( &
         if (dumc(i,k).ge.qsmall) then
 
 
-           ! hm add 6/2/11 switch for specification of droplet and crystal number
+           ! switch for specification of droplet and crystal number
            if (nccons) then
               ! make sure nc is consistence with the constant N by adjusting tendency, need
               ! to multiply by cloud fraction
@@ -2582,7 +2579,7 @@ pure subroutine micro_mg2_tend ( &
            effc_fn(i,k) = 10._r8
         end if
 
-        ! hm mg2, recalculate 'final' rain size distribution parameters
+        ! recalculate 'final' rain size distribution parameters
         ! to ensure that rain size is in bounds, adjust rain number if needed
 
         if (dumr(i,k).ge.qsmall) then
@@ -2599,7 +2596,7 @@ pure subroutine micro_mg2_tend ( &
 
         end if
 
-        ! hm mg2, recalculate 'final' snow size distribution parameters
+        ! recalculate 'final' snow size distribution parameters
         ! to ensure that snow size is in bounds, adjust snow number if needed
 
         if (dums(i,k).ge.qsmall) then
@@ -2624,7 +2621,6 @@ pure subroutine micro_mg2_tend ( &
         !=================================================================================
         if (qc(i,k)+qctend(i,k)*deltat.lt.qsmall) nctend(i,k)=-nc(i,k)/deltat
         if (do_cldice .and. qi(i,k)+qitend(i,k)*deltat.lt.qsmall) nitend(i,k)=-ni(i,k)/deltat
-        ! mg2
         if (qr(i,k)+qrtend(i,k)*deltat.lt.qsmall) nrtend(i,k)=-nr(i,k)/deltat
         if (qs(i,k)+qstend(i,k)*deltat.lt.qsmall) nstend(i,k)=-ns(i,k)/deltat
 
@@ -2815,33 +2811,33 @@ pure subroutine micro_mg2_tend ( &
   call unpack_array(nrtend, mgcols, top_lev, -nrn/deltat, nrtendo)
   call unpack_array(nstend, mgcols, top_lev, -nsn/deltat, nstendo)
 
-  call unpack_array(effc, mgcols, top_lev, 10._r8, effco)
+  call unpack_array(effc,    mgcols, top_lev, 10._r8, effco)
   call unpack_array(effc_fn, mgcols, top_lev, 10._r8, effco_fn)
-  call unpack_array(effi, mgcols, top_lev, 25._r8, effio)
+  call unpack_array(effi,    mgcols, top_lev, 25._r8, effio)
 
   call unpack_array(prect, mgcols, 0._r8, precto)
   call unpack_array(preci, mgcols, 0._r8, precio)
 
-  call unpack_array(nevapr, mgcols, top_lev, 0._r8, nevapro)
+  call unpack_array(nevapr,   mgcols, top_lev, 0._r8, nevapro)
   call unpack_array(evapsnow, mgcols, top_lev, 0._r8, evapsnowo)
-  call unpack_array(prain, mgcols, top_lev, 0._r8, praino)
+  call unpack_array(prain,    mgcols, top_lev, 0._r8, praino)
   call unpack_array(prodsnow, mgcols, top_lev, 0._r8, prodsnowo)
-  call unpack_array(cmeout, mgcols, top_lev, 0._r8, cmeouto)
+  call unpack_array(cmeout,   mgcols, top_lev, 0._r8, cmeouto)
 
   call unpack_array(lamcrad, mgcols, top_lev, 0._r8, lamcrado)
   call unpack_array(pgamrad, mgcols, top_lev, 0._r8, pgamrado)
-  call unpack_array(deffi, mgcols, top_lev, 0._r8, deffio)
+  call unpack_array(deffi,   mgcols, top_lev, 0._r8, deffio)
 
-  call unpack_array(qsout, mgcols, top_lev, 0._r8, qsouto)
+  call unpack_array(qsout,  mgcols, top_lev, 0._r8, qsouto)
   call unpack_array(qsout2, mgcols, top_lev, 0._r8, qsouto2)
-  call unpack_array(nsout, mgcols, top_lev, 0._r8, nsouto)
+  call unpack_array(nsout,  mgcols, top_lev, 0._r8, nsouto)
   call unpack_array(nsout2, mgcols, top_lev, 0._r8, nsouto2)
-  call unpack_array(dsout, mgcols, top_lev, 0._r8, dsouto)
+  call unpack_array(dsout,  mgcols, top_lev, 0._r8, dsouto)
   call unpack_array(dsout2, mgcols, top_lev, 0._r8, dsouto2)
 
-  call unpack_array(qrout, mgcols, top_lev, 0._r8, qrouto)
+  call unpack_array(qrout,  mgcols, top_lev, 0._r8, qrouto)
   call unpack_array(qrout2, mgcols, top_lev, 0._r8, qrouto2)
-  call unpack_array(nrout, mgcols, top_lev, 0._r8, nrouto)
+  call unpack_array(nrout,  mgcols, top_lev, 0._r8, nrouto)
   call unpack_array(nrout2, mgcols, top_lev, 0._r8, nrouto2)
   call unpack_array(drout2, mgcols, top_lev, 0._r8, drouto2)
 
@@ -2856,42 +2852,42 @@ pure subroutine micro_mg2_tend ( &
 
   call unpack_array(qcsevap, mgcols, top_lev, 0._r8, qcsevapo)
   call unpack_array(qisevap, mgcols, top_lev, 0._r8, qisevapo)
-  call unpack_array(qvres, mgcols, top_lev, 0._r8, qvreso)
+  call unpack_array(qvres,   mgcols, top_lev, 0._r8, qvreso)
   call unpack_array(cmeitot, mgcols, top_lev, 0._r8, cmeiout)
-  call unpack_array(vtrmc, mgcols, top_lev, 0._r8, vtrmco)
-  call unpack_array(vtrmi, mgcols, top_lev, 0._r8, vtrmio)
-!++ag
+  call unpack_array(vtrmc,   mgcols, top_lev, 0._r8, vtrmco)
+  call unpack_array(vtrmi,   mgcols, top_lev, 0._r8, vtrmio)
+  !++ag
   call unpack_array(ums, mgcols, top_lev, 0._r8, umso)
   call unpack_array(umr, mgcols, top_lev, 0._r8, umro)
-!--ag
+  !--ag
   call unpack_array(qcsedten, mgcols, top_lev, 0._r8, qcsedteno)
   call unpack_array(qisedten, mgcols, top_lev, 0._r8, qisedteno)
 
-  call unpack_array(pratot, mgcols,top_lev, 0._r8, prao)
-  call unpack_array(prctot, mgcols,top_lev, 0._r8, prco)
-  call unpack_array(mnuccctot, mgcols,top_lev, 0._r8, mnuccco)
-  call unpack_array(mnuccttot, mgcols,top_lev, 0._r8, mnuccto)
-  call unpack_array(msacwitot, mgcols,top_lev, 0._r8, msacwio)
-  call unpack_array(psacwstot, mgcols,top_lev, 0._r8, psacwso)
-  call unpack_array(bergstot, mgcols,top_lev, 0._r8, bergso)
-  call unpack_array(bergtot, mgcols,top_lev, 0._r8, bergo)
-  call unpack_array(melttot, mgcols,top_lev, 0._r8, melto)
-  call unpack_array(homotot, mgcols,top_lev, 0._r8, homoo)
-  call unpack_array(qcrestot, mgcols,top_lev, 0._r8, qcreso)
-  call unpack_array(prcitot, mgcols,top_lev, 0._r8, prcio)
-  call unpack_array(praitot, mgcols,top_lev, 0._r8, praio)
-  call unpack_array(qirestot, mgcols,top_lev, 0._r8, qireso)
-  call unpack_array(mnuccrtot, mgcols,top_lev, 0._r8, mnuccro)
-  call unpack_array(pracstot, mgcols,top_lev, 0._r8, pracso)
-  call unpack_array(mnuccdtot, mgcols,top_lev, 0._r8, mnuccdo)
+  call unpack_array(pratot,     mgcols,top_lev, 0._r8, prao)
+  call unpack_array(prctot,     mgcols,top_lev, 0._r8, prco)
+  call unpack_array(mnuccctot,  mgcols,top_lev, 0._r8, mnuccco)
+  call unpack_array(mnuccttot,  mgcols,top_lev, 0._r8, mnuccto)
+  call unpack_array(msacwitot,  mgcols,top_lev, 0._r8, msacwio)
+  call unpack_array(psacwstot,  mgcols,top_lev, 0._r8, psacwso)
+  call unpack_array(bergstot,   mgcols,top_lev, 0._r8, bergso)
+  call unpack_array(bergtot,    mgcols,top_lev, 0._r8, bergo)
+  call unpack_array(melttot,    mgcols,top_lev, 0._r8, melto)
+  call unpack_array(homotot,    mgcols,top_lev, 0._r8, homoo)
+  call unpack_array(qcrestot,   mgcols,top_lev, 0._r8, qcreso)
+  call unpack_array(prcitot,    mgcols,top_lev, 0._r8, prcio)
+  call unpack_array(praitot,    mgcols,top_lev, 0._r8, praio)
+  call unpack_array(qirestot,   mgcols,top_lev, 0._r8, qireso)
+  call unpack_array(mnuccrtot,  mgcols,top_lev, 0._r8, mnuccro)
+  call unpack_array(pracstot,   mgcols,top_lev, 0._r8, pracso)
+  call unpack_array(mnuccdtot,  mgcols,top_lev, 0._r8, mnuccdo)
   call unpack_array(meltsdttot, mgcols,top_lev, 0._r8, meltsdto)
-  call unpack_array(frzrdttot, mgcols,top_lev, 0._r8, frzrdto)
+  call unpack_array(frzrdttot,  mgcols,top_lev, 0._r8, frzrdto)
 
-  call unpack_array(refl, mgcols, top_lev, -9999._r8, reflo)
-  call unpack_array(arefl, mgcols, top_lev, 0._r8, areflo)
+  call unpack_array(refl,   mgcols, top_lev, -9999._r8, reflo)
+  call unpack_array(arefl,  mgcols, top_lev, 0._r8, areflo)
   call unpack_array(areflz, mgcols, top_lev, 0._r8, areflzo)
-  call unpack_array(frefl, mgcols, top_lev, 0._r8, freflo)
-  call unpack_array(csrfl, mgcols, top_lev, -9999._r8, csrflo)
+  call unpack_array(frefl,  mgcols, top_lev, 0._r8, freflo)
+  call unpack_array(csrfl,  mgcols, top_lev, -9999._r8, csrflo)
   call unpack_array(acsrfl, mgcols, top_lev, 0._r8, acsrflo)
   call unpack_array(fcsrfl, mgcols, top_lev, 0._r8, fcsrflo)
 
@@ -2903,9 +2899,10 @@ pure subroutine micro_mg2_tend ( &
 
   call unpack_array(ncai, mgcols, top_lev, 0._r8, ncaio)
   call unpack_array(ncal, mgcols, top_lev, 0._r8, ncalo)
-!++ag
+
+
 end subroutine micro_mg2_tend
-!--ag
+
 !========================================================================
 !OUTPUT CALCULATIONS
 !========================================================================
@@ -2946,9 +2943,8 @@ end subroutine calc_rercld
 !========================================================================
 !UTILITIES
 !========================================================================
-!++ag
+
 pure subroutine micro_mg2_get_cols(ncol, nlev, top_lev, qcn, qin, &
-!--ag
      qrn, qsn, mgncol, mgcols)
 
   ! Determines which columns microphysics should operate over by
@@ -2960,7 +2956,6 @@ pure subroutine micro_mg2_get_cols(ncol, nlev, top_lev, qcn, qin, &
 
   real(r8), intent(in) :: qcn(:,:) ! cloud water mixing ratio (kg/kg)
   real(r8), intent(in) :: qin(:,:) ! cloud ice mixing ratio (kg/kg)
-  ! mg2
   real(r8), intent(in) :: qrn(:,:) ! rain mixing ratio (kg/kg)
   real(r8), intent(in) :: qsn(:,:) ! snow mixing ratio (kg/kg)
 
@@ -2982,7 +2977,6 @@ pure subroutine micro_mg2_get_cols(ncol, nlev, top_lev, qcn, qin, &
 
   ltrue = any(qcn(:ncol,top_lev:(nlev+lev_offset)) >= qsmall, 2)
   ltrue = ltrue .or. any(qin(:ncol,top_lev:(nlev+lev_offset)) >= qsmall, 2)
-  ! mg2
   ltrue = ltrue .or. any(qrn(:ncol,top_lev:(nlev+lev_offset)) >= qsmall, 2)
   ltrue = ltrue .or. any(qsn(:ncol,top_lev:(nlev+lev_offset)) >= qsmall, 2)
 
@@ -2997,9 +2991,9 @@ pure subroutine micro_mg2_get_cols(ncol, nlev, top_lev, qcn, qin, &
         mgcols(i) = ii
      end if
   end do
-!++ag
+
 end subroutine micro_mg2_get_cols
-!--ag
+
 ! Subroutines to pack arrays into smaller, contiguous pieces
 !========================================================================
 ! Rank 1 array of reals, columns only
@@ -3150,7 +3144,5 @@ pure subroutine unpack_array_2Dr8_arrayfill(old_array, cols, top_lev, fill, new_
 
 end subroutine unpack_array_2Dr8_arrayfill
 
-!++ag
-!end module micro_mg2_0
 end module module_mp_mg2
-!--ag
+

@@ -134,8 +134,8 @@ public :: &
 ! nccons = .true. to specify constant cloud droplet number
 ! nicons = .true. to specify constant cloud ice number
 
-logical, parameter, public :: nccons = .false.
-logical, parameter, public :: nicons = .false.
+logical, parameter, public :: nccons = .true. ! false originally
+logical, parameter, public :: nicons = .true. ! false originally
 
 !=========================================================
 ! Private module parameters
@@ -693,7 +693,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
   real(r8) :: qcsedten(mgncol,nlev)  ! qc sedimentation tendency (1/s)
   real(r8) :: qisedten(mgncol,nlev)  ! qi sedimentation tendency (1/s)
   real(r8) :: qrsedten(mgncol,nlev)  ! qr sedimentation tendency (1/s)
-  real(r8) :: qssedten(mgncol,nlev)          ! qs sedimentation tendency (1/s)
+  real(r8) :: qssedten(mgncol,nlev)  ! qs sedimentation tendency (1/s)
 
   real(r8) :: pratot(mgncol,nlev)    ! accretion of cloud by rain
   real(r8) :: prctot(mgncol,nlev)    ! autoconversion of cloud to rain
@@ -3233,7 +3233,6 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
   call unpack_array(prer_evap, mgcols, top_lev, 1._r8, prer_evapo)
 
-
 end subroutine micro_mg2_acme_v1beta_tend
 
 !========================================================================
@@ -3394,7 +3393,7 @@ pure subroutine unpack_array_1Dr8(old_array, cols, fill, new_array)
   real(r8), intent(in)  :: old_array(:)   ! Array to be packed
   integer,  intent(in)  :: cols(:)        ! List of columns to include
   real(r8), intent(in)  :: fill           ! Value with which to fill unused
-  ! sections of new_array.
+                                          ! sections of new_array.
 
   ! Output
   real(r8), intent(out) :: new_array(:)
@@ -3416,7 +3415,7 @@ pure subroutine unpack_array_1Dr8_arrayfill(old_array, cols, fill, new_array)
   real(r8), intent(in)  :: old_array(:)   ! Array to be packed
   integer,  intent(in)  :: cols(:)        ! List of columns to include
   real(r8), intent(in)  :: fill(:)        ! Value with which to fill unused
-  ! sections of new_array.
+                                          ! sections of new_array.
 
   ! Output
   real(r8), intent(out) :: new_array(:)
@@ -3439,7 +3438,7 @@ pure subroutine unpack_array_2Dr8(old_array, cols, top_lev, fill, new_array)
   integer,  intent(in)  :: cols(:)        ! List of columns to include
   integer,  intent(in)  :: top_lev        ! First level to use
   real(r8), intent(in)  :: fill           ! Value with which to fill unused
-  ! sections of new_array.
+                                          ! sections of new_array.
 
   ! Output
   real(r8), intent(out) :: new_array(:,:)
@@ -3462,7 +3461,7 @@ pure subroutine unpack_array_2Dr8_arrayfill(old_array, cols, top_lev, fill, new_
   integer,  intent(in)  :: cols(:)        ! List of columns to include
   integer,  intent(in)  :: top_lev        ! First level to use
   real(r8), intent(in)  :: fill(:,:)      ! Value with which to fill unused
-  ! sections of new_array.
+                                          ! sections of new_array.
 
   ! Output
   real(r8), intent(out) :: new_array(:,:)
@@ -3513,7 +3512,5 @@ return
 
 end subroutine get_dcst
 !!== KZ_DCS
-
-
 
 end module module_mp_mg2_acme_v1beta

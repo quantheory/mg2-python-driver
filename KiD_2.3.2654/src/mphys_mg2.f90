@@ -682,7 +682,7 @@ call micro_mg2_tend ( &
        precprt2d = precto
        snowrt2d = precio
    
-       print*,'precto,precio',precto(1),precio(1)
+       ! print*,'precto,precio',precto(1),precio(1)
    
        ! save tendencies
   do i=1,nx

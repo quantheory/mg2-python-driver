@@ -11,8 +11,8 @@ VPATH = ./:./UM_source
 NCPATH=/usr/local/tools/netcdf-intel-4.1.3
 
 #blank ver doesn't test, other does
-TESTING=True #PMC for testing.
-#TESTING=
+#TESTING=True #PMC for testing.
+TESTING=
 
 ifeq ($(COMPILER), gfortran)
 FPP= -x f95-cpp-input
@@ -48,7 +48,8 @@ ifdef TESTING
 OPTS=-g -O0 -check all -warn all,nodec,interfaces \
  -traceback -fpe0
 else
-OPTS=-O3 -traceback -pg -g
+#OPTS=-O3 -traceback -pg -g
+OPTS=-O3 -traceback -g
 endif
 endif
 

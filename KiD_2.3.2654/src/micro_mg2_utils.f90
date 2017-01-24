@@ -1,4 +1,4 @@
-module micro_mg_utils
+module micro_mg2_utils
 
 !--------------------------------------------------------------------------
 !
@@ -44,7 +44,7 @@ private
 save
 
 public :: &
-     micro_mg_utils_init, &
+     micro_mg2_utils_init, &
      size_dist_param_liq, &
      size_dist_param_basic, &
      avg_diameter, &
@@ -126,8 +126,7 @@ real(r8), parameter, public :: ar = 841.99667_r8
 real(r8), parameter, public :: br = 0.8_r8
 
 ! mass of new crystal due to aerosol freezing and growth (kg)
-real(r8), parameter, public :: mi0 = &
-     4._r8/3._r8*pi*rhoi*(10.e-6_r8)*(10.e-6_r8)*(10.e-6_r8)
+real(r8), parameter, public :: mi0 = 4._r8/3._r8*pi*rhoi*(10.e-6_r8)**3
 
 !=================================================
 ! Private module parameters
@@ -208,7 +207,7 @@ contains
 !
 ! Check the list at the top of this module for descriptions of all other
 ! arguments.
-subroutine micro_mg_utils_init( kind, rh2o, cpair, tmelt_in, latvap, &
+subroutine micro_mg2_utils_init( kind, rh2o, cpair, tmelt_in, latvap, &
      latice, errstring)
 
   integer,  intent(in)  :: kind
@@ -253,7 +252,7 @@ subroutine micro_mg_utils_init( kind, rh2o, cpair, tmelt_in, latvap, &
   mg_rain_props = NewMGHydrometeorProps(rhow, dsph, lam_bnd_rain)
   mg_snow_props = NewMGHydrometeorProps(rhosn, dsph, lam_bnd_snow)
 
-end subroutine micro_mg_utils_init
+end subroutine micro_mg2_utils_init
 
 ! Constructor for a constituent property object.
 function NewMGHydrometeorProps(rho, eff_dim, lambda_bounds, min_mean_mass) &
@@ -535,7 +534,7 @@ elemental subroutine kk2000_liq_autoconversion(microp_uniform, qcic, &
 
      ! assume exponential sub-grid distribution of qc, resulting in additional
      ! factor related to qcvar below
-     ! hm switch for sub-columns, don't include sub-grid qc
+     ! switch for sub-columns, don't include sub-grid qc
 
      prc = prc_coef * &
           1350._r8 * qcic**2.47_r8 * (ncic/1.e6_r8*rho)**(-1.79_r8)
@@ -1224,4 +1223,4 @@ pure function limiter_is_on(lim)
 
 end function limiter_is_on
 
-end module micro_mg_utils
+end module micro_mg2_utils

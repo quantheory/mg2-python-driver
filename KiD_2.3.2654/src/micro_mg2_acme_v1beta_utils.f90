@@ -112,7 +112,7 @@ real(r8), parameter, public :: omsm   = 1._r8 - 1.e-5_r8
 real(r8), parameter, public :: qsmall = 1.e-18_r8
 
 ! minimum allowed cloud fraction
-real(r8), parameter, public :: mincld = 0.0001_r8
+real(r8), parameter, public :: mincld = 0.0001_r8 ! same as module_mp_mg2.f90
 
 real(r8), parameter, public :: rhosn = 250._r8  ! bulk density snow
 real(r8), parameter, public :: rhoi = 500._r8   ! bulk density ice
@@ -153,6 +153,7 @@ real(r8), parameter :: icsmall = 1.e-8_r8
 real(r8), parameter :: dsph = 3._r8
 
 ! Bounds for mean diameter for different constituents.
+! no lam_bnd_ice parameter?
 real(r8), parameter :: lam_bnd_rain(2) = 1._r8/[500.e-6_r8, 20.e-6_r8]
 real(r8), parameter :: lam_bnd_snow(2) = 1._r8/[2000.e-6_r8, 10.e-6_r8]
 
@@ -170,7 +171,7 @@ real(r8), parameter :: f2r = 0.308_r8
 
 ! collection efficiencies
 ! aggregation of cloud ice and snow
-real(r8), parameter :: eii = 0.5_r8
+real(r8), parameter :: eii = 0.5_r8 ! 0.1 in micro_mg2_utils.f90
 
 ! immersion freezing parameters, bigg 1953
 real(r8), parameter :: bimm = 100._r8
@@ -280,9 +281,7 @@ subroutine micro_mg2_acme_v1beta_utils_init( kind, rh2o, cpair, tmelt_in, latvap
   ! Mean ice diameter can not grow bigger than twice the autoconversion
   ! threshold for snow.
   ice_lambda_bounds = 1._r8/[2._r8*dcs, 10.e-6_r8]
-  mg_ice_props = MGHydrometeorProps(rhoi, dsph, &
-       ice_lambda_bounds, min_mean_mass_ice)
-
+  mg_ice_props = MGHydrometeorProps(rhoi, dsph, ice_lambda_bounds, min_mean_mass_ice)
   mg_rain_props = MGHydrometeorProps(rhow, dsph, lam_bnd_rain)
   mg_snow_props = MGHydrometeorProps(rhosn, dsph, lam_bnd_snow)
 
