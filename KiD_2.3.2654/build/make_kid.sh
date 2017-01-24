@@ -17,41 +17,34 @@ PYTHONHOME=/usr/apps/python/bin
 
 use
 
-# Working directory and case name
-# --------------------------------------------------------------------
-WRKDIR=/p/lscratchd/${USER}/KiD
-CASENAME='warm00_test'
-
 # compile source code
 # --------------------------------------------------------------------
 BUILD_ROOT=$PWD
 KID_ROOT=${HOME}/Climate/Physics/KiD/KiD_2.3.2654
 
 cd $KID_ROOT
-make clean
 make -j $1 CASE=1D all
 
 RESULT=$?
-if [ $RESULT -eq 0 ]; then
-    echo ">>> Successfully Built KiD <<<"
-else
-    echo ">>> Failed to Build KiD <<<"
+if [ ! $RESULT -eq 0 ]; then
+    echo
+    echo ">>> BUILD FAILED <<<"
     exit $RESULT
+else
+    echo ">>> BUILD COMPLETE <<<"
 fi
 
-# setup tests
+# copy to testing directory
 # --------------------------------------------------------------------
-RUNDIR=${WRKDIR}/${CASENAME}
-if [ ! -d $RUNDIR ]; then
-    mkdir -p $RUNDIR
+if [ $# -gt 1 ]; then 
+    TESTDIR=$2
+    if [ ! -d $TESTDIR ]; then
+        mkdir -p $TESTDIR
+    fi
+
+    echo "Copying executable to $TESTDIR"
+    cp $KID_ROOT/bin/KiD_1D.exe $TESTDIR/.
+
+    echo "Copying launch script to $TESTDIR"
+    cp $BUILD_ROOT/runkid_batch.sh $TESTDIR/.
 fi
-
-echo "Copying executable to $RUNDIR"
-cp $KID_ROOT/bin/KiD_1D.exe $RUNDIR/.
-
-echo "Copying launch script to $RUNDIR"
-cp $BUILD_ROOT/runkid_batch.sh $RUNDIR/.
-
-# clean up build
-# ------------------------------------------------------------------------------
-make clean
