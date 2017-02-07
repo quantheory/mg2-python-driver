@@ -484,25 +484,25 @@ contains
     ! Initialise microphysics 
     if (micro_unset) then
 
-       rhmini_in = 0.7_wp          ! Minimum rh for ice cloud fraction > 0.
+       rhmini_in = 0.8_wp          ! Minimum rh for ice cloud fraction > 0.
 
        ! values from micro_mg_cam.f90
-       micro_mg_dcs      = 90.e-6_wp       ! micro_mg2_utils, dcs
-       micro_mg_dcs_tdep = .false.         ! ice autoconversion
+       micro_mg_dcs      = 195.0e-6_wp     ! micro_mg2_utils, dcs
+       micro_mg_dcs_tdep = .true.          ! ice autoconversion
 
-       microp_uniform_in      = .true.
-       do_cldice_in           = .false.
-       use_hetfrz_classnuc_in = .false.
+       microp_uniform_in      = .false.
+       do_cldice_in           = .true.
+       use_hetfrz_classnuc_in = .true.
 
-       micro_mg_precip_frac_method_in = 'max_overlap' ! micro vert loop
-       micro_mg_berg_eff_factor_in    = 1.0_wp    ! bergs?
-       allow_sed_supersat_in          = .true.    ! allow ice supersaturation?
-       ice_sed_ai                     = 700.0_wp  ! see "ai" in micro_mg2_utils
-       prc_coef1_in                   = 1350.0_wp ! autoconversion kk2000?
-       prc_exp_in                     = 2.47_wp   ! autoconversion kk2000?
-       prc_exp1_in                    = -1.79_wp  ! autoconversion kk2000?
-       cld_sed_in                     = 1.0_wp    ! acn value?
-       mg_prc_coeff_fix_in            = .false.   ! autoconversion kk2000?
+       micro_mg_precip_frac_method_in = 'in_cloud' ! micro vert loop
+       micro_mg_berg_eff_factor_in    = 0.1_wp     ! bergs
+       allow_sed_supersat_in          = .false.    ! allow ice supersaturation?
+       ice_sed_ai                     = 500.0_wp   ! see "ai" in micro_mg2_utils
+       prc_coef1_in                   = 30500.0_wp ! autoconversion kk2000
+       prc_exp_in                     = 3.19_wp    ! autoconversion kk2000
+       prc_exp1_in                    = -1.2_wp    ! autoconversion kk2000
+       cld_sed_in                     = 1.0_wp     ! acn value
+       mg_prc_coeff_fix_in            = .true.     ! autoconversion kk2000
 
        h2otrip_in = 273.16_wp
        tboil_in   = 373.16_wp
