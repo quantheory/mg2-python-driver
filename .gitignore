@@ -1,0 +1,6 @@
+# compiled source #
+###################
+*.o
+*.mod
+*.pyc
+*.exe
