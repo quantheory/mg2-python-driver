@@ -35,9 +35,9 @@ module micro_mg2_acme_v1beta_utils
 !
 !--------------------------------------------------------------------------
 
-! #ifndef HAVE_GAMMA_INTRINSICS
-! use shr_spfn_mod, only: gamma => shr_spfn_gamma
-! #endif
+!#ifndef HAVE_GAMMA_INTRINSICS
+!use shr_spfn_mod, only: gamma => shr_spfn_gamma
+!#endif
 
 implicit none
 private
@@ -127,7 +127,7 @@ real(r8), parameter, public :: bc = 2._r8
 real(r8), parameter, public :: as = 11.72_r8
 real(r8), parameter, public :: bs = 0.41_r8
 ! cloud ice
-real(r8), public :: ai = huge(1.0_r8)                    !Fall speed parameter for cloud ice (micro_mg2_acme_v1beta_utils_init should assign it a valid value)
+real(r8), public :: ai = huge(1.0_r8) ! Fall speed parameter for cloud ice (micro_mg2_acme_v1beta_utils_init should assign it a valid value)
 real(r8), parameter, public :: bi = 1._r8
 ! rain
 real(r8), parameter, public :: ar = 841.99667_r8
@@ -153,7 +153,7 @@ real(r8), parameter :: icsmall = 1.e-8_r8
 real(r8), parameter :: dsph = 3._r8
 
 ! Bounds for mean diameter for different constituents.
-! no lam_bnd_ice parameter?
+! no lam_bnd_ice parameter here, it is in the init routine below
 real(r8), parameter :: lam_bnd_rain(2) = 1._r8/[500.e-6_r8, 20.e-6_r8]
 real(r8), parameter :: lam_bnd_snow(2) = 1._r8/[2000.e-6_r8, 10.e-6_r8]
 
