@@ -495,7 +495,7 @@ contains
 
        micro_mg_precip_frac_method_in = 'max_overlap' ! max_overlap assumed in old MG2
        micro_mg_berg_eff_factor_in    = 1.0_wp        ! scaling not used in old MG2
-       allow_sed_supersat_in          = .true.    ! allow ice supersaturation (don't know?)
+       allow_sed_supersat_in          = .true.    ! true to get old mg2
        ice_sed_ai                     = 700.0_wp  ! ai = 700._r8
        prc_coef1_in                   = 1350.0_wp ! prc_coef1 = 1350._r8 
        prc_exp_in                     = 2.47_wp   ! prc_exp = 2.47_r8
