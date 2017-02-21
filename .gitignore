@@ -4,3 +4,5 @@
 *.mod
 *.pyc
 *.exe
+*.includes
+*case.used
