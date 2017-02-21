@@ -20,9 +20,8 @@ import subprocess  # launch subprocesses
 import numpy as np # math functions
 import os          # operating system functions
 import sys
-from shutil import copyfile
 
-wrkdir = '/p/lscratchd/dgardner/KiD'
+wrkdir = '/p/lscratchd/dgardner/KiD/test-1'
 
 # test case: warm1, warm7, mixed1
 casename = 'warm1'
@@ -47,13 +46,17 @@ if (ierr != 0):
 # ------------------------------------------------------------------------------
 # make name lists
 
+TestDir = wrkdir+'/'+casename
+if not os.path.exists(TestDir):
+       os.makedirs(TestDir)
+
 for dt in dtvals:
        for mstep in mstepvals:
               
               infile  = open(casename+'.nml','r')  
               
               nmlname = casename+'_'+mphys+'_dt'+str(dt)+'_mstep'+str(mstep)+'.nml'
-              outfile = open(wrkdir+'/'+casename+'/'+nmlname,'w')
+              outfile = open(TestDir+'/'+nmlname,'w')
               
               for line in infile:
                      if 'MPHYS' in line:
