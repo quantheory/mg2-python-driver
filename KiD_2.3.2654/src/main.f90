@@ -49,8 +49,8 @@ contains
 
     !+++PMC: put macro stepping where dt is actually known.
     ! now in namelist:    mstep = 2  ! call micro every mstep (an integer) dynamics calls
-    mcount = 0               ! just need to initialize the counter which is incremented below
-    dtm    = dt*float(mstep) ! what is the micro timestep if only call every mstep dynamics steps?
+    mcount = 0        ! just need to initialize the counter which is incremented below
+    dtm    = dt*mstep ! micro timestep if only call every mstep dynamics steps
     
     write(*,*) 'mstep, dtm = ', mstep, dtm
     !---PMC
