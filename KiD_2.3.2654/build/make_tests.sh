@@ -20,16 +20,20 @@ import subprocess  # launch subprocesses
 import numpy as np # math functions
 import os          # operating system functions
 import sys
+from shutil import copyfile
 
-wrkdir   = '/p/lscratchd/dgardner/KiD'
-casename = 'warm00_test'
+wrkdir = '/p/lscratchd/dgardner/KiD'
 
-icase = 198               # KiD test case
-#mphys = 'mg2_acme_v1beta' # microphysics option
-mphys = 'mg2'
+# test case: warm1, warm7, mixed1
+casename = 'warm1'
 
-# time step sizes
-dt_vals = [1.0]
+mphys='mg2_acme_v1beta'
+
+# dynamics time step sizes
+dtvals = [ 1.0 ]
+
+# dtm = dt * mstep, physics time step sizes
+mstepvals = [ 1, 5, 10, 15, 30, 60, 300, 600, 900, 1200]
 
 # ------------------------------------------------------------------------------
 # make KiD
@@ -43,69 +47,21 @@ if (ierr != 0):
 # ------------------------------------------------------------------------------
 # make name lists
 
-# # iterate over step sizes dt
-# for dt in dt_vals:
-
-#        if (dt < 1):
-#               dt_str = str(int(np.log2(dt)))
-#        else:
-#               dt_str = str(int(dt))
+for dt in dtvals:
+       for mstep in mstepvals:
               
-#        nmlname  = mphys+'_dt'+dt_str+'.nml'
-#        filename = wrkdir+'/'+casename+'/'+nmlname
-                            
-#        f = os.open(filename,os.O_CREAT|os.O_WRONLY)
-       
-#        # Microphysics Namelist
-#        nml = ('&mphys \n'
-#               '! hydrometeor names \n'
-#               'h_names = \'cloud\',  \'rain\',  \'ice\',  \'snow\',  \'graupel\' \n'
-#               '! number of moments for each species \n'
-#               'num_h_moments = 2,2,2,2,0 \n'
-#               'num_h_bins    = 1,1,1,1,1 \n'
-#               '! Background values for each moment (assumed the same for all species) \n'
-#               'mom_init = 0,0,0 \n'
-#               '! Aerosol initialization \n'
-#               'num_aero_moments = 0,0,0 \n'
-#               'num_aero_bins    = 1 \n'
-#               'aero_N_init      = 0.0d0, 50.0d6, 0.0d0 \n'
-#               'aero_sig_init    = 0.0d0, 1.4d0, 0.0d0 \n'
-#               'aero_rd_init     = 0.0d0, 0.05d-6, 0.0d0 \n'
-#               '/ \n\n')
-       
-#        # Case Namelist    
-#        nml = nml + ('&case \n'
-#                     'icase = '+str(icase)+' \n'
-#                     '/ \n\n')
-       
-#        # Control Namelist 
-#        nml = nml + ('&control \n'
-#                     'mphys_scheme = \''+mphys+'\'\n'
-#                     'dt      = '+str(dt)+'d0 \n'
-#                     'dgstart = 0.0d0 \n'
-#                     'dg_dt   = '+ str(dt)+'d0 \n'
-#                     '! scaling factor for updraft \n'
-#                     'wctrl(1) = 0.0d0 \n'
-#                     '! half period of forcing \n'
-#                     'tctrl(2) = 0.0d0 \n'
-#                     '/ \n\n')
-
-#        # '! final time \n'
-#        # 'tctrl(1) = '+str(final_t)+'\n'
-       
-#        # Switch Namelist 
-#        nml = nml + ('&switch \n'
-#                     'l_advect            =.false. \n'
-#                     'l_diverge           =.false. \n'
-#                     'l_fix_theta         =.true.  \n'
-#                     'l_diverge_advection =.false. \n'
-#                     'l_fix_aerosols      =.true.  \n'
-#                     'l_periodic_bound    =.true.  \n'
-#                     '/ \n\n')
-       
-#        nml = nml + ('&addcontrol \n'
-#                     'iiwarm = .true. \n'
-#                     '/ \n\n')
-       
-#        os.write(f,nml)
-#        os.close(f)
+              infile  = open(casename+'.nml','r')  
+              
+              nmlname = casename+'_'+mphys+'_dt'+str(dt)+'_mstep'+str(mstep)+'.nml'
+              outfile = open(wrkdir+'/'+casename+'/'+nmlname,'w')
+              
+              for line in infile:
+                     if 'MPHYS' in line:
+                            line = line.replace('MPHYS', '\''+str(mphys)+'\'')
+                     if 'DT' in line:
+                            line = line.replace('DT', str(dt))
+                     if 'MSTEP' in line:
+                            line = line.replace('MSTEP', str(mstep))
+                     outfile.write(line)
+              outfile.close()
+              infile.close()
