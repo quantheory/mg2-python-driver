@@ -133,7 +133,8 @@ contains
   
   subroutine query_dgstep
 
-    if(mod(time,dg_dt)<dt.and.time>dgstart)then
+    if(mod(time-dt,dg_dt)<dt.and.time>=dgstart)then
+    !if(mod(time,dg_dt)<dt.and.time>dgstart)then ! original logic
        l_dgstep=.true.
        i_dgtime=i_dgtime+1
     else
