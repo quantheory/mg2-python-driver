@@ -124,15 +124,9 @@ private
 save
 
 public :: &
-!++ag (add mg2)
      micro_mg2_init, &
      micro_mg2_get_cols, &
      micro_mg2_tend
-
-!     micro_mg_init, &
-!     micro_mg_get_cols, &
-!     micro_mg_tend
-!--ag
 
 ! switch for specification rather than prediction of droplet and crystal number
 ! note: number will be adjusted as needed to keep mean size within bounds,
@@ -441,12 +435,6 @@ pure subroutine micro_mg2_tend ( &
   real(r8), intent(in) :: rndstn(:,:,:)  ! radius of each dust bin, for contact freezing (from microp_aero_ts) (m)
   real(r8), intent(in) :: naconin(:,:,:) ! number in each dust bin, for contact freezing  (from microp_aero_ts) (1/m^3)
 
-  ! Used with CARMA cirrus microphysics
-  ! (or similar external microphysics model)
-  real(r8), intent(in) :: tnd_qsnown(:,:) ! snow mass tendency (kg/kg/s)
-  real(r8), intent(in) :: tnd_nsnown(:,:) ! snow number tendency (#/kg/s)
-  real(r8), intent(in) :: re_icen(:,:)    ! ice effective radius (m)
-
   ! output arguments
 
   real(r8), intent(out) :: rate1ord_cw2pr_st(:,:)    ! 1st order rate for direct cw to precip conversion
@@ -538,6 +526,14 @@ pure subroutine micro_mg2_tend ( &
 
   character(128),   intent(out) :: errstring  ! output status (non-blank for error return)
 
+  ! Tendencies calculated by external schemes that can replace MG's native
+  ! process tendencies.
+
+  ! Used with CARMA cirrus microphysics
+  ! (or similar external microphysics model)
+  real(r8), intent(in) :: tnd_qsnown(:,:) ! snow mass tendency (kg/kg/s)
+  real(r8), intent(in) :: tnd_nsnown(:,:) ! snow number tendency (#/kg/s)
+  real(r8), intent(in) :: re_icen(:,:)    ! ice effective radius (m)
 
   ! local workspace
   ! all units mks unless otherwise stated
