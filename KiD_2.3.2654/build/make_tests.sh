@@ -25,14 +25,17 @@ wrkdir = '/p/lscratchd/dgardner/KiD/test-1'
 
 # test case: warm1, warm7, mixed1
 casename = 'warm1'
+#casename = 'mixed1'
 
 mphys='mg2_acme_v1beta'
+#mphys='mg2'
 
 # dynamics time step sizes
 dtvals = [ 1.0 ]
 
 # dtm = dt * mstep, physics time step sizes
-mstepvals = [ 1, 5, 10, 15, 30, 60, 300, 600, 900, 1200]
+#mstepvals = [ 1, 5, 10, 15, 30, 60, 300, 600, 900, 1200]
+mstepvals = [ 1, 5, 10, 15, 30, 60]
 
 # ------------------------------------------------------------------------------
 # make KiD

@@ -39,5 +39,5 @@ l_periodic_bound=.false.
 
 &addcontrol
 iiwarm=.true.
-mstemp=MSTEP
+mstep=MSTEP
 /

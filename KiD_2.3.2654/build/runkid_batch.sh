@@ -13,11 +13,9 @@ use netcdf-intel-4.1.3
 
 echo 'running KiD tests'
 for f in *.nml; do
-    NAME=${f%%.*}
-    echo "running KiD test: $NAME"
-    ./KiD_1D.exe $NAME.nml $NAME.nc > $NAME.log &
+    echo "running KiD test: $f"
+    ./KiD_1D.exe $f $f.nc > $f.log
+    wait
 done
-
-wait
 
 echo 'tests complete'
