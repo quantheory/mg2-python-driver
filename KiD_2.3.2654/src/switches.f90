@@ -224,6 +224,8 @@ Module switches
 
   integer :: mstep=1 !# of micro steps for each dynamics step
 
+  character(1024) :: fname_stats='mphys_stats' ! output file for fixed point diagnostics
+
   real(wp) :: end_time = 2.592d6 ! end at 30 days
 
 

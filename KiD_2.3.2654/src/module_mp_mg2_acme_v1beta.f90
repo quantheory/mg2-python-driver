@@ -87,9 +87,12 @@ module module_mp_mg2_acme_v1beta
 ! 2) saturation vapor pressure and specific humidity over water
 ! 3) svp over ice
 
-! #ifndef HAVE_GAMMA_INTRINSICS
-! use shr_spfn_mod, only: gamma => shr_spfn_gamma
-! #endif
+
+!#ifndef HAVE_GAMMA_INTRINSICS
+!use shr_spfn_mod, only: gamma => shr_spfn_gamma
+!#endif
+
+use mphys_stats
 
 use wv_sat_methods, only: &
      qsat_water => wv_sat_qsat_water, &
@@ -1461,11 +1464,25 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      qric(:,k) = qr(:,k)/precip_frac(:,k)
      nric(:,k) = nr(:,k)/precip_frac(:,k)
 
-     ! limit in-precip mixing ratios to 10 g/kg
+     ! update limiter count and save magnitude of limiter change
+     where (qric(:,k) > 0.01_r8)
+        qric_limiter(:,k) = qric_limiter(:,k) + 1
+        qric_limiter_mag(:,k) = (qric(:,k) - 0.01_r8)/qric(:,k)
+     end where
+
+     ! limit in-precip mixing ratios to 10 g/kg at most
      qric(:,k)=min(qric(:,k),0.01_r8)
 
      ! add autoconversion to precip from above to get provisional rain mixing ratio
      ! and number concentration (qric and nric)
+
+     where (qric(:,k).lt.qsmall)
+        qric_qsmall(:,k) = qric_qsmall(:,k) + 1
+        nric_qsmall(:,k) = nric_qsmall(:,k) + 1
+        
+        qric_qsmall_mag(:,k) = abs(qric(:,k))
+        nric_qsmall_mag(:,k) = abs(nric(:,k))
+     end where
 
      where (qric(:,k).lt.qsmall)
         qric(:,k)=0._r8
@@ -1474,6 +1491,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      ! make sure number concentration is a positive number to avoid
      ! taking root of negative later
+     where (nric(:,k) < 0.0_r8)
+        nric_neg(:,k) = nric_neg(:,k) + 1   
+        nric_neg_mag(:,k) = abs(nric(:,k))
+     end where
 
      nric(:,k)=max(nric(:,k),0._r8)
 
@@ -1511,10 +1532,24 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      qsic(:,k) = qs(:,k)/precip_frac(:,k)
      nsic(:,k) = ns(:,k)/precip_frac(:,k)
 
-     ! limit in-precip mixing ratios to 10 g/kg
+     ! update limiter count and save magnitude of limiter change
+     where (qsic(:,k) > 0.01_r8)
+        qsic_limiter(:,k) = qsic_limiter(:,k) + 1
+        qsic_limiter_mag(:,k) = (qsic(:,k) - 0.01_r8)/qsic(:,k)
+     end where
+
+     ! limit in-precip mixing ratios to 10 g/kg at most (>>> limiter <<<)
      qsic(:,k)=min(qsic(:,k),0.01_r8)
 
      ! if precip mix ratio is zero so should number concentration
+
+     where (qsic(:,k).lt.qsmall)
+        qsic_qsmall(:,k) = qsic_qsmall(:,k) + 1
+        nsic_qsmall(:,k) = nsic_qsmall(:,k) + 1
+        
+        qsic_qsmall_mag(:,k) = abs(qric(:,k))
+        nsic_qsmall_mag(:,k) = abs(nsic(:,k))
+     end where
 
      where (qsic(:,k) < qsmall)
         qsic(:,k)=0._r8
@@ -1522,7 +1557,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      end where
 
      ! make sure number concentration is a positive number to avoid
-     ! taking root of negative later
+     ! taking root of negative later 
+
+     where (nsic(:,k) < 0.0_r8) 
+        nsic_neg(:,k) = nsic_neg(:,k) + 1   
+        nsic_neg_mag(:,k) = abs(nsic(:,k))
+     end where
 
      nsic(:,k)=max(nsic(:,k),0._r8)
 
@@ -1574,7 +1614,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
                 qcic(:,k), ncic(:,k), relvar(:,k), mnuccc(:,k), nnuccc(:,k))
 
            ! make sure number of droplets frozen does not exceed available ice nuclei concentration
-           ! this prevents 'runaway' droplet freezing
+           ! this prevents 'runaway' droplet freezing (>>> limiter? <<<)
 
            where (qcic(:,k).ge.qsmall .and. t(:,k).lt.269.15_r8)
               where (nnuccc(:,k)*lcldm(:,k).gt.nnuccd(:,k))
@@ -1595,7 +1635,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
            ! Mass of droplets frozen is the average droplet mass, except
            ! with two limiters: concentration must be at least 1/cm^3, and
-           ! mass must be at least the minimum defined above.
+           ! mass must be at least the minimum defined above. (>>> limiter <<<)
            mi0l = qcic(:,k)/max(ncic(:,k), 1.0e6_r8/rho(:,k))
            mi0l = max(mi0l_min, mi0l)
 
@@ -1710,7 +1750,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
         ! note: for check on conservation, processes are multiplied by omsm
         ! to prevent problems due to round off error
 
-        ! conservation of qc
+        ! conservation of qc (>>> limiter <<<)
         !-------------------------------------------------------------------
 
         dum = ((prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+msacwi(i,k)+ &
@@ -1728,6 +1768,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            bergs(i,k) = bergs(i,k)*ratio
            berg(i,k) = berg(i,k)*ratio
            qcrat(i,k) = ratio
+
+           qc_conservation(i,k) = qc_conservation(i,k) + 1
+           qc_conservation_mag(i,k) = ratio
+           
         else
            qcrat(i,k) = 1._r8
         end if
@@ -1762,7 +1806,15 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               ! processes. Don't divide by cloud fraction; these are grid-
               ! mean rates.
               dum1 = mnuccd(i,k) / (vap_dep(i,k)+mnuccd(i,k))
+              
+              ice_nucleation_limiter(i,k) = ice_nucleation_limiter(i,k) + 1
+              ice_nucleation_limiter_mag(i,k) = abs((mnuccd(i,k) - dum*dum1)/mnuccd(i,k))
+
               mnuccd(i,k) = dum*dum1
+
+              ice_deposition_limiter(i,k) = ice_deposition_limiter(i,k) + 1
+              ice_deposition_limiter_mag(i,k) = abs((vap_dep(i,k) - dum + mnuccd(i,k))/vap_dep(i,k))
+
               vap_dep(i,k) = dum - mnuccd(i,k)
            end if
         end if
@@ -1787,6 +1839,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            nnucct(i,k) = nnucct(i,k)*ratio
            npsacws(i,k) = npsacws(i,k)*ratio
            nsubc(i,k)=nsubc(i,k)*ratio
+
+           nc_conservation(i,k) = nc_conservation(i,k) + 1
+           nc_conservation_mag(i,k) = ratio
+
         end if
 
         mnuccri(i,k)=0._r8
@@ -1794,7 +1850,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
         if (do_cldice) then
 
-           ! freezing of rain to produce ice if mean rain size is smaller than Dcs
+           ! freezing of rain to produce ice if mean rain size is smaller than Dcs (???)
            if (lamr(i,k) > qsmall .and. 1._r8/lamr(i,k) < Dcs) then
               mnuccri(i,k)=mnuccr(i,k)
               nnuccri(i,k)=nnuccr(i,k)
@@ -1821,13 +1877,17 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            pracs(i,k)=pracs(i,k)*ratio
            mnuccr(i,k)=mnuccr(i,k)*ratio
            mnuccri(i,k)=mnuccri(i,k)*ratio
+
+           qr_conservation(i,k) = qr_conservation(i,k) + 1
+           qr_conservation_mag(i,k) = ratio
+
         end if
 
      end do
 
      do i=1,mgncol
 
-        ! conservation of rain number
+        ! conservation of rain number (??? not really limiter ???)
         !-------------------------------------------------------------------
 
         ! Add evaporation of rain number.
@@ -1855,6 +1915,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            nnuccr(i,k)=nnuccr(i,k)*ratio
            nsubr(i,k)=nsubr(i,k)*ratio
            nnuccri(i,k)=nnuccri(i,k)*ratio
+
+           nr_conservation(i,k) = nr_conservation(i,k) + 1
+           nr_conservation_mag(i,k) = ratio
+
         end if
 
      end do
@@ -1878,6 +1942,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               prci(i,k) = prci(i,k)*ratio
               prai(i,k) = prai(i,k)*ratio
               ice_sublim(i,k) = ice_sublim(i,k)*ratio
+
+              qi_conservation(i,k) = qi_conservation(i,k) + 1
+              qi_conservation_mag(i,k) = ratio
+
            end if
 
         end do
@@ -1907,6 +1975,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               nprci(i,k) = nprci(i,k)*ratio
               nprai(i,k) = nprai(i,k)*ratio
               nsubi(i,k) = nsubi(i,k)*ratio
+
+              ni_conservation(i,k) = ni_conservation(i,k) + 1
+              ni_conservation_mag(i,k) = ratio
+
            end if
 
         end do
@@ -1925,6 +1997,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
                 (bergs(i,k)+psacws(i,k))*lcldm(i,k)+(pracs(i,k)+mnuccr(i,k))*precip_frac(i,k))/ &
                 precip_frac(i,k)/(-prds(i,k))*omsm
            prds(i,k)=prds(i,k)*ratio
+
+           qs_conservation(i,k) = qs_conservation(i,k) + 1
+           qs_conservation_mag(i,k) = ratio
+           
         end if
 
      end do
@@ -1945,11 +2021,17 @@ subroutine micro_mg2_acme_v1beta_tend ( &
                 (-nsubs(i,k)-nsagg(i,k))*omsm
            nsubs(i,k)=nsubs(i,k)*ratio
            nsagg(i,k)=nsagg(i,k)*ratio
+
+           ns_conservation(i,k) = ns_conservation(i,k) + 1
+           ns_conservation_mag(i,k) = ratio
+
         end if
 
      end do
 
      do i=1,mgncol
+
+        ! DJG NOTE: These limiters appeared after qc limiter in older MG2
 
         ! next limit ice and snow sublimation and rain evaporation
         ! get estimate of q and t at end of time step
@@ -1969,6 +2051,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            ! modify ice/precip evaporation rate if q > qsat
            if (qtmp > qvn) then
 
+              qiqs_sublimation_qr_evaporation_limiter(i,k) = &
+                   qiqs_sublimation_qr_evaporation_limiter(i,k) + 1
+              
               dum1=pre(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k))*precip_frac(i,k)+ice_sublim(i,k))
               dum2=prds(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k))*precip_frac(i,k)+ice_sublim(i,k))
               ! recalculate q and t after vap_dep and mnuccd but without evap or sublim
@@ -1981,6 +2066,8 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               dum=(qtmp-qvn)/(1._r8 + xxlv_squared*qvn/(cpp*rv*ttmp**2))
               dum=min(dum,0._r8)
 
+              rain_evaporation_limiter_mag(i,k) = abs((pre(i,k) - dum*dum1/deltat/precip_frac(i,k))/pre(i,k))
+
               ! modify rates if needed, divide by precip_frac to get local (in-precip) value
               pre(i,k)=dum*dum1/deltat/precip_frac(i,k)
 
@@ -1990,8 +2077,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               dum=(qtmp-qvn)/(1._r8 + xxls_squared*qvn/(cpp*rv*ttmp**2))
               dum=min(dum,0._r8)
 
+              snow_sublimation_limiter_mag(i,k) = abs((prds(i,k) - dum*dum2/deltat/precip_frac(i,k))/prds(i,k))
+              
               ! modify rates if needed, divide by precip_frac to get local (in-precip) value
               prds(i,k) = dum*dum2/deltat/precip_frac(i,k)
+
+              ice_sublimation_limiter_mag(i,k) = abs((ice_sublim(i,k) - dum*(1._r8-dum1-dum2)/deltat)/ice_sublim(i,k))
 
               ! don't divide ice_sublim by cloud fraction since it is grid-averaged
               dum1 = (1._r8-dum1-dum2)
@@ -2001,7 +2092,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      end do
 
-     ! Big "administration" loop enforces conservation, updates variables
+     ! End Big "administration" loop enforces conservation, updates variables
      ! that accumulate over substeps, and sets output variables.
 
      do i=1,mgncol
@@ -2121,6 +2212,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
         !================================================================
 
         if (do_cldice .and. nitend(i,k).gt.0._r8.and.ni(i,k)+nitend(i,k)*deltat.gt.nimax(i,k)) then
+           ni_tendency_limiter(i,k)     = ni_tendency_limiter(i,k) + 1
+           ni_tendency_limiter_mag(i,k) = abs((nitend(i,k) - max(0._r8,(nimax(i,k)-ni(i,k))/deltat))/nitend(i,k))
+           
            nitend(i,k)=max(0._r8,(nimax(i,k)-ni(i,k))/deltat)
         end if
 

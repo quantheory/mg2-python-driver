@@ -66,7 +66,8 @@ module namelists
      ! Thompson 09...
      , l_reuse_thompson_lookup &
      , mstep &
-     , end_time
+     , end_time &
+     , fname_stats
 
   ! Namelist input...
 

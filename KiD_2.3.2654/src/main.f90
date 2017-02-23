@@ -28,6 +28,8 @@ Module main
   Use stepfields, only : step_column
   Use divergence, only : diverge_column
 
+  Use mphys_stats
+
   Implicit none
 
 contains
@@ -55,6 +57,9 @@ contains
     write(*,*) 'mstep, dtm = ', mstep, dtm
     !---PMC
 
+    ! initialize stats file
+    call init_stats()
+
     ! Set up the initial fields and forcing
     if (l_input_file)then
        call read_profiles(input_file)
@@ -67,6 +72,11 @@ contains
     call interpolate_forcing
 
     call calc_derived_fields
+
+    if (l_mphys)then
+       call mphys_column(scheme_id=imphys)
+       call write_stats(0)
+    end if
 
     ! Do we want to do diagnostics on this timestep?
     call query_dgstep
@@ -118,11 +128,15 @@ contains
           ! reset mphys step counter (move outsize fp iter) !!!
           mcount = 0
 
+          ! write mphys stats to file
+          call write_stats(itime)
+
        end if
 
        ! update mphys step counter (move outsize fp iter) !!!
        mcount = mcount+1
 
+       ! compute Euler step, always trickle in micro tendency (true flag)
        call step_column(.true., dt)
 
        if (time > end_time) exit
@@ -136,6 +150,8 @@ contains
     end do
 
     if (l_write_dgs) call write_diagnostics
+    
+    call finalize_stats()
 
   end subroutine main_loop
 
