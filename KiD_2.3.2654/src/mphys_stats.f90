@@ -96,7 +96,7 @@ contains
   subroutine init_stats()
     
     fid = 101
-    fname = trim(fname_stats) // '_limiters.txt'
+    fname = trim(fname_stats)
     open(unit = fid, file = fname)
     write(fid,'(A)') "================================================================================"
     write(fid,'(A)') "Limiter Counts"
