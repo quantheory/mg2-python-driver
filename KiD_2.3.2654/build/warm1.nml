@@ -40,4 +40,5 @@ l_periodic_bound=.false.
 &addcontrol
 iiwarm=.true.
 mstep=MSTEP
+fname_stats=FNAMESTATS
 /
