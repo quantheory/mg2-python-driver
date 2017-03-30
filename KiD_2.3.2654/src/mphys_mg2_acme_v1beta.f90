@@ -6,6 +6,9 @@
 !  Andrew Gettelman, February 2013
 !  Updated May 2013 for MG2 code in MG2_dev_n07_CAM5_3_01
 
+#define ADJUST_SATURATION_BEFORE
+!#define ADJUST_SATURATION_AFTER
+
 module mphys_mg2_acme_v1beta
 
   use parameters, only : num_h_moments, num_h_bins, nspecies, nz, dt, &
@@ -342,6 +345,14 @@ contains
     real(r8) :: flip_mnuccdo(nx,nz)      ! mass tendency from ice nucleation
     !--ag
 
+    ! internal variables for saturation adjustment
+    real(r8) :: qvlato_adj(nx,nz)  
+    real(r8) :: tlato_adj(nx,nz)   
+    real(r8) :: qctendo_adj(nx,nz) 
+    real(r8) :: nctendo_adj(nx,nz) 
+    real(r8) :: qitendo_adj(nx,nz) 
+    real(r8) :: nitendo_adj(nx,nz) 
+    
     !note different order of i,k for MG...
     !also: MG is top down, kid arrays are bottom up.    
 
@@ -375,6 +386,14 @@ contains
           qstendo(i,k) = 0.0_wp
           nrtendo(i,k) = 0.0_wp
           nstendo(i,k) = 0.0_wp
+
+          ! zero saturation adjustment tendencies
+          qvlato_adj(i,k)  = 0.0_wp 
+          tlato_adj(i,k)   = 0.0_wp 
+          qctendo_adj(i,k) = 0.0_wp 
+          nctendo_adj(i,k) = 0.0_wp 
+          qitendo_adj(i,k) = 0.0_wp 
+          nitendo_adj(i,k) = 0.0_wp 
 
           effco(i,k)    = 0.0_wp
           effio(i,k)    = 0.0_wp
@@ -495,7 +514,7 @@ contains
 
        micro_mg_precip_frac_method_in = 'in_cloud' ! max_overlap assumed in old MG2
        micro_mg_berg_eff_factor_in    = 0.1_wp     ! 1.0 (scaling not used in old MG2)
-       allow_sed_supersat_in          = .true.     ! true to get old mg2 (.true. leads to different behavior in KiD)
+       allow_sed_supersat_in          = .false.     ! true to get old mg2 (.true. leads to different behavior in KiD)
        ice_sed_ai                     = 500.0_wp   ! ai = 700._r8
        prc_coef1_in                   = 30500.0_wp ! prc_coef1 = 1350._r8 
        prc_exp_in                     = 3.19_wp    ! prc_exp = 2.47_r8
@@ -539,6 +558,90 @@ contains
     rndstn(:,:,4)  = 10.0e-6_wp     ! radius (m)
     !number
     naconin(:,:,:) = 1000.0_wp  ! 100 m-3
+
+#ifdef ADJUST_SATURATION_BEFORE
+    ! Add saturation adjustment...based on m2005
+    do i=1,nx
+       do k=1,nz
+          !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+          ! NOW CALCULATE SATURATION ADJUSTMENT TO CONDENSE EXTRA VAPOR ABOVE
+          ! WATER SATURATION  
+
+          DUMT  = tn(i,k) !+ dt*tlato(i,k) 
+          DUMQV = qn(i,k) !+ dt*qvlato(i,k)
+
+          call wv_sat_qsat_water(DUMT, pn(i,k), ESL, QVL, 1)
+
+          ! DUMQSS = qsaturation(tn(k,i),pmb(k,i))
+          DUMQSS = QVL
+
+          DUMQC = qcn(i,k) !+ dt*qctendo(i,k)
+          DUMQC = MAX(DUMQC,0.0_wp)
+          DUMNC = ncn(i,k) !+ dt*nctendo(i,k)
+
+          ! SATURATION ADJUSTMENT FOR LIQUID
+          PCC= 0.0_wp
+
+          DUMS = DUMQV-DUMQSS
+
+          CPM = cpair*(1.0_wp+0.887_wp*DUMQC) 
+
+          ! Do condensation only (doesnt seem to work without a positive limit warm2: 
+          ! why doesn't evap work?)
+          !             if (DUMS.GT.qsmall) &
+          PCC = DUMS / (1.+ latvap**2 * DUMQSS/(CPM * rh2o * DUMT**2)) / dt
+
+          ! limit evap to qc
+          IF (PCC*dt + DUMQC.LT.qsmall) THEN
+             PCC = -DUMQC/dt
+          END IF
+
+          !++ag
+          satadj(i,k)=PCC
+          !--ag
+
+          ! Figure out additional number concentration (assume size of 8 microns...)
+          DNC =  3.0_r8 * PCC / (4.0_r8*3.14_r8* 8.0e-6_r8**3*997.0_r8)
+
+          ! make sure it does not get less than zero
+          IF (DNC*dt + DUMNC.LT.qsmall) THEN
+             DNC = -DUMNC/dt
+          END IF
+
+          ! if (i.eq.1.and.k.eq. 25) &
+          !      print*, 'z,pmb,DUMT,DUMqv,DUMQS,DUMQC,pcc,dnc,tlato=',&
+          !      z(k),pmb(k,i),DUMT,DUMQV,QVL,DUMQC,PCC,DNC,tlato(k,i)
+          
+          ! apply tendencies
+          qvlato_adj(i,k)  = qvlato_adj(i,k)  - PCC
+          tlato_adj(i,k)   = tlato_adj(i,k)   + PCC * latvap/CPM
+          qctendo_adj(i,k) = qctendo_adj(i,k) + PCC
+          nctendo_adj(i,k) = nctendo_adj(i,k) + DNC 
+
+          ! limters to make sure if 
+          ! (a) non negative mass and number and 
+          ! (b) no mass, then no number
+          if (qcn(i,k)+qctendo_adj(i,k).lt.qsmall) then
+             qctendo_adj(i,k)=-qcn(i,k)/dt
+             nctendo_adj(i,k)=-ncn(i,k)/dt
+          end if
+
+          if (qin(i,k)+qitendo_adj(i,k).lt.qsmall) then
+             qitendo_adj(i,k)=-qin(i,k)/dt
+             nitendo_adj(i,k)=-nin(i,k)/dt
+          end if
+
+          ! perform sequential update
+          qn  = qn  + dt * qvlato_adj(i,k)
+          tn  = tn  + dt * tlato_adj(i,k)
+          qcn = qcn + dt * qctendo_adj(i,k)
+          ncn = ncn + dt * nctendo_adj(i,k)
+          qin = qin + dt * qitendo_adj(i,k)
+          nin = nin + dt * nitendo_adj(i,k)
+
+       end do
+    end do
+#endif
 
     !=================================================
     ! 2. NOW FLIP FROM SURF-FIRST TO TOP-OF-ATMOS FIRST
@@ -683,6 +786,7 @@ contains
     frzrdto(:,:)   = flip_frzrdto(:,nz:1:-1) 
     mnuccdo(:,:)   = flip_mnuccdo(:,nz:1:-1)       
 
+#ifdef ADJUST_SATURATION_AFTER
     !Add saturation adjustment...based on m2005
     do i=1,nx
        do k=1,nz
@@ -753,6 +857,22 @@ contains
           end if
        end do
     end do
+#endif
+
+#ifdef ADJUST_SATURATION_BEFORE
+    do i=1,nx
+       do k=1,nz
+          ! add in saturation from before microphysics to output tendencies
+          qvlato(i,k)  = qvlato(i,k)  + qvlato_adj(i,k) 
+          tlato(i,k)   = tlato(i,k)   + tlato_adj(i,k)  
+          qctendo(i,k) = qctendo(i,k) + qctendo_adj(i,k)
+          nctendo(i,k) = nctendo(i,k) + nctendo_adj(i,k)
+          qitendo(i,k) = qitendo(i,k) + qitendo_adj(i,k)
+          nitendo(i,k) = nitendo(i,k) + nitendo_adj(i,k)
+       end do
+    end do
+#endif
+    
 
     !=================================================
     ! 9. WRITE OUTPUT:
