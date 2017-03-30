@@ -345,6 +345,7 @@ contains
     real(r8) :: flip_mnuccdo(nx,nz)      ! mass tendency from ice nucleation
     !--ag
 
+#ifdef ADJUST_SATURATION_BEFORE
     ! internal variables for saturation adjustment
     real(r8) :: qvlato_adj(nx,nz)  
     real(r8) :: tlato_adj(nx,nz)   
@@ -352,6 +353,7 @@ contains
     real(r8) :: nctendo_adj(nx,nz) 
     real(r8) :: qitendo_adj(nx,nz) 
     real(r8) :: nitendo_adj(nx,nz) 
+#endif
     
     !note different order of i,k for MG...
     !also: MG is top down, kid arrays are bottom up.    
@@ -386,14 +388,6 @@ contains
           qstendo(i,k) = 0.0_wp
           nrtendo(i,k) = 0.0_wp
           nstendo(i,k) = 0.0_wp
-
-          ! zero saturation adjustment tendencies
-          qvlato_adj(i,k)  = 0.0_wp 
-          tlato_adj(i,k)   = 0.0_wp 
-          qctendo_adj(i,k) = 0.0_wp 
-          nctendo_adj(i,k) = 0.0_wp 
-          qitendo_adj(i,k) = 0.0_wp 
-          nitendo_adj(i,k) = 0.0_wp 
 
           effco(i,k)    = 0.0_wp
           effio(i,k)    = 0.0_wp
@@ -560,6 +554,14 @@ contains
     naconin(:,:,:) = 1000.0_wp  ! 100 m-3
 
 #ifdef ADJUST_SATURATION_BEFORE
+    ! zero saturation adjustment tendencies
+    qvlato_adj(i,k)  = 0.0_wp 
+    tlato_adj(i,k)   = 0.0_wp 
+    qctendo_adj(i,k) = 0.0_wp 
+    nctendo_adj(i,k) = 0.0_wp 
+    qitendo_adj(i,k) = 0.0_wp 
+    nitendo_adj(i,k) = 0.0_wp 
+
     ! Add saturation adjustment...based on m2005
     do i=1,nx
        do k=1,nz
@@ -613,14 +615,18 @@ contains
           !      z(k),pmb(k,i),DUMT,DUMQV,QVL,DUMQC,PCC,DNC,tlato(k,i)
           
           ! apply tendencies
-          qvlato_adj(i,k)  = qvlato_adj(i,k)  - PCC
-          tlato_adj(i,k)   = tlato_adj(i,k)   + PCC * latvap/CPM
-          qctendo_adj(i,k) = qctendo_adj(i,k) + PCC
-          nctendo_adj(i,k) = nctendo_adj(i,k) + DNC 
+          qvlato_adj(i,k)  = -PCC
+          tlato_adj(i,k)   = PCC * latvap/CPM
+          qctendo_adj(i,k) = PCC
+          nctendo_adj(i,k) = DNC 
 
           ! limters to make sure if 
           ! (a) non negative mass and number and 
           ! (b) no mass, then no number
+          if (qn(i,k).lt.qsmall) then !+++djg
+             qvlato_adj(i,k) = -qn(i,k)/dt
+          end if
+
           if (qcn(i,k)+qctendo_adj(i,k).lt.qsmall) then
              qctendo_adj(i,k)=-qcn(i,k)/dt
              nctendo_adj(i,k)=-ncn(i,k)/dt
@@ -632,12 +638,12 @@ contains
           end if
 
           ! perform sequential update
-          qn  = qn  + dt * qvlato_adj(i,k)
-          tn  = tn  + dt * tlato_adj(i,k)
-          qcn = qcn + dt * qctendo_adj(i,k)
-          ncn = ncn + dt * nctendo_adj(i,k)
-          qin = qin + dt * qitendo_adj(i,k)
-          nin = nin + dt * nitendo_adj(i,k)
+          qn(i,k)  = qn(i,k)  + dt * qvlato_adj(i,k)
+          tn(i,k)  = tn(i,k)  + dt * tlato_adj(i,k) ! need exner pressure?
+          qcn(i,k) = qcn(i,k) + dt * qctendo_adj(i,k)
+          ncn(i,k) = ncn(i,k) + dt * nctendo_adj(i,k)
+          qin(i,k) = qin(i,k) + dt * qitendo_adj(i,k)
+          nin(i,k) = nin(i,k) + dt * nitendo_adj(i,k)
 
        end do
     end do
@@ -871,8 +877,7 @@ contains
           nitendo(i,k) = nitendo(i,k) + nitendo_adj(i,k)
        end do
     end do
-#endif
-    
+#endif   
 
     !=================================================
     ! 9. WRITE OUTPUT:
