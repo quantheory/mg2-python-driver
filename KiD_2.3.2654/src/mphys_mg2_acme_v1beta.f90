@@ -484,24 +484,24 @@ contains
     ! Initialise microphysics (see micro_mg2_utils.f90 for old values)
     if (micro_unset) then
 
-       rhmini_in = 0.7_wp       ! Minimum rh for ice cloud fraction > 0.
+       rhmini_in = 0.8_wp       ! Minimum rh for ice cloud fraction > 0.
 
-       micro_mg_dcs      = 90.0e-6_wp ! dcs = 90.e-6_r8 
-       micro_mg_dcs_tdep = .false.    ! false to get old ice autoconversion
+       micro_mg_dcs      = 195.0e-6_wp ! dcs = 90.e-6_r8 
+       micro_mg_dcs_tdep = .true.      ! false to get old ice autoconversion
 
-       microp_uniform_in      = .true.  ! true in old MG2
+       microp_uniform_in      = .true.  ! true in old MG2 (false in ACME but causes KiD to fail)
        do_cldice_in           = .true.  ! true in old MG2
-       use_hetfrz_classnuc_in = .false. ! not an option in old MG2
+       use_hetfrz_classnuc_in = .false. ! not an option in old MG2 (requires more interfacing to bring into KiD)
 
-       micro_mg_precip_frac_method_in = 'max_overlap' ! max_overlap assumed in old MG2
-       micro_mg_berg_eff_factor_in    = 1.0_wp     ! 1.0 (scaling not used in old MG2)
-       allow_sed_supersat_in          = .true.     ! true to get old mg2
-       ice_sed_ai                     = 700.0_wp   ! ai = 700._r8
-       prc_coef1_in                   = 1350.0_wp  ! prc_coef1 = 1350._r8 
-       prc_exp_in                     = 2.47_wp    ! prc_exp = 2.47_r8
-       prc_exp1_in                    = -1.79_wp   ! prc_exp1 = -1.79_r8
-       cld_sed_in                     = 1.0_wp     ! acn value
-       mg_prc_coeff_fix_in            = .false.    ! false to get old mg2
+       micro_mg_precip_frac_method_in = 'in_cloud' ! max_overlap assumed in old MG2
+       micro_mg_berg_eff_factor_in    = 0.1_wp     ! 1.0 (scaling not used in old MG2)
+       allow_sed_supersat_in          = .true.     ! true to get old mg2 (.true. leads to different behavior in KiD)
+       ice_sed_ai                     = 500.0_wp   ! ai = 700._r8
+       prc_coef1_in                   = 30500.0_wp ! prc_coef1 = 1350._r8 
+       prc_exp_in                     = 3.19_wp    ! prc_exp = 2.47_r8
+       prc_exp1_in                    = -1.2_wp    ! prc_exp1 = -1.79_r8
+       cld_sed_in                     = 1.0_wp     ! acn value = 1.0
+       mg_prc_coeff_fix_in            = .true.     ! false to get old mg2
 
        h2otrip_in = 273.16_wp
        tboil_in   = 373.16_wp
