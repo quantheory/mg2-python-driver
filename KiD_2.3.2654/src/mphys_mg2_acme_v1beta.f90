@@ -623,23 +623,23 @@ contains
           ! limters to make sure if 
           ! (a) non negative mass and number and 
           ! (b) no mass, then no number
-          if (qn(i,k).lt.qsmall) then !+++djg
+          if (qn(i,k) + dt * qvlato(i,k).lt.qsmall) then !+++djg
              qvlato_adj(i,k) = -qn(i,k)/dt
           end if
 
-          if (qcn(i,k)+qctendo_adj(i,k).lt.qsmall) then
+          if (qcn(i,k) + dt * qctendo_adj(i,k).lt.qsmall) then
              qctendo_adj(i,k)=-qcn(i,k)/dt
              nctendo_adj(i,k)=-ncn(i,k)/dt
           end if
 
-          if (qin(i,k)+qitendo_adj(i,k).lt.qsmall) then
+          if (qin(i,k) + dt * qitendo_adj(i,k).lt.qsmall) then
              qitendo_adj(i,k)=-qin(i,k)/dt
              nitendo_adj(i,k)=-nin(i,k)/dt
           end if
 
           ! perform sequential update
           qn(i,k)  = qn(i,k)  + dt * qvlato_adj(i,k)
-          tn(i,k)  = tn(i,k)  + dt * tlato_adj(i,k) ! need exner pressure?
+          tn(i,k)  = tn(i,k)  + dt * tlato_adj(i,k)
           qcn(i,k) = qcn(i,k) + dt * qctendo_adj(i,k)
           ncn(i,k) = ncn(i,k) + dt * nctendo_adj(i,k)
           qin(i,k) = qin(i,k) + dt * qitendo_adj(i,k)
@@ -852,12 +852,12 @@ contains
           nctendo(i,k) = nctendo(i,k) + DNC 
 
           !limters to make sure if (a) non negative mass and number and (b) no mass, then no number
-          if (qcn(i,k)+qctendo(i,k).lt.qsmall) then
+          if (qcn(i,k) + dt * qctendo(i,k).lt.qsmall) then
              qctendo(i,k)=-qcn(i,k)/dt
              nctendo(i,k)=-ncn(i,k)/dt
           end if
 
-          if (qin(i,k)+qitendo(i,k).lt.qsmall) then
+          if (qin(i,k) + dt * qitendo(i,k).lt.qsmall) then
              qitendo(i,k)=-qin(i,k)/dt
              nitendo(i,k)=-nin(i,k)/dt
           end if
