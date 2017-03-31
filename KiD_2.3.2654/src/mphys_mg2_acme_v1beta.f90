@@ -645,6 +645,17 @@ contains
           qin(i,k) = qin(i,k) + dt * qitendo_adj(i,k)
           nin(i,k) = nin(i,k) + dt * nitendo_adj(i,k)
 
+          if (tn(i,k) < 0.0d0) then
+             write(*,*) "Error: negative temperature"
+          end if
+         
+          ! set small values are zero
+          if (qn(i,k).lt.qsmall)  qn(i,k)  = 0.0_wp
+          if (qcn(i,k).lt.qsmall) qcn(i,k) = 0.0_wp
+          if (qcn(i,k).lt.qsmall) ncn(i,k) = 0.0_wp
+          if (qin(i,k).lt.qsmall) qin(i,k) = 0.0_wp
+          if (qin(i,k).lt.qsmall) nin(i,k) = 0.0_wp
+          
        end do
     end do
 #endif
@@ -875,6 +886,8 @@ contains
           nctendo(i,k) = nctendo(i,k) + nctendo_adj(i,k)
           qitendo(i,k) = qitendo(i,k) + qitendo_adj(i,k)
           nitendo(i,k) = nitendo(i,k) + nitendo_adj(i,k)
+
+          ! limiters?
        end do
     end do
 #endif   
