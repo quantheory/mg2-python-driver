@@ -396,7 +396,8 @@ contains
           !set input arguments
 
           !temperature
-          tn(i,k) = (theta(k,i) + (dtheta_adv(k,i)+dtheta_div(k,i))*dt )*exner(k,i)
+          ! tn(i,k) = (theta(k,i) + (dtheta_adv(k,i)+dtheta_div(k,i))*dt )*exner(k,i)
+          tn(i,k) = theta(k,i) * exner(k,i)
 
           !layer pressure
           pn(i,k) = p0*exner(k,i)**(1.0_wp/r_on_cp)
@@ -404,63 +405,82 @@ contains
           !interface pressure calculated using dp = rho * g* dz
           pdeln(i,k)= pn(i,k)/(287.15*tn(i,k)) * 9.81_wp * dz(k)
 
-          ! sequential update with advection and divergence tendencies
-          qn(i,k) = qv(k,i)+ (dqv_adv(k,i)+dqv_div(k,i))*dt
+          ! sequential updates with advection and divergence tendencies (note dt = dtm)
+
+          ! water vapor mass
+          ! qn(i,k) = qv(k,i)+ (dqv_adv(k,i)+dqv_div(k,i))*dt
+          qn(i,k) = qv(k,i)
 
           if (qn(i,k).lt.qsmall) qn(i,k) = 0.0_wp
 
-          qcn(i,k) = hydrometeors(k,i,1)%moments(1,1) & 
-               + (dhydrometeors_adv(k,i,1)%moments(1,1) &
-               + dhydrometeors_div(k,i,1)%moments(1,1))*dt
+          ! cloud water mass
+          ! qcn(i,k) = hydrometeors(k,i,1)%moments(1,1) & 
+          !      + (dhydrometeors_adv(k,i,1)%moments(1,1) &
+          !      + dhydrometeors_div(k,i,1)%moments(11,))*dt
+          qcn(i,k) = hydrometeors(k,i,1)%moments(1,1)
 
           if (qcn(i,k).lt.qsmall) qcn(i,k) = 0.0_wp
 
+          ! cloud water number
           if (num_h_moments(1) >= 2) &
-               ncn(i,k) = hydrometeors(k,i,1)%moments(1,2)& 
-               + (dhydrometeors_adv(k,i,1)%moments(1,2) &
-               + dhydrometeors_div(k,i,1)%moments(1,2))*dt
-
+               ! ncn(i,k) = hydrometeors(k,i,1)%moments(1,2)& 
+               ! + (dhydrometeors_adv(k,i,1)%moments(1,2) &
+               ! + dhydrometeors_div(k,i,1)%moments(1,2))*dt
+               ncn(i,k) = hydrometeors(k,i,1)%moments(1,2)
+          
           if (qcn(i,k).lt.qsmall) ncn(i,k) = 0.0_wp
 
+          ! cloud ice mass
           if (num_h_moments(3) >= 1) &
-               qin(i,k) = hydrometeors(k,i,3)%moments(1,1)& 
-               + (dhydrometeors_adv(k,i,3)%moments(1,1) &
-               + dhydrometeors_div(k,i,3)%moments(1,1))*dt
+               ! qin(i,k) = hydrometeors(k,i,3)%moments(1,1)& 
+               ! + (dhydrometeors_adv(k,i,3)%moments(1,1) &
+               ! + dhydrometeors_div(k,i,3)%moments(1,1))*dt
+               qin(i,k) = hydrometeors(k,i,3)%moments(1,1)
 
           if (qin(i,k).lt.qsmall) qin(i,k)=0.0_wp
 
+          ! cloud ice number
           if (num_h_moments(3) >= 2) &
-               nin(i,k) = hydrometeors(k,i,3)%moments(1,2)& 
-               + (dhydrometeors_adv(k,i,3)%moments(1,2) &
-               + dhydrometeors_div(k,i,3)%moments(1,2))*dt
+               ! nin(i,k) = hydrometeors(k,i,3)%moments(1,2)& 
+               ! + (dhydrometeors_adv(k,i,3)%moments(1,2) &
+               ! + dhydrometeors_div(k,i,3)%moments(1,2))*dt
+               nin(i,k) = hydrometeors(k,i,3)%moments(1,2)
 
           if (qin(i,k).lt.qsmall) nin(i,k) = 0.0_wp
 
+          ! rain mass
           if (num_h_moments(2) >= 1) &
-               qrn(i,k) = hydrometeors(k,i,2)%moments(1,1)& 
-               + (dhydrometeors_adv(k,i,2)%moments(1,1) &
-               + dhydrometeors_div(k,i,2)%moments(1,1))*dt
+               ! qrn(i,k) = hydrometeors(k,i,2)%moments(1,1)& 
+               ! + (dhydrometeors_adv(k,i,2)%moments(1,1) &
+               ! + dhydrometeors_div(k,i,2)%moments(1,1))*dt
+               qrn(i,k) = hydrometeors(k,i,2)%moments(1,1)
 
           if (qrn(i,k).lt.qsmall) qrn(i,k)=0.0_wp 
 
+          ! rain number
           if (num_h_moments(2) >= 2) &
-               nrn(i,k) = hydrometeors(k,i,2)%moments(1,2)& 
-               + (dhydrometeors_adv(k,i,2)%moments(1,2) &
-               + dhydrometeors_div(k,i,2)%moments(1,2))*dt
+               ! nrn(i,k) = hydrometeors(k,i,2)%moments(1,2)& 
+               ! + (dhydrometeors_adv(k,i,2)%moments(1,2) &
+               ! + dhydrometeors_div(k,i,2)%moments(1,2))*dt
+               nrn(i,k) = hydrometeors(k,i,2)%moments(1,2)
 
           if (qrn(i,k).lt.qsmall) nrn(i,k)=0.0_wp
 
+          ! snow mass
           if (num_h_moments(4) >= 1) &
-               qsn(i,k) = hydrometeors(k,i,4)%moments(1,1)& 
-               + (dhydrometeors_adv(k,i,4)%moments(1,1) &
-               + dhydrometeors_div(k,i,4)%moments(1,1))*dt
+               ! qsn(i,k) = hydrometeors(k,i,4)%moments(1,1)& 
+               ! + (dhydrometeors_adv(k,i,4)%moments(1,1) &
+               ! + dhydrometeors_div(k,i,4)%moments(1,1))*dt
+               qsn(i,k) = hydrometeors(k,i,4)%moments(1,1)
 
           if (qsn(i,k).lt.qsmall) qsn(i,k)=0.0_wp
 
+          ! snow number
           if (num_h_moments(4) >= 2) &
-               nsn(i,k) = hydrometeors(k,i,4)%moments(1,2)& 
-               + (dhydrometeors_adv(k,i,4)%moments(1,2) &
-               + dhydrometeors_div(k,i,4)%moments(1,2))*dt
+               ! nsn(i,k) = hydrometeors(k,i,4)%moments(1,2)& 
+               ! + (dhydrometeors_adv(k,i,4)%moments(1,2) &
+               ! + dhydrometeors_div(k,i,4)%moments(1,2))*dt
+               nsn(i,k) = hydrometeors(k,i,4)%moments(1,2)
 
           if (qsn(i,k).lt.qsmall) nsn(i,k)=0.0_wp
 
