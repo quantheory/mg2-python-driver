@@ -7,7 +7,7 @@ module mphys_stats
   ! outputting with netcdf
   
   use parameters, only : nx, nz
-  use switches, only   : fname_stats
+  use namelists, only  : KiD_outdir, KiD_outfile, fileNameOut
   
   implicit none
   private
@@ -96,10 +96,11 @@ contains
   subroutine init_stats()
     
     fid = 101
-    fname = trim(fname_stats)
+    fname = trim(fileNameOut)//'.limiters.txt'
     open(unit = fid, file = fname)
     write(fid,'(A)') "================================================================================"
     write(fid,'(A)') "Limiter Counts"
+    close(fid)
 
     qric_limiter = 0.0d0
     qric_limiter_mag  = 0.0d0
@@ -171,6 +172,10 @@ contains
     character(len=25) :: fmt
 
     fmt = '(A,I0,A,I0,A,I0,E23.15)'
+
+    fid = 101
+    fname = trim(fileNameOut)//'.limiters.txt'
+    open(unit = fid, file = fname, status="old", position="append", action="write")
 
     write(fid,'(A)')      "================================================================================"
     write(fid,'(A,I0,A)') "Step",step," (nx,nz)" 
@@ -253,6 +258,8 @@ contains
        end do
        write(fid,'(A)') "--------------------------------------------------------------------------------"
     end do
+
+    close(fid)
     
   end subroutine write_stats
   
@@ -260,6 +267,10 @@ contains
 
     ! add sum over columns as a summary to end of file
 
+    fid = 101
+    fname = trim(fileNameOut)//'.limiters.txt'
+    open(unit = fid, file = fname, status="old", position="append", action="write")
+    
     write(fid,'(A)') "================================================================================"
     write(fid,'(A)') "EOF"
     write(fid,'(A)') "================================================================================"
