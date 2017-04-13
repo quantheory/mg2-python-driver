@@ -1775,7 +1775,7 @@ contains
         outfile=trim(outfile(1:len_trim(outfile)-offset))//'_v-'//char4//'.nc'
       end do
     else
-      outfile=trim(fileNameOut)
+      outfile=trim(fileNameOut)//'.nc'
       status=nf90_create(outfile, nf90_clobber, ncid)
     end if
 
@@ -2058,7 +2058,7 @@ contains
 
 
     ! We now write out the full namelist data to file
-    nmlfile=outfile(1:len_trim(outfile)-3)//'.nml'
+    nmlfile=outfile(1:len_trim(outfile)-3)//'-full.nml'
     open(99, file=nmlfile)
     write(99, '(A)') 'Namelist data corresponding to data file: '//&
          trim(outfile)
