@@ -528,13 +528,14 @@ contains
 
        micro_mg_precip_frac_method_in = 'in_cloud' ! max_overlap assumed in old MG2
        micro_mg_berg_eff_factor_in    = 0.1_wp     ! 1.0 (scaling not used in old MG2)
-       allow_sed_supersat_in          = .false.     ! true to get old mg2 (.true. leads to different behavior in KiD)
-       ice_sed_ai                     = 500.0_wp   ! ai = 700._r8
-       prc_coef1_in                   = 30500.0_wp ! prc_coef1 = 1350._r8 
-       prc_exp_in                     = 3.19_wp    ! prc_exp = 2.47_r8
-       prc_exp1_in                    = -1.2_wp    ! prc_exp1 = -1.79_r8
-       cld_sed_in                     = 1.0_wp     ! acn value = 1.0
-       mg_prc_coeff_fix_in            = .true.     ! false to get old mg2
+       allow_sed_supersat_in          = .false.    ! true => saturation adjstment (old MG2)
+                                                   ! false => no saturation adjustment
+       ice_sed_ai                     = 500.0_wp   ! ai        =   700 in old MG2
+       prc_coef1_in                   = 30500.0_wp ! prc_coef1 =  1350 in old MG2
+       prc_exp_in                     = 3.19_wp    ! prc_exp   =  2.47 in old MG2
+       prc_exp1_in                    = -1.2_wp    ! prc_exp1  = -1.79 in old MG2
+       cld_sed_in                     = 1.0_wp     ! acn value =   1.0 in old MG2
+       mg_prc_coeff_fix_in            = .true.     ! false in old MG2
 
        h2otrip_in = 273.16_wp
        tboil_in   = 373.16_wp
