@@ -116,6 +116,8 @@ use micro_mg2_acme_v1beta_utils, only: &
      mi0, &
      rising_factorial
 
+use namelists, only: KiD_outdir, KiD_outfile, fileNameOut
+
 implicit none
 private
 save
@@ -143,6 +145,13 @@ logical, parameter, public :: nicons = .true. ! false originally
 !=========================================================
 ! Private module parameters
 !=========================================================
+
+! call counter
+integer :: mphys_calls = 0
+
+! file ID and file name for output
+integer        :: fid_nstep
+character(100) :: fname
 
 ! parameters for specified ice and droplet number concentration
 ! note: these are local in-cloud values, not grid-mean
@@ -2426,7 +2435,17 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      end do       !!! vertical loop
 
      ! initialize nstep for sedimentation sub-steps
-
+     fid_nstep = 102
+     fname = trim(fileNameOut)//'.nstep.txt'
+     if (mphys_calls == 0) then
+        open(unit = fid_nstep, file = fname, status="new", action="write")
+        write(fid_nstep,'(A12,4X,A12,4X,A12,4X,A12,4X,A12)') "mphys_call", &
+             "nstep_qi", "nstep_qc", "nstep_qr","nstep_qs"
+     else
+        open(unit = fid_nstep, file = fname, status="old", &
+             position="append", action="write")
+     end if
+     
      ! calculate number of split time steps to ensure courant stability criteria
      ! for sedimentation calculations
      !-------------------------------------------------------------------
@@ -2435,6 +2454,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
           maxval(fni/pdel(i,:))) &
           * deltat)
 
+     write(fid_nstep,'(I12,4X,I12,4X)',advance="no") mphys_calls, nstep
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
@@ -2517,6 +2537,8 @@ subroutine micro_mg2_acme_v1beta_tend ( &
           maxval(fnc/pdel(i,:))) &
           * deltat)
 
+     write(fid_nstep,'(I12,4X)',advance="no") nstep
+
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      do n = 1,nstep
@@ -2578,6 +2600,8 @@ subroutine micro_mg2_acme_v1beta_tend ( &
           maxval(fnr/pdel(i,:))) &
           * deltat)
 
+     write(fid_nstep,'(I12,4X)',advance="no") nstep
+
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      do n = 1,nstep
@@ -2628,6 +2652,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
           maxval( fs/pdel(i,:)), &
           maxval(fns/pdel(i,:))) &
           * deltat)
+
+     write(fid_nstep,'(I12,4X)') nstep
+     close(fid_nstep)
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
@@ -3326,6 +3353,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
   call unpack_array(ncal, mgcols, top_lev, 0._r8, ncalo)
 
   call unpack_array(prer_evap, mgcols, top_lev, 1._r8, prer_evapo)
+
+  ! update call count
+  mphys_calls = mphys_calls + 1
 
 end subroutine micro_mg2_acme_v1beta_tend
 
