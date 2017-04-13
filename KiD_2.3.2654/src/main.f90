@@ -125,7 +125,7 @@ contains
           ! reset time step for dynamics
           dt = dt_orig
 
-          ! reset mphys step counter (move outsize fp iter) !!!
+          ! reset mphys step counter
           mcount = 0
 
           ! write mphys stats to file
@@ -133,7 +133,7 @@ contains
 
        end if
 
-       ! update mphys step counter (move outsize fp iter) !!!
+       ! update mphys step counter
        mcount = mcount+1
 
        ! compute Euler step, always trickle in micro tendency (true flag)
