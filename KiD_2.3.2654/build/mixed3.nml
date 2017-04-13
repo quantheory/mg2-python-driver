@@ -15,7 +15,7 @@ aero_rd_init=0., 0.05e-6, 0.
 /
 
 &case
-icase=101
+icase=203
 /
 
 &control
@@ -23,21 +23,13 @@ mphys_scheme=MPHYS
 dt=DT
 dgstart=0.0
 dg_dt=1.0
-wctrl(1)=2.0
-tctrl(1)=3600.
-tctrl(2)=600.
 /
 
 &switch
-l_diverge=.true.
 l_fix_theta=.true.
-l_diverge_advection=.true.
-l_fix_aerosols=.true.
-l_sediment=.true.
-l_periodic_bound=.false.
+!l_noadv_qv=.true.
 /
 
 &addcontrol
-iiwarm=.true.
 mstep=MSTEP
 /

@@ -21,11 +21,11 @@ import numpy as np # math functions
 import os          # operating system functions
 import sys
 
-wrkdir = '/p/lscratchd/dgardner/KiD/debug-1'
+wrkdir = '/p/lscratchd/dgardner/KiD/test-1'
 
-# test case: warm1, warm7, mixed1
+# test case: warm1, warm2, warm3, warm7, mixed1, mixed3
 casename = 'warm1'
-#casename = 'mixed1'
+# casename = 'mixed1'
 
 mphys='mg2_acme_v1beta'
 #mphys='mg2'
@@ -34,7 +34,8 @@ mphys='mg2_acme_v1beta'
 dtvals = [ 1.0 ]
 
 # dtm = dt * mstep, physics time step sizes
-mstepvals = [ 1, 5, 10, 15, 30, 60, 300, 600, 900, 1200]
+mstepvals = [ 1, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200]
+# mstepvals = [ 30 ]
 
 # ------------------------------------------------------------------------------
 # make KiD
@@ -68,8 +69,6 @@ for dt in dtvals:
                             line = line.replace('DT', str(dt))
                      if 'MSTEP' in line:
                             line = line.replace('MSTEP', str(mstep))
-                     if 'FNAMESTATS' in line:
-                            line = line.replace('FNAMESTATS', '\''+testname+'_stats.txt'+'\'')
                      outfile.write(line)
               outfile.close()
               infile.close()

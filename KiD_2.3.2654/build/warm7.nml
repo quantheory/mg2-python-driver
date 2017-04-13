@@ -35,5 +35,4 @@ l_diverge_advection=.true.
 &addcontrol
 iiwarm=.true.
 mstep=MSTEP
-fname_stats=FNAMESTATS
 /

@@ -31,5 +31,4 @@ l_fix_theta=.true.
 
 &addcontrol
 mstep=MSTEP
-fname_stats=FNAMESTATS
 /
