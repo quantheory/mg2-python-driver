@@ -23,7 +23,7 @@ use netcdf-intel-4.1.3
 echo 'running KiD tests'
 for f in *.nml; do
     echo "running KiD test: $f"
-    ./KiD_1D.exe $f $f.nc > $f.log &
+    ./KiD_1D.exe $f ${f%.*} > ${f%.*}.log &
     sleep 10
 done
 wait
