@@ -23,6 +23,8 @@ module mphys_mg2_acme_v1beta
 
   use module_mp_mg2_acme_v1beta, only: micro_mg2_acme_v1beta_init, &
        micro_mg2_acme_v1beta_tend
+
+  use mphys_stats
   
   implicit none
   
@@ -344,6 +346,11 @@ contains
     real(r8) :: flip_frzrdto(nx,nz)      ! latent heating rate due to homogeneous freezing of rain (W/kg)
     real(r8) :: flip_mnuccdo(nx,nz)      ! mass tendency from ice nucleation
     !--ag
+
+    ! -----------------------------------------------------------------------------
+    ! Generic Flipped arrays 
+    ! -----------------------------------------------------------------------------
+    real(r8) :: flip_data(nx,nz) ! temporary fliped data array
 
 #ifdef ADJUST_SATURATION_BEFORE
     ! internal variables for saturation adjustment
@@ -1215,6 +1222,454 @@ contains
     else
        call save_dg(qctendo(1:nx,:), name, i_dgtime,  units, dim='z')
     endif
+
+    ! ---------------------------------------------------------------------------
+    ! output limiter information
+    ! ---------------------------------------------------------------------------
+     
+    flip_data(:,:) = qric_limiter(:,nz:1:-1)
+    name='qric_lim'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = qric_limiter_mag(:,nz:1:-1)
+    name='qric_lim_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = qric_qsmall(:,nz:1:-1)
+    name='qric_qsmall'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = qric_qsmall_mag(:,nz:1:-1)
+    name='qric_qsmall_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = nric_qsmall(:,nz:1:-1)
+    name='nric_qsmall'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = nric_qsmall_mag(:,nz:1:-1)
+    name='nric_qsmall_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = nric_neg(:,nz:1:-1)
+    name='nric_neg'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = nric_neg_mag(:,nz:1:-1)
+    name='nric_neg_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = qsic_limiter(:,nz:1:-1)
+    name='qsic_lim'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = qsic_limiter_mag(:,nz:1:-1)
+    name='qsic_lim_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = qsic_qsmall(:,nz:1:-1)
+    name='qsic_qsmall'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = qsic_qsmall_mag(:,nz:1:-1)
+    name='qsic_qsmall_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = nric_qsmall(:,nz:1:-1)
+    name='nsic_qsmall'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = nric_qsmall_mag(:,nz:1:-1)
+    name='nsic_qsmall_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = nsic_neg(:,nz:1:-1)
+    name='nsic_neg'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = nsic_neg_mag(:,nz:1:-1)
+    name='nsic_neg_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = qc_conservation(:,nz:1:-1)
+    name='qc_conserv'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = qc_conservation_mag(:,nz:1:-1)
+    name='qc_conserv_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = ice_nucleation_limiter(:,nz:1:-1)
+    name='ice_nuc_lim'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = ice_nucleation_limiter_mag(:,nz:1:-1)
+    name='ice_nuc_lim_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = ice_deposition_limiter(:,nz:1:-1)
+    name='ice_dep_lim'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = ice_deposition_limiter_mag(:,nz:1:-1)
+    name='ice_dep_lim_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = nc_conservation(:,nz:1:-1)
+    name='nc_conserv'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = nc_conservation_mag(:,nz:1:-1)
+    name='nc_conserv_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = qr_conservation(:,nz:1:-1)
+    name='qr_conserv'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = qr_conservation_mag(:,nz:1:-1)
+    name='qr_conserv_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = nr_conservation(:,nz:1:-1)
+    name='nr_conserv'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = nr_conservation_mag(:,nz:1:-1)
+    name='nr_conserv_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = qi_conservation(:,nz:1:-1)
+    name='qi_conserv'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = qi_conservation_mag(:,nz:1:-1)
+    name='qi_conserv_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = ni_conservation(:,nz:1:-1)
+    name='ni_conserv'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = ni_conservation_mag(:,nz:1:-1)
+    name='ni_conserv_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = qs_conservation(:,nz:1:-1)
+    name='qs_conserv'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = qs_conservation_mag(:,nz:1:-1)
+    name='qs_conserv_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    ! flip_data(:,:) = ns_conservationq(:,nz:1:-1)
+    ! name='ns_conserv'
+    ! units=''
+    ! if (nx == 1) then
+    !    call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    ! else
+    !    call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    ! endif
+
+    ! flip_data(:,:) = ns_conservation_mag(:,nz:1:-1)
+    ! name='ns_conserv_mag'
+    ! units=''
+    ! if (nx == 1) then
+    !    call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    ! else
+    !    call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    ! endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = qiqs_sublimation_qr_evaporation_limiter(:,nz:1:-1)
+    name='qiqs_sub_qr_evap_lim'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = rain_evaporation_limiter_mag(:,nz:1:-1)
+    name='rain_evap_lim_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = snow_sublimation_limiter_mag(:,nz:1:-1)
+    name='snow_sub_lim_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = ice_sublimation_limiter_mag(:,nz:1:-1)
+    name='ice_sub_lim_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    flip_data(:,:) = ni_tendency_limiter(:,nz:1:-1)
+    name='ni_tend_lim'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    flip_data(:,:) = ni_tendency_limiter_mag(:,nz:1:-1)
+    name='ni_tend_lim_mag'
+    units=''
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
+
+    ! ---------------------------------------------------------------------------
+
+    name='nsteps_qi'
+    units='#'
+    if (nx == 1) then
+       call save_dg(1.0*nsteps_qi, name, i_dgtime,  units, dim='time')
+    endif
+
+    name='nsteps_qc'
+    units='#'
+    if (nx == 1) then
+       call save_dg(1.0*nsteps_qc, name, i_dgtime,  units, dim='time')
+    endif
+
+    name='nsteps_qr'
+    units='#'
+    if (nx == 1) then
+       call save_dg(1.0*nsteps_qr, name, i_dgtime,  units, dim='time')
+    endif
+
+    name='nsteps_qs'
+    units='#'
+    if (nx == 1) then
+       call save_dg(1.0*nsteps_qs, name, i_dgtime,  units, dim='time')
+    endif
+
+    ! ---------------------------------------------------------------------------  
 
   end Subroutine mphys_mg2_acme_v1beta_interface
 
