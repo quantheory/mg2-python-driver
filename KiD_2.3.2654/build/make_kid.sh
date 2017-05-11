@@ -2,6 +2,10 @@
 # ==============================================================================
 # Script to build the Kinemaitc Driver (KiD) source code on LLNL LC machines.
 #
+# Inputs (Optional):
+#     1) Number of threads to use in parallel build
+#     2) Where to copy executable and launch scripts
+#
 # D.J. Gardner @ LLNL
 # Dec 2016
 # ==============================================================================
@@ -15,6 +19,7 @@ use netcdf-intel-4.1.3                  # netcdf for output
 use python                              # Load python for use in makefile 
 PYTHONHOME=/usr/apps/python/bin
 
+# print software loaded with dotkit
 use
 
 # compile source code
@@ -45,6 +50,12 @@ if [ $# -gt 1 ]; then
     echo "Copying executable to $TESTDIR"
     cp $KID_ROOT/bin/KiD_1D.exe $TESTDIR/.
 
-    echo "Copying launch script to $TESTDIR"
+    echo "Copying batch launch script to $TESTDIR"
     cp $BUILD_ROOT/runkid_batch.sh $TESTDIR/.
+
+    echo "Copying local launch script to $TESTDIR"
+    cp $BUILD_ROOT/runkid_local.sh $TESTDIR/.
+
+    echo "Copying local pattern launch script to $TESTDIR"
+    cp $BUILD_ROOT/runkid_pattern.sh $TESTDIR/.
 fi

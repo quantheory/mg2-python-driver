@@ -11,15 +11,6 @@
 source /usr/global/tools/dotkit/init.sh  
 use netcdf-intel-4.1.3
 
-# echo 'running KiD tests'
-# for f in *.nml; do
-#     echo "running KiD test: $f"
-#     ./KiD_1D.exe $f $f.nc > $f.log
-#     wait
-#     sleep 10
-# done
-# echo 'tests complete'
-
 echo 'running KiD tests'
 for f in *.nml; do
     echo "running KiD test: $f"
