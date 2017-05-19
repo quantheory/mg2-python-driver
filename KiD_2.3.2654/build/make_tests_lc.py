@@ -21,7 +21,7 @@ import numpy as np # math functions
 import os          # operating system functions
 import sys
 
-wrkdir = '/p/lscratchd/dgardner/KiD/test-1'
+wrkdir = '/p/lscratchd/vogl2/KiD'
 
 # test case: warm1, warm2, warm3, warm7, mixed1, mixed3
 casename = 'warm1'
@@ -39,7 +39,7 @@ mstepvals = [ 1, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200]
 
 # ------------------------------------------------------------------------------
 # make KiD
-command = "make_kid.sh 8 " + wrkdir + '/' + casename
+command = "make_kid_lc.sh 8 " + wrkdir + '/' + casename
 ierr = subprocess.call(command, shell=True)
 
 if (ierr != 0):
