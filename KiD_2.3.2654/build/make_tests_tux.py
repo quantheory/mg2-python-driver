@@ -24,7 +24,7 @@ import numpy as np # math functions
 import os          # operating system functions
 import sys
 
-wrkdir = '/home/vogl2/workspace/kid/runs'
+wrkdir = '/home/vogl2/workspace/kid/results'
 
 # test case: warm1, warm2, warm3, warm7, mixed1, mixed3
 casename = 'warm1'
