@@ -75,7 +75,7 @@ contains
 
     if (l_mphys)then
        call mphys_column(scheme_id=imphys)
-       call write_stats(0)
+       call write_stats_summary(0)
     end if
 
     ! Do we want to do diagnostics on this timestep?
@@ -129,7 +129,7 @@ contains
           mcount = 0
 
           ! write mphys stats to file
-          call write_stats(itime)
+          call write_stats_summary(itime)
 
        end if
 
