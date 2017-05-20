@@ -10,13 +10,9 @@
 def main():
 
     import argparse
-    import sys
-    import os
-    import subprocess
-    import operator
+    import os, sys
     
     from netCDF4 import Dataset # netcdf reader
-    import FileHelper
     
     import numpy as np
     

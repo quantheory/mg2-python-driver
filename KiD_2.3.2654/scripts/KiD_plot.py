@@ -10,13 +10,10 @@
 def main():
 
     import argparse
-    import sys
-    import os
+    import os, sys
     import subprocess
-    import operator
     
     from netCDF4 import Dataset # netcdf reader
-    import FileHelper
     
     import numpy as np
     
@@ -83,14 +80,14 @@ def main():
         print "Searching for netcdf files in",outdir
 
         # get list of output files in the outdir
-        temp_output_files = FileHelper.list_files(outdir,'*.nc')
+        temp_output_files = list_files(outdir,'*.nc')
 
         if (len(temp_output_files) == 0):
             print "Warning: No output files found in",outdir
         else:
             # sort output files
             temp_output_files = sorted(temp_output_files, 
-                                       key=FileHelper.numericalSort)
+                                       key=numericalSort)
 
             # add output files to list for plotting
             for f in temp_output_files:
@@ -251,6 +248,29 @@ def main():
             os.remove(fname);
         
     plt.close()
+
+# ===============================================================================
+
+# get list files in dir that match ext
+def list_files(dir, ext):
+    import os, fnmatch
+
+    r = []
+    for root, dirs, files in os.walk(dir):
+        for name in fnmatch.filter(files, ext):
+            r.append(os.path.join(root, name))
+    return r
+
+# ===============================================================================
+
+# custom sorting function for files
+def numericalSort(value):
+    import re
+
+    numbers = re.compile(r'(\d+)')
+    parts = numbers.split(value)
+    parts[1::2] = map(int, parts[1::2])
+    return parts
 
 # ===============================================================================
 
