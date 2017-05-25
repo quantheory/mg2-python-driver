@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # ==============================================================================
-# This python script will create a set of namelist input files for KiD and save 
+# This python script will create a set of namelist input files for KiD and save
 # them in the directory specified by rundir.
 #
 # The naming convention is: case_mphys_dt#.nml
-# For exmaple: Using the warm1 case with mg2 microphsysics and a 1s time step 
+# For exmaple: Using the warm1 case with mg2 microphsysics and a 1s time step
 # the name list is warm1_mg2_dt1.nml
 #
 # for dt<1, (given the assumption of powers of 2), powers of 2 are used instead
@@ -14,6 +14,9 @@
 #
 # D.J. Gardner @ LLNL
 # Dec 2016
+#
+# modified by C.J. Vogl @ LLNL
+# May 2017
 # ==============================================================================
 
 import subprocess  # launch subprocesses
@@ -21,13 +24,13 @@ import numpy as np # math functions
 import os          # operating system functions
 import sys
 
-wrkdir = '/p/lscratchd/dgardner/KiD/test-1'
+wrkdir = '/home/vogl2/workspace/kid/results'
 
 # test case: warm1, warm2, warm3, warm7, mixed1, mixed3
 casename = 'warm1'
 # casename = 'mixed1'
 
-mphys='mg2_acme_v1beta'
+mphys='thompson09'
 #mphys='mg2'
 
 # dynamics time step sizes
@@ -39,7 +42,7 @@ mstepvals = [ 1, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200]
 
 # ------------------------------------------------------------------------------
 # make KiD
-command = "make_kid.sh 8 " + wrkdir + '/' + casename
+command = "./make_kid_tux.sh 1 " + wrkdir + '/' + casename
 ierr = subprocess.call(command, shell=True)
 
 if (ierr != 0):
@@ -55,13 +58,13 @@ if not os.path.exists(TestDir):
 
 for dt in dtvals:
        for mstep in mstepvals:
-              
-              infile  = open(casename+'.nml','r')  
-              
+
+              infile  = open(casename+'.nml','r')
+
               testname = casename+'_'+mphys+'_dt'+str(dt)+'_mstep'+str(mstep)
               nmlname  = testname+'.nml'
               outfile  = open(TestDir+'/'+nmlname,'w')
-              
+
               for line in infile:
                      if 'MPHYS' in line:
                             line = line.replace('MPHYS', '\''+str(mphys)+'\'')

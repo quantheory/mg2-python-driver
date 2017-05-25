@@ -25,7 +25,7 @@ use
 # compile source code
 # --------------------------------------------------------------------
 BUILD_ROOT=$PWD
-KID_ROOT=${HOME}/Climate/Physics/KiD/KiD_2.3.2654
+KID_ROOT=${HOME}/workspace/kid/KiD_2.3.2654
 
 cd $KID_ROOT
 make -j $1 CASE=1D all
@@ -51,7 +51,7 @@ if [ $# -gt 1 ]; then
     cp $KID_ROOT/bin/KiD_1D.exe $TESTDIR/.
 
     echo "Copying batch launch script to $TESTDIR"
-    cp $BUILD_ROOT/runkid_batch.sh $TESTDIR/.
+    cp $BUILD_ROOT/runkid_batch_lc.sh $TESTDIR/.
 
     echo "Copying local launch script to $TESTDIR"
     cp $BUILD_ROOT/runkid_local.sh $TESTDIR/.
