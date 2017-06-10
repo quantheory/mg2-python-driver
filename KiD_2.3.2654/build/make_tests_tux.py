@@ -24,14 +24,14 @@ import numpy as np # math functions
 import os          # operating system functions
 import sys
 
-wrkdir = '/home/vogl2/workspace/kid/results'
+wrkdir = '/home/vogl2/workspace/kid/KiD_2.3.2654/output'
 
 # test case: warm1, warm2, warm3, warm7, mixed1, mixed3
 casename = 'warm1'
 # casename = 'mixed1'
 
-mphys='thompson09'
-#mphys='mg2'
+#mphys='thompson09'
+mphys='mg2_acme_v1beta'
 
 # dynamics time step sizes
 dtvals = [ 1.0 ]

@@ -167,9 +167,9 @@ real(r8), parameter :: minrefl = 1.26e-10_r8    ! minrefl = 10._r8**(mindbz/10._
 ! autoconversion size threshold for cloud ice to snow (m)
 real(r8) :: dcs
 
-!!== KZ_DCS 
+!!== KZ_DCS
 logical :: dcs_tdep
-!!== KZ_DCS 
+!!== KZ_DCS
 
 ! minimum mass of new crystal due to freezing of cloud droplets done
 ! externally (kg)
@@ -246,9 +246,9 @@ contains
 subroutine micro_mg2_acme_v1beta_init( &
      kind, gravit, rair, rh2o, cpair,    &
      tmelt_in, latvap, latice,           &
-!!== KZ_DCS 
+!!== KZ_DCS
      rhmini_in, micro_mg_dcs, micro_mg_dcs_tdep, &
-!!== KZ_DCS 
+!!== KZ_DCS
      microp_uniform_in, do_cldice_in, use_hetfrz_classnuc_in, &
      micro_mg_precip_frac_method_in, micro_mg_berg_eff_factor_in, &
      allow_sed_supersat_in, ice_sed_ai, prc_coef1_in,prc_exp_in,  &
@@ -276,9 +276,9 @@ subroutine micro_mg2_acme_v1beta_init( &
   real(r8), intent(in)  :: rhmini_in    ! Minimum rh for ice cloud fraction > 0.
   real(r8), intent(in)  :: micro_mg_dcs
   real(r8), intent(in)  :: ice_sed_ai   !Fall speed parameter for cloud ice
-!!== KZ_DCS 
+!!== KZ_DCS
   logical,  intent(in)  :: micro_mg_dcs_tdep
-!!== KZ_DCS 
+!!== KZ_DCS
 
   logical,  intent(in)  :: microp_uniform_in    ! .true. = configure uniform for sub-columns
                                             ! .false. = use w/o sub-columns (standard)
@@ -300,9 +300,9 @@ subroutine micro_mg2_acme_v1beta_init( &
 
   dcs = micro_mg_dcs
 
-!!== KZ_DCS 
-  dcs_tdep = micro_mg_dcs_tdep 
-!!== KZ_DCS 
+!!== KZ_DCS
+  dcs_tdep = micro_mg_dcs_tdep
+!!== KZ_DCS
 
  prc_coef1 = prc_coef1_in
  prc_exp   = prc_exp_in
@@ -434,9 +434,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
   ! Size calculation functions.
   use micro_mg2_acme_v1beta_utils, only: &
        size_dist_param_liq, &
-!!== KZ_DCS 
+!!== KZ_DCS
        size_dist_param_ice, &
-!!== KZ_DCS 
+!!== KZ_DCS
        size_dist_param_basic, &
        avg_diameter
 
@@ -890,9 +890,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
   ! relative humidity
   real(r8) :: relhum(mgncol,nlev)
 
-!!== KZ_DCS 
+!!== KZ_DCS
   real(r8) :: dcst(mgncol,nlev)        ! t-dependent dcs
-!!== KZ_DCS 
+!!== KZ_DCS
 
   ! parameters for cloud water and cloud ice sedimentation calculations
   real(r8) :: fc(nlev)
@@ -1495,13 +1495,13 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      where (qric(:,k) < qsmall)
         qric_qsmall(:,k) = 1
         nric_qsmall(:,k) = 1
-        
+
         qric_qsmall_mag(:,k) = abs(qric(:,k))
         nric_qsmall_mag(:,k) = abs(nric(:,k))
      elsewhere
         qric_qsmall(:,k) = 0
         nric_qsmall(:,k) = 0
-        
+
         qric_qsmall_mag(:,k) = 0.0d0
         nric_qsmall_mag(:,k) = 0.0d0
      end where
@@ -1530,12 +1530,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
         ! Get size distribution parameters for cloud ice
         call size_dist_param_ice(mg_ice_props, dcst(:,k), qiic(:,k), niic(:,k), &
              lami(:,k), n0i(:,k))
-     else 
+     else
         ! Get size distribution parameters for cloud ice
         call size_dist_param_basic(mg_ice_props, qiic(:,k), niic(:,k), &
              lami(:,k), n0i(:,k))
      end if
-!!== KZ_DCS 
+!!== KZ_DCS
 
      !.......................................................................
      ! Autoconversion of cloud ice to snow
@@ -1543,9 +1543,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      if (do_cldice) then
         call ice_autoconversion(t(:,k), qiic(:,k), lami(:,k), n0i(:,k), &
-!!== KZ_DCS 
+!!== KZ_DCS
              dcs, dcst(:,k), dcs_tdep, prci(:,k), nprci(:,k))
-!!== KZ_DCS 
+!!== KZ_DCS
      else
         ! Add in the particles that we have already converted to snow, and
         ! don't do any further autoconversion of ice.
@@ -1577,13 +1577,13 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      where (qsic(:,k) < qsmall)
         qsic_qsmall(:,k) = 1
         nsic_qsmall(:,k) = 1
-        
+
         qsic_qsmall_mag(:,k) = abs(qsic(:,k))
         nsic_qsmall_mag(:,k) = abs(nsic(:,k))
      elsewhere
         qsic_qsmall(:,k) = 0
         nsic_qsmall(:,k) = 0
-        
+
         qsic_qsmall_mag(:,k) = 0.0d0
         nsic_qsmall_mag(:,k) = 0.0d0
      end where
@@ -1594,11 +1594,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      end where
 
      ! make sure number concentration is a positive number to avoid
-     ! taking root of negative later 
+     ! taking root of negative later
 
      ! LIMITER: flag and save change due to limiter
-     where (nsic(:,k) < 0.0_r8) 
-        nsic_neg(:,k)     = 1   
+     where (nsic(:,k) < 0.0_r8)
+        nsic_neg(:,k)     = 1
         nsic_neg_mag(:,k) = abs(nsic(:,k))
      elsewhere
         nsic_neg(:,k)     = 0
@@ -1761,9 +1761,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      if (do_cldice) then
 
         call ice_deposition_sublimation(t(:,k), q(:,k), qi(:,k), ni(:,k), &
-!!== KZ_DCS 
+!!== KZ_DCS
              icldm(:,k), rho(:,k), dv(:,k), qvl(:,k), qvi(:,k), dcst(:,k), dcs_tdep, &
-!!== KZ_DCS 
+!!== KZ_DCS
              berg(:,k), vap_dep(:,k), ice_sublim(:,k))
 
         berg(:,k)=berg(:,k)*micro_mg_berg_eff_factor
@@ -1810,14 +1810,14 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            berg(i,k) = berg(i,k)*ratio
            qcrat(i,k) = ratio
 
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            qc_conservation(i,k)     = 1
            qc_conservation_mag(i,k) = ratio
-           
+
         else
            qcrat(i,k) = 1._r8
 
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            qc_conservation(i,k)     = 0
            qc_conservation_mag(i,k) = 1.0d0
         end if
@@ -1852,25 +1852,25 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               ! processes. Don't divide by cloud fraction; these are grid-
               ! mean rates.
               dum1 = mnuccd(i,k) / (vap_dep(i,k)+mnuccd(i,k))
-              
-              ! LIMITER: flag and save change due to limiter 
+
+              ! LIMITER: flag and save change due to limiter
               ice_nucleation_limiter(i,k)     = 1
               ice_nucleation_limiter_mag(i,k) = abs(mnuccd(i,k) - dum*dum1)
 
               mnuccd(i,k) = dum*dum1
 
-              ! LIMITER: flag and save change due to limiter 
+              ! LIMITER: flag and save change due to limiter
               ice_deposition_limiter(i,k)     = 1
               ice_deposition_limiter_mag(i,k) = abs(vap_dep(i,k) - dum + mnuccd(i,k))
 
               vap_dep(i,k) = dum - mnuccd(i,k)
 
            else
-              ! LIMITER: flag and save change due to limiter 
+              ! LIMITER: flag and save change due to limiter
               ice_nucleation_limiter(i,k)     = 0
               ice_nucleation_limiter_mag(i,k) = 0.0d0
 
-              ! LIMITER: flag and save change due to limiter 
+              ! LIMITER: flag and save change due to limiter
               ice_deposition_limiter(i,k)     = 0
               ice_deposition_limiter_mag(i,k) = 0.0d0
            end if
@@ -1897,11 +1897,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            npsacws(i,k) = npsacws(i,k)*ratio
            nsubc(i,k)=nsubc(i,k)*ratio
 
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            nc_conservation(i,k)     = 1
            nc_conservation_mag(i,k) = ratio
         else
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            nc_conservation(i,k)     = 0
            nc_conservation_mag(i,k) = 1.0d0
         end if
@@ -1939,13 +1939,14 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            mnuccr(i,k)=mnuccr(i,k)*ratio
            mnuccri(i,k)=mnuccri(i,k)*ratio
 
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            qr_conservation(i,k)     = 1
-           qr_conservation_mag(i,k) = ratio
+           qr_conservation_mag(i,k) = deltat*(ratio-1.d0)* &
+              precip_frac(i,k)*(-pre(i,k)+pracs(i,k)+mnuccr(i,k)+mnuccri(i,k))
         else
            ! LIMITER: flag and save change due to limiter
            qr_conservation(i,k)     = 0
-           qr_conservation_mag(i,k) = 1.0d0
+           qr_conservation_mag(i,k) = 0.0d0
         end if
 
      end do
@@ -1981,11 +1982,13 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            nsubr(i,k)=nsubr(i,k)*ratio
            nnuccri(i,k)=nnuccri(i,k)*ratio
 
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            nr_conservation(i,k)     = 1
-           nr_conservation_mag(i,k) = ratio
+           nr_conservation_mag(i,k) = deltat*(ratio-1.d0)* &
+              (-nsubr(i,k)+npracs(i,k)+nnuccr(i,k)+nnuccri(i,k)-nragg(i,k))
+
         else
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            nr_conservation(i,k)     = 0
            nr_conservation_mag(i,k) = 1.0d0
         end if
@@ -2012,11 +2015,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               prai(i,k) = prai(i,k)*ratio
               ice_sublim(i,k) = ice_sublim(i,k)*ratio
 
-              ! LIMITER: flag and save change due to limiter 
+              ! LIMITER: flag and save change due to limiter
               qi_conservation(i,k)     = 1
               qi_conservation_mag(i,k) = ratio
            else
-              ! LIMITER: flag and save change due to limiter 
+              ! LIMITER: flag and save change due to limiter
               qi_conservation(i,k)     = 0
               qi_conservation_mag(i,k) = 1.0d0
            end if
@@ -2049,11 +2052,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               nprai(i,k) = nprai(i,k)*ratio
               nsubi(i,k) = nsubi(i,k)*ratio
 
-              ! LIMITER: flag and save change due to limiter 
+              ! LIMITER: flag and save change due to limiter
               ni_conservation(i,k)     = 1
               ni_conservation_mag(i,k) = ratio
            else
-              ! LIMITER: flag and save change due to limiter 
+              ! LIMITER: flag and save change due to limiter
               ni_conservation(i,k)     = 0
               ni_conservation_mag(i,k) = 1.0d0
            end if
@@ -2075,11 +2078,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
                 precip_frac(i,k)/(-prds(i,k))*omsm
            prds(i,k)=prds(i,k)*ratio
 
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            qs_conservation(i,k)     = 1
            qs_conservation_mag(i,k) = ratio
         else
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            qs_conservation(i,k)     = 0
            qs_conservation_mag(i,k) = 1.0d0
         end if
@@ -2113,11 +2116,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            ! BUG: if nsubs and nsagg are zero then the ratio is infinite
            ! write(*,*) nsubs(i,k), nsagg(i,k)
 
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            ns_conservation(i,k)     = 1
            ns_conservation_mag(i,k) = ratio
         else
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            ns_conservation(i,k)     = 0
            ns_conservation_mag(i,k) = 1.0d0
         end if
@@ -2148,7 +2151,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
               ! LIMITER: flag limiter, see changes due to limiter below
               qiqs_sublimation_qr_evaporation_limiter(i,k) = 1
-              
+
               dum1=pre(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k))*precip_frac(i,k)+ice_sublim(i,k))
               dum2=prds(i,k)*precip_frac(i,k)/((pre(i,k)+prds(i,k))*precip_frac(i,k)+ice_sublim(i,k))
               ! recalculate q and t after vap_dep and mnuccd but without evap or sublim
@@ -2177,7 +2180,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               ! LIMITER: save change due to limiter
               snow_sublimation_limiter_mag(i,k) = &
                    abs(prds(i,k) - dum*dum2/deltat/precip_frac(i,k))
-              
+
               ! modify rates if needed, divide by precip_frac to get local (in-precip) value
               prds(i,k) = dum*dum2/deltat/precip_frac(i,k)
 
@@ -2190,12 +2193,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
               ice_sublim(i,k) = dum*dum1/deltat
            else
 
-              ! LIMITER: flag and save change due to limiter 
+              ! LIMITER: flag and save change due to limiter
               qiqs_sublimation_qr_evaporation_limiter(i,k) = 0
               rain_evaporation_limiter_mag(i,k) = 0.0d0
-              snow_sublimation_limiter_mag(i,k) = 0.0d0 
+              snow_sublimation_limiter_mag(i,k) = 0.0d0
               ice_sublimation_limiter_mag(i,k)  = 0.0d0
-              
+
            end if
         end if
 
@@ -2321,14 +2324,14 @@ subroutine micro_mg2_acme_v1beta_tend ( &
         !================================================================
 
         if (do_cldice .and. nitend(i,k).gt.0._r8.and.ni(i,k)+nitend(i,k)*deltat.gt.nimax(i,k)) then
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            ni_tendency_limiter(i,k)     = 1
            ni_tendency_limiter_mag(i,k) = &
                 abs((nitend(i,k) - max(0._r8,(nimax(i,k)-ni(i,k))/deltat))/nitend(i,k))
-           
+
            nitend(i,k)=max(0._r8,(nimax(i,k)-ni(i,k))/deltat)
         else
-           ! LIMITER: flag and save change due to limiter 
+           ! LIMITER: flag and save change due to limiter
            ni_tendency_limiter(i,k)     = 0
            ni_tendency_limiter_mag(i,k) = 0.0d0
         end if
@@ -2551,7 +2554,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
         open(unit = fid_nstep, file = fname, status="old", &
              position="append", action="write")
      end if
-     
+
      ! calculate number of split time steps to ensure courant stability criteria
      ! for sedimentation calculations
      !-------------------------------------------------------------------
@@ -2562,7 +2565,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      write(fid_nstep,'(I12,4X,I12,4X)',advance="no") mphys_calls, nstep
      nsteps_qi = nstep
-     
+
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      do n = 1,nstep

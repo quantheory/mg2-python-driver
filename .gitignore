@@ -6,4 +6,5 @@
 *.exe
 *.includes
 *case.used
-results/
+KiD_2.3.2654/output
+
