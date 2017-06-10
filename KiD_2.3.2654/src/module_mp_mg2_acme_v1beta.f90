@@ -1990,7 +1990,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
         else
            ! LIMITER: flag and save change due to limiter
            nr_conservation(i,k)     = 0
-           nr_conservation_mag(i,k) = 1.0d0
+           nr_conservation_mag(i,k) = 0.0d0
         end if
 
      end do
