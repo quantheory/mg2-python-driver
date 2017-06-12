@@ -28,9 +28,18 @@ run_dict = {'warm1_mg2_acme_v1beta_dt1.0_mstep1.nc':1.0, \
     'warm1_mg2_acme_v1beta_dt1.0_mstep900.nc':900.0, \
     'warm1_mg2_acme_v1beta_dt1.0_mstep1200.nc':1200.0}
 
-# Reference run
+# Reference time and run
 reference_run = 'warm1_mg2_acme_v1beta_dt1.0_mstep1.nc'
+T = 3600
 
+# Figures to save
+save_dict = {'number_ratio_global1':2, \
+    'number_ratio_global2':3, \
+    'number_ratio_spatial1':0, \
+    'number_ratio_spatial2':1, \
+    'error_ratio':10, \
+    'error_normalized1':30, \
+    'error_normalized2':31}
 ################################################################################
 # Plot the ratio of limited timsteps to total timesteps
 ################################################################################
@@ -48,13 +57,13 @@ for j,limiter in enumerate(limitercount_list):
         data = Dataset(run,mode='r')
         var = data.variables[limiter][:]
         num_levels = np.shape(var)[0];
-        num_timesteps = np.shape(var)[1];
+        num_timesteps = T/dt_list[k]
 
         # Spatial ratio is sum_n (sum_n var_i^n) / (# timesteps * # levels)
         spatial_ratio[j,k] = np.sum(var)/(num_levels*num_timesteps)
 
         # Global ratio is sum_n ( max_i y_i^n ) / (# timesteps)
-        tmp = np.max(var,0)
+        tmp = np.max(var,axis=0)
         global_ratio[j,k] = np.sum(tmp)/num_timesteps
 
     # If limiters was ever active, add plot to corresponding figure
@@ -69,19 +78,21 @@ for j,limiter in enumerate(limitercount_list):
             G = 3
 
         pyplot.figure(F)
-        pyplot.plot(dt_list,spatial_ratio[j,:],'-o',label=limiter)
+        pyplot.semilogx(dt_list,spatial_ratio[j,:],'-o',label=limiter)
         pyplot.figure(G)
-        pyplot.plot(dt_list,global_ratio[j,:],'-o',label=limiter)
+        pyplot.semilogx(dt_list,global_ratio[j,:],'-o',label=limiter)
 
 # Create plots and labels
-for j in range(4):
+for j in range(2):
     pyplot.figure(j)
     pyplot.xlabel('dt',fontsize=15)
-    pyplot.ylabel('limited timesteps / timesteps',fontsize=15)
+    pyplot.ylabel('Sum_z Sum_t limiter_bool(z,t) / (levels*timesteps)',fontsize=15)
     pyplot.legend()
-
-pyplot.show()
-
+for j in range(2,4):
+    pyplot.figure(j)
+    pyplot.xlabel('dt',fontsize=15)
+    pyplot.ylabel('Sum_t Max_z limiter_bool(z,t) / (timesteps)',fontsize=15)
+    pyplot.legend()
 
 ################################################################################
 # Plot the ratio of limiter error to total error
@@ -98,19 +109,62 @@ for j,limiter in enumerate(limitermag_list):
     qref = data.variables[q_list[j]][:,-1]
 
     for k,run in enumerate(sorted(run_dict,key=run_dict.get)):
-        data = Dataset(run,mode='r')
-        var = data.variables[limiter][:]
-        q = data.variables[q_list[j]][:,-1]
+        if (run is not reference_run):
+            data = Dataset(run,mode='r')
+            var = data.variables[limiter][:]
+            q = data.variables[q_list[j]][:,-1]
 
-        ratio[j,k] = np.max(np.abs(np.sum(var,1)/(q-qref)))
+            ratio[j,k] = np.max(np.abs(np.sum(var,1)/(q-qref)))
 
     pyplot.figure(10)
-    pyplot.plot(dt_list,ratio[j,:],'-o',label=limiter)
+    pyplot.semilogx(dt_list,ratio[j,:],'-o',label=limiter)
 
 # Create plots and labels
 pyplot.figure(10)
 pyplot.xlabel('dt',fontsize=15)
-pyplot.ylabel('limited timesteps / timesteps',fontsize=15)
+pyplot.ylabel('dt Max_z |Sum_t (a-1) f2(y,t) / (y-yref)|',fontsize=15)
 pyplot.legend()
 
-pyplot.show()
+################################################################################
+# Plot the ratio of per-step limiter error to per-step change
+################################################################################
+
+# Initialize variables to hold ratios
+num_limiters = len(limitermag_list)
+
+# Compute ratios
+for j,limiter in enumerate(limitermag_list):
+    for k,run in enumerate(sorted(run_dict,key=run_dict.get)):
+        data = Dataset(run,mode='r')
+
+        # get limitermag values, save mask, and compress
+        tmp = data.variables[limiter][:]
+        mask = np.ma.getmask(tmp)
+        var = np.ma.compress_cols(tmp)
+
+        # get y values, apply mask, and compress
+        tmp = data.variables[q_list[j]][:]
+        tmp = np.ma.array(tmp,mask=mask)
+        q = np.ma.compress_cols(tmp)
+
+        N = np.shape(q)[1]
+        tmp = var[:,0:(N-1)] / (q[:,1:N] - q[:,0:(N-1)] + 1e-16)
+        ratio = np.max(np.abs(tmp),axis=0)
+
+        pyplot.figure(10*(j+2) + (k < 5))
+        label = 'dt = %f' % dt_list[k]
+        pyplot.plot(dt_list[k]*np.arange(N-1),ratio,'-o',label=label)
+
+    for k in range(len(run_dict.keys())/5):
+        pyplot.figure(10*(j+2) + k)
+        pyplot.title(limiter)
+        pyplot.xlabel('t',fontsize=15)
+        pyplot.ylabel('dt (a_n-1) f2_n / (y_np1-y_n)',fontsize=15)
+        pyplot.legend()
+
+################################################################################
+# Save the appropriate plots
+################################################################################
+for name in save_dict.keys():
+    pyplot.figure(save_dict[name])
+    pyplot.savefig(name + '.png')

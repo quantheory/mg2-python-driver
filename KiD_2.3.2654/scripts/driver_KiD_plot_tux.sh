@@ -7,7 +7,7 @@
 # Last updated: 19 May 2017
 # -------------------------------------------------------------------------------
 
-RESULTSDIR=${HOME}/workspace/kid/results
+RESULTSDIR=${HOME}/workspace/kid/KiD_2.3.2654/output
 TEST="warm1"
 LABEL="warm1_Test"
 

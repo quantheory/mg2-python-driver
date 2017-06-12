@@ -11,52 +11,52 @@ def main():
 
     import argparse
     import os, sys
-    
+
     from netCDF4 import Dataset # netcdf reader
-    
+
     import numpy as np
-    
+
     import matplotlib        as mpl
     import matplotlib.pyplot as plt
     import matplotlib.cm     as cm   # colormap for graphics
-    
+
     parser = argparse.ArgumentParser(description = 'Plot KiD NetCDF files')
-    
+
     # required arguments
     parser.add_argument('Label', type=str,
                         help='Name for saving figure')
 
     parser.add_argument('reffile', type=str,
                         help='Reference solution output')
-        
-    parser.add_argument('--outfiles', dest='outfiles', type=str, nargs='+', 
+
+    parser.add_argument('--outfiles', dest='outfiles', type=str, nargs='+',
                         required=True,
                         help='Test solution outputs')
 
-    parser.add_argument('--stepsizes', dest='stepsizes', type=float, nargs='+', 
+    parser.add_argument('--stepsizes', dest='stepsizes', type=float, nargs='+',
                         required=True,
                         help='Test solution outputs')
-    
+
     # plotting options
-    parser.add_argument('--Warm', dest='Warm', action='store_true', 
+    parser.add_argument('--Warm', dest='Warm', action='store_true',
                         default=False,
                         help='Signal Warm test case')
 
     parser.add_argument('--SetColors', type=int, nargs='+', dest='SetColors',
                         help='Set line colors')
-    
-    parser.add_argument('--show', dest='show', action='store_true', 
+
+    parser.add_argument('--show', dest='show', action='store_true',
                         default=False,
                         help='Display plot on the screen rather than writing to file')
-    
+
     parser.add_argument('--debug', dest='debug', action='store_true', default=False,
                         help='Turn on debugging ouput')
 
-    parser.add_argument('--WriteArrays', dest='WriteArrays', action='store_true', 
+    parser.add_argument('--WriteArrays', dest='WriteArrays', action='store_true',
                         default=False,
                         help='Flag to write convergence arrays to file')
 
-        
+
     # parse command line args
     args = parser.parse_args()
 
@@ -69,7 +69,7 @@ def main():
         sys.exit()
 
     # line colors (qualitative colors from colorbrewer2.org)
-    if (args.SetColors):    
+    if (args.SetColors):
 
         if (len(args.SetColors) != noutfiles):
             msg = "ERROR: len(SetColors) != len(outfiles)"
@@ -113,36 +113,36 @@ def main():
     nr_ref = data.variables['rain_number'][:,-1]
     ni_ref = data.variables['ice_number'][:,-1]
     ns_ref = data.variables['snow_number'][:,-1]
-               
+
     data.close()
 
     # if (args.Warm):
     #     state_ref = np.concatenate((qv_ref, qc_ref, qr_ref))
     # else:
     #     state_ref = np.concatenate((qv_ref, qc_ref, qr_ref, qi_ref, qs_ref))
-        
+
     # print "Shape: ",np.shape(state_ref)
 
-    err_qv = np.empty([noutfiles]) 
+    err_qv = np.empty([noutfiles])
 
-    err_qc = np.empty([noutfiles])  
-    err_qr = np.empty([noutfiles])  
-    err_qi = np.empty([noutfiles])  
-    err_qs = np.empty([noutfiles])  
+    err_qc = np.empty([noutfiles])
+    err_qr = np.empty([noutfiles])
+    err_qi = np.empty([noutfiles])
+    err_qs = np.empty([noutfiles])
 
-    err_nc = np.empty([noutfiles])  
-    err_nr = np.empty([noutfiles])  
-    err_ni = np.empty([noutfiles])  
-    err_ns = np.empty([noutfiles])  
+    err_nc = np.empty([noutfiles])
+    err_nr = np.empty([noutfiles])
+    err_ni = np.empty([noutfiles])
+    err_ns = np.empty([noutfiles])
 
-    # err_state = np.empty([noutfiles]) 
+    # err_state = np.empty([noutfiles])
 
     for i in range(noutfiles):
 
         print "Reading:",args.outfiles[i]
 
         # data file
-        data = Dataset(args.outfiles[i], mode='r')   
+        data = Dataset(args.outfiles[i], mode='r')
 
         qv = data.variables['vapour'][:,-1]
 
@@ -185,13 +185,13 @@ def main():
     stepsizes = np.array(args.stepsizes)
 
     plt.figure(1)
-    plt.loglog(stepsizes, err_qv, label='qv', color='blue')
-    plt.loglog(stepsizes, err_qc, label='qc', color='green')
-    plt.loglog(stepsizes, err_qr, label='qr', color='red')
+    plt.loglog(stepsizes, err_qv, '-o', label='qv', color='blue')
+    plt.loglog(stepsizes, err_qc, '-o', label='qc', color='green')
+    plt.loglog(stepsizes, err_qr, '-o', label='qr', color='red')
 
     if (not args.Warm):
-        plt.loglog(stepsizes, err_qi, label='qi', color='cyan')
-        plt.loglog(stepsizes, err_qs, label='qs', color='magenta')
+        plt.loglog(stepsizes, err_qi, '-o', label='qi', color='cyan')
+        plt.loglog(stepsizes, err_qs, '-o', label='qs', color='magenta')
 
     plt.title(args.Label.replace("_"," "))
     plt.xlabel('Physics Step Size')
@@ -210,12 +210,12 @@ def main():
     # plot convergence
     # ---------------------------------------------------------------------------
     plt.figure(1)
-    plt.loglog(args.stepsizes, err_nc, label='nc', color='green')
-    plt.loglog(args.stepsizes, err_nr, label='nr', color='red')
+    plt.loglog(args.stepsizes, err_nc, '-o', label='nc', color='green')
+    plt.loglog(args.stepsizes, err_nr, '-o', label='nr', color='red')
 
     if (not args.Warm):
-        plt.loglog(args.stepsizes, err_ni, label='ni', color='cyan')
-        plt.loglog(args.stepsizes, err_ns, label='ns', color='magenta')
+        plt.loglog(args.stepsizes, err_ni, '-o', label='ni', color='cyan')
+        plt.loglog(args.stepsizes, err_ns, '-o', label='ns', color='magenta')
 
     plt.title(args.Label.replace("_"," "))
     plt.xlabel('Physics Step Size')
@@ -244,10 +244,10 @@ def main():
     if (not args.Warm):
         m,b = np.polyfit(np.log10(stepsizes[0:3]), np.log10(err_qi[0:3]), 1)
         print "qi: ",m
-        
-        m,b = np.polyfit(np.log10(stepsizes[0:3]), np.log10(err_qs[0:3]), 1)   
+
+        m,b = np.polyfit(np.log10(stepsizes[0:3]), np.log10(err_qs[0:3]), 1)
         print "qs: ",m
-        
+
     # m,b = np.polyfit(np.log10(stepsizes[0:3]), np.log10(err_state[0:3]), 1)
     # print "state: ",m
 
@@ -286,29 +286,29 @@ def main():
     nr_ref = np.ravel(data.variables['rain_number'][...])
     ni_ref = np.ravel(data.variables['ice_number'][...])
     ns_ref = np.ravel(data.variables['snow_number'][...])
-               
+
     data.close()
 
     # if (args.Warm):
     #     state_ref = np.concatenate((qv_ref, qc_ref, qr_ref))
     # else:
     #     state_ref = np.concatenate((qv_ref, qc_ref, qr_ref, qi_ref, qs_ref))
-        
+
     # print "Shape: ",np.shape(state_ref)
 
-    err_qv = np.empty([noutfiles]) 
+    err_qv = np.empty([noutfiles])
 
-    err_qc = np.empty([noutfiles])  
-    err_qr = np.empty([noutfiles])  
-    err_qi = np.empty([noutfiles])  
-    err_qs = np.empty([noutfiles])  
+    err_qc = np.empty([noutfiles])
+    err_qr = np.empty([noutfiles])
+    err_qi = np.empty([noutfiles])
+    err_qs = np.empty([noutfiles])
 
-    err_nc = np.empty([noutfiles])  
-    err_nr = np.empty([noutfiles])  
-    err_ni = np.empty([noutfiles])  
-    err_ns = np.empty([noutfiles])  
+    err_nc = np.empty([noutfiles])
+    err_nr = np.empty([noutfiles])
+    err_ni = np.empty([noutfiles])
+    err_ns = np.empty([noutfiles])
 
-    # err_state = np.empty([noutfiles]) 
+    # err_state = np.empty([noutfiles])
 
     for i in range(noutfiles):
 
@@ -358,13 +358,13 @@ def main():
     stepsizes = np.array(args.stepsizes)
 
     plt.figure(1)
-    plt.loglog(stepsizes, err_qv, label='qv', color='blue')
-    plt.loglog(stepsizes, err_qc, label='qc', color='green')
-    plt.loglog(stepsizes, err_qr, label='qr', color='red')
+    plt.loglog(stepsizes, err_qv, '-o', label='qv', color='blue')
+    plt.loglog(stepsizes, err_qc, '-o', label='qc', color='green')
+    plt.loglog(stepsizes, err_qr, '-o', label='qr', color='red')
 
     if (not args.Warm):
-        plt.loglog(stepsizes, err_qi, label='qi', color='cyan')
-        plt.loglog(stepsizes, err_qs, label='qs', color='magenta')
+        plt.loglog(stepsizes, err_qi, '-o', label='qi', color='cyan')
+        plt.loglog(stepsizes, err_qs, '-o', label='qs', color='magenta')
 
     plt.title(args.Label.replace("_"," "))
     plt.xlabel('Physics Step Size')
@@ -383,12 +383,12 @@ def main():
     # plot convergence
     # ---------------------------------------------------------------------------
     plt.figure(1)
-    plt.loglog(args.stepsizes, err_nc, label='nc', color='green')
-    plt.loglog(args.stepsizes, err_nr, label='nr', color='red')
+    plt.loglog(args.stepsizes, err_nc, '-o', label='nc', color='green')
+    plt.loglog(args.stepsizes, err_nr, '-o', label='nr', color='red')
 
     if (not args.Warm):
-        plt.loglog(args.stepsizes, err_ni, label='ni', color='cyan')
-        plt.loglog(args.stepsizes, err_ns, label='ns', color='magenta')
+        plt.loglog(args.stepsizes, err_ni, '-o', label='ni', color='cyan')
+        plt.loglog(args.stepsizes, err_ns, '-o', label='ns', color='magenta')
 
     plt.title(args.Label.replace("_"," "))
     plt.xlabel('Physics Step Size')
@@ -417,10 +417,10 @@ def main():
     if (not args.Warm):
         m,b = np.polyfit(np.log10(stepsizes[0:3]), np.log10(err_qi[0:3]), 1)
         print "qi: ",m
-        
-        m,b = np.polyfit(np.log10(stepsizes[0:3]), np.log10(err_qs[0:3]), 1)   
+
+        m,b = np.polyfit(np.log10(stepsizes[0:3]), np.log10(err_qs[0:3]), 1)
         print "qs: ",m
-        
+
     # m,b = np.polyfit(np.log10(stepsizes[0:3]), np.log10(err_state[0:3]), 1)
     # print "state: ",m
 
@@ -442,7 +442,7 @@ def main():
 # ===============================================================================
 
 def write_convergence(dt, err, label, fout):
-    
+
     import numpy as np
 
     # check lengths
@@ -454,13 +454,13 @@ def write_convergence(dt, err, label, fout):
             print >> fout, dt[i], '\t', err[i], '\t', 0.0
         else:
             print >> fout, dt[i], '\t', err[i], '\t', np.log10(err[i]/err[i+1])/np.log10(dt[i]/dt[i+1])
-               
+
 # ===============================================================================
 
 if __name__ == "__main__":
     import sys
     sys.exit(main())
-    
+
 # EOF
 
 
@@ -473,24 +473,24 @@ if __name__ == "__main__":
     # Y = err_state[0] * (X / X[0])**ordpow
 
     # # horizontal shift
-    # if (args.OrderHShift < 0): 
+    # if (args.OrderHShift < 0):
     #     # left shift
     #     X = X/np.log10(10 + abs(args.OrderHShift))
     # elif (args.OrderHShift > 0):
     #     # right shift
     #     X = X*np.log10(10 + args.OrderHShift)
-    
+
     # # vertical shift
     # Y = args.OrderVShift * Y
 
 
     # left shift
     # X = X/np.log10(10 + 10)
-               
+
     # vertical shift
     # Y = args.OrderVShift * Y
-        
+
     # plt.loglog(X, Y,
-    #            linestyle='--', 
-    #            color='black', 
+    #            linestyle='--',
+    #            color='black',
     #            label=None)
