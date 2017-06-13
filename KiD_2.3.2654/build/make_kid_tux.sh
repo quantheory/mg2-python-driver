@@ -15,7 +15,7 @@ BUILD_ROOT=$PWD
 KID_ROOT=${HOME}/workspace/kid/KiD_2.3.2654
 
 cd $KID_ROOT
-make -j $1 CASE=1D NCPATH=${HOME}/local all
+make -j $1 CASE=1D COMPILER=gfortran NCPATH=${HOME}/local all
 
 RESULT=$?
 if [ ! $RESULT -eq 0 ]; then
