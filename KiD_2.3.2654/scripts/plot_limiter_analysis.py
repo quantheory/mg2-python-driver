@@ -28,18 +28,21 @@ run_dict = {'warm1_mg2_acme_v1beta_dt1.0_mstep1.nc':1.0, \
     'warm1_mg2_acme_v1beta_dt1.0_mstep900.nc':900.0, \
     'warm1_mg2_acme_v1beta_dt1.0_mstep1200.nc':1200.0}
 
-# Reference time and run
+# Reference run information
 reference_run = 'warm1_mg2_acme_v1beta_dt1.0_mstep1.nc'
 T = 3600
+num_levels = 120
 
-# Figures to save
-save_dict = {'number_ratio_global1':2, \
-    'number_ratio_global2':3, \
-    'number_ratio_spatial1':0, \
-    'number_ratio_spatial2':1, \
-    'error_ratio':10, \
-    'error_normalized1':30, \
-    'error_normalized2':31}
+# Figures to save (empty dictionary to show all plots)
+save_dict = {}
+#save_dict = {'number_ratio_global1':2, \
+#    'number_ratio_global2':3, \
+#    'number_ratio_spatial1':0, \
+#    'number_ratio_spatial2':1, \
+#    'error_ratio':10, \
+#    'error_normalized1':30, \
+#    'error_normalized2':31}
+
 ################################################################################
 # Plot the ratio of limited timsteps to total timesteps
 ################################################################################
@@ -56,7 +59,6 @@ for j,limiter in enumerate(limitercount_list):
     for k,run in enumerate(sorted(run_dict,key=run_dict.get)):
         data = Dataset(run,mode='r')
         var = data.variables[limiter][:]
-        num_levels = np.shape(var)[0];
         num_timesteps = T/dt_list[k]
 
         # Spatial ratio is sum_n (sum_n var_i^n) / (# timesteps * # levels)
@@ -100,7 +102,7 @@ for j in range(2,4):
 
 # Initialize variables to hold ratios
 num_limiters = len(limitermag_list)
-ratio = np.zeros((num_limiters,num_runs))
+ratio = np.zeros((num_limiters,num_runs,num_levels))
 
 # Compute ratios
 for j,limiter in enumerate(limitermag_list):
@@ -114,10 +116,11 @@ for j,limiter in enumerate(limitermag_list):
             var = data.variables[limiter][:]
             q = data.variables[q_list[j]][:,-1]
 
-            ratio[j,k] = np.max(np.abs(np.sum(var,1)/(q-qref)))
+            ratio[j,k,:] = np.sum(var,axis=1)/(q-qref)
 
     pyplot.figure(10)
-    pyplot.semilogx(dt_list,ratio[j,:],'-o',label=limiter)
+    maxratio = np.max(np.abs(ratio),axis=2)
+    pyplot.semilogx(dt_list,maxratio[j,:],'-o',label=limiter)
 
 # Create plots and labels
 pyplot.figure(10)
@@ -163,8 +166,11 @@ for j,limiter in enumerate(limitermag_list):
         pyplot.legend()
 
 ################################################################################
-# Save the appropriate plots
+# Save the appropriate plots or show all plots
 ################################################################################
-for name in save_dict.keys():
-    pyplot.figure(save_dict[name])
-    pyplot.savefig(name + '.png')
+if (len(save_dict.keys()) > 0):
+    for name in save_dict.keys():
+        pyplot.figure(save_dict[name])
+        pyplot.savefig(name + '.png')
+else:
+    pyplot.show()
