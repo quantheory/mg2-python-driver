@@ -39,7 +39,7 @@ mstepvals = [ 1, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200]
 
 # ------------------------------------------------------------------------------
 # make KiD
-command = "make_kid_lc.sh 8 " + wrkdir + '/' + casename
+command = "make_kid_cab.sh 8 " + wrkdir + '/' + casename
 ierr = subprocess.call(command, shell=True)
 
 if (ierr != 0):
