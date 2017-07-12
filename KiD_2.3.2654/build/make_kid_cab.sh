@@ -51,7 +51,7 @@ if [ $# -gt 1 ]; then
     cp $KID_ROOT/bin/KiD_1D.exe $TESTDIR/.
 
     echo "Copying batch launch script to $TESTDIR"
-    cp $BUILD_ROOT/runkid_batch_lc.sh $TESTDIR/.
+    cp $BUILD_ROOT/runkid_batch_cab.sh $TESTDIR/.
 
     echo "Copying local launch script to $TESTDIR"
     cp $BUILD_ROOT/runkid_local.sh $TESTDIR/.
