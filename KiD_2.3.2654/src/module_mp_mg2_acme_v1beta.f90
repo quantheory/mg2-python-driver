@@ -1812,14 +1812,16 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
            ! LIMITER: flag and save change due to limiter
            qc_conservation(i,k)     = 1
-           qc_conservation_mag(i,k) = ratio
+           qc_conservation_mag(i,k) = deltat*(ratio-1.d0)* &
+                (prc(i,k)+pra(i,k)+mnuccc(i,k)+mnucct(i,k)+ &
+                    msacwi(i,k)+psacws(i,k)+bergs(i,k))*lcldm(i,k)+berg(i,k)
 
         else
            qcrat(i,k) = 1._r8
 
            ! LIMITER: flag and save change due to limiter
            qc_conservation(i,k)     = 0
-           qc_conservation_mag(i,k) = 1.0d0
+           qc_conservation_mag(i,k) = 0.0d0
         end if
 
         !PMC 12/3/12: ratio is also frac of step w/ liquid.
@@ -1900,7 +1902,8 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            ! LIMITER: flag and save change due to limiter
            nc_conservation(i,k)     = 1
            nc_conservation_mag(i,k) = deltat*(ratio-1.d0)* &
-              (nprc1(i,k)+npra(i,k)+nnuccc(i,k)+nnucct(i,k)+npsacws(i,k)-nsubc(i,k))*lcldm(i,k)
+              (nprc1(i,k)+npra(i,k)+nnuccc(i,k)+nnucct(i,k)+&
+                  npsacws(i,k)-nsubc(i,k))*lcldm(i,k)
         else
            ! LIMITER: flag and save change due to limiter
            nc_conservation(i,k)     = 0
