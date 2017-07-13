@@ -1899,11 +1899,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
            ! LIMITER: flag and save change due to limiter
            nc_conservation(i,k)     = 1
-           nc_conservation_mag(i,k) = ratio
+           nc_conservation_mag(i,k) = deltat*(ratio-1.d0)* &
+              (nprc1(i,k)+npra(i,k)+nnuccc(i,k)+nnucct(i,k)+npsacws(i,k)-nsubc(i,k))*lcldm(i,k)
         else
            ! LIMITER: flag and save change due to limiter
            nc_conservation(i,k)     = 0
-           nc_conservation_mag(i,k) = 1.0d0
+           nc_conservation_mag(i,k) = 0.0d0
         end if
 
         mnuccri(i,k)=0._r8
