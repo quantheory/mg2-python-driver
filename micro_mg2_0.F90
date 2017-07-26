@@ -2141,7 +2141,7 @@ subroutine micro_mg_tend ( &
         dumnc(i,k) = max((nc(i,k)+nctend(i,k)*deltat),0._r8)
         dumi(i,k) = (qi(i,k)+qitend(i,k)*deltat)
         dumni(i,k) = max((ni(i,k)+nitend(i,k)*deltat),0._r8)
-        dumr(i,k) = (qr(i,k)+qrtend(i,k)*deltat)
+        dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat, 0._r8)
         dumnr(i,k) = max((nr(i,k)+nrtend(i,k)*deltat),0._r8)
         dums(i,k) = (qs(i,k)+qstend(i,k)*deltat)
         dumns(i,k) = max((ns(i,k)+nstend(i,k)*deltat),0._r8)
@@ -2328,13 +2328,18 @@ subroutine micro_mg_tend ( &
            fnr = 0._r8
         end where
 
-        ! Size of this time step.
-        sed_deltat = 1./max(maxval(fr/pdel(i,:)), maxval(fnr/pdel(i,:)))
-        ! Time we will advance to if taking this step size.
-        sed_time = sed_time + sed_deltat
+        ! Size of this time step.  Note that the limiter of 1.e-6 is only here
+        ! in case fr is everywhere 0 (or ridiculously small). Unless running MG2
+        ! at a ridiculously long time step, it should not impact the answer at
+        ! all (not even roundoff-level).
+        sed_deltat = omsm/max(maxval(fr/pdel(i,:)), maxval(fnr/pdel(i,:)), 1.e-6)
         ! Make sure we don't go past the end of the time step.
-        if (sed_time >= deltat) then
-           sed_deltat = sed_deltat - (sed_time - deltat)
+        if (sed_time + sed_deltat >= deltat) then
+           sed_deltat = deltat - sed_time
+           sed_time = deltat
+        else
+           ! Time we will advance to if taking this step size.
+           sed_time = sed_time + sed_deltat
         end if
         sed_step_ratio = sed_deltat / deltat
 
@@ -2353,8 +2358,8 @@ subroutine micro_mg_tend ( &
         ! sedimentation tendency for output
         qrsedten(i,k)=qrsedten(i,k)-faltndr*sed_step_ratio
 
-        dumr(i,k) = dumr(i,k)-faltndr*deltat*sed_step_ratio
-        dumnr(i,k) = dumnr(i,k)-faltndnr*deltat*sed_step_ratio
+        dumr(i,k) = dumr(i,k)-faltndr*sed_deltat
+        dumnr(i,k) = dumnr(i,k)-faltndnr*sed_deltat
 
         do k = 2,nlev
 
@@ -2368,27 +2373,12 @@ subroutine micro_mg_tend ( &
            ! sedimentation tendency for output
            qrsedten(i,k)=qrsedten(i,k)-faltndr*sed_step_ratio
 
-           dumr(i,k) = dumr(i,k)-faltndr*deltat*sed_step_ratio
-           dumnr(i,k) = dumnr(i,k)-faltndnr*deltat*sed_step_ratio
+           dumr(i,k) = dumr(i,k)-faltndr*sed_deltat
+           dumnr(i,k) = dumnr(i,k)-faltndnr*sed_deltat
 
         end do
 
         prect(i) = prect(i)+faloutr(nlev)*sed_step_ratio/g/1000._r8
-
-        if (.not. all(dumr(i,:) < 1.)) then
-           print *, "Bad values in dumr"
-           stop 1
-        end if
-
-        if (.not. all(dumr(i,:) >= 0.)) then
-           print *, "Negative values in dumr"
-           stop 1
-        end if
-
-        if (.not. all(dumnr(i,:) >= 2.)) then
-           print *, "Negative values in dumnr"
-           stop 1
-        end if
 
         if (sed_time >= deltat) then
            exit rain_sed
