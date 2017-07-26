@@ -1,5 +1,4 @@
-# compiled source #
-###################
+# KiD ignores
 *.o
 *.mod
 *.pyc
@@ -8,3 +7,7 @@
 *case.used
 KiD_2.3.2654/output
 
+# Python Driver ignores
+*.pyf
+*.pyfe
+*.so

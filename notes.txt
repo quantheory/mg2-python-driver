@@ -1,0 +1,353 @@
+-*- mode: org -*-
+
+#+title: MG2 Test Notes
+#+author: Sean Patrick Santos
+#+email: spsantos@uw.edu
+
+#+TODO: TODO WAITING STALLED REVIEW | DONE CANCELED
+#+startup: logdone
+#+startup: lognotedone
+
+* Initial notes [2017-06-15 Thu]
+** TODO Refactor Python scripts.
+*** TODO Break timestep_plot.py into smaller functions.
+*** TODO Change variant scripts (e.g. timestep_plot_prec.py) to leverage this.
+*** TODO Improve outlier_plot.py and variants thereof.
+*** TODO Add netCDF output capability to scripts.
+** DONE Test for poor Q/QR convergence under various conditions.
+*** CANCELED Fix rain evaporation time step.
+*** DONE Turn off rain evaporation entirely.
+*** DONE Change precipitation fraction method.
+** TODO Decide what output to add to measure nr conservation limiter activity.
+** TODO Allow Python script to handle arbitrary numbers of input columns.
+** TODO Change Python script temperature updating.
+   The script should change to mimic what the ~physics_update~ and
+   ~geopotential~ functions do for every MG2 substep.
+** TODO Decide on a strategy for more parallel processing.
+** TODO Figure out system for archiving/organizing plots.
+
+* Daily notes [2017-06-15 Thu]
+** Turning off rain evaporation
+   - Turning off rain evaporation entirely led to most test cases converging in
+     Q, but not in QR, as seen in these plots:
+     + [[file:plots_20170615/timesteps_Q.eps][Q with evaporation]]
+     + [[file:plots_20170615/timesteps_Q_noevap.eps][Q without evaporation]]
+     + [[file:plots_20170615/timesteps_QR.eps][QR with evaporation]]
+     + [[file:plots_20170615/timesteps_QR_noevap.eps][QR without evaporation]]
+   - There is, however, at least one column which fails to converge in Q at any
+     time step with evaporation turned off, which can be seen in the plot above.
+** DONE Turn off (non-ice) processes that affect rain number.
+   This is for deciding whether any one process can be "blamed" for the fact
+   that the asymptotic range does not extend to timesteps larger than ~15-30
+   seconds. Evaporation has already been tried.
+*** DONE Turn off autoconversion.
+    This may not be very informative, since the only rain will presumably be
+    from previous timesteps.
+*** DONE Turn off self-collection.
+
+* Daily notes [2017-06-16 Fri]
+** Turning off self-collection
+   - This seems to get rid off the "kink" in the convergence plots for Q and QR,
+     though both variables seem to show sub-first-order convergence.
+     + [[file:plots_20170615/timesteps_Q.eps][Q with self-collection]]
+     + [[file:plots_20170616/timesteps_Q_nocollect.eps][Q without self-collection]]
+     + [[file:plots_20170615/timesteps_QR.eps][QR with self-collection]]
+     + [[file:plots_20170616/timesteps_QR_nocollect.eps][QR without self-collection]]
+   - The "bumpiness" in the plots makes it hard to estimate the convergence from
+     a couple of points. However, the following output was produced by the
+     current diagnostic:
+     + Estimated median convergence rate for variable Q: 0.958888081956
+     + Estimated mean convergence rate for variable Q: 0.383736110988
+     + Estimated median convergence rate for variable QC: 1.25114515978
+     + Estimated mean convergence rate for variable QC: 1.08667639075
+     + Estimated median convergence rate for variable QI: 1.19099540874
+     + Estimated mean convergence rate for variable QI: 1.15282041008
+     + Estimated median convergence rate for variable QR: 0.493678862123
+     + Estimated mean convergence rate for variable QR: 0.429452252071
+     + Estimated median convergence rate for variable QS: 1.1424212205
+     + Estimated mean convergence rate for variable QS: 0.694204680647
+     + Estimated median convergence rate for variable T: 0.997614837595
+     + Estimated mean convergence rate for variable T: 0.379149412583
+** TODO Come up with a better convergence rate diagnostic.
+** Turning off autoconversion
+   - This did not lead to any clear qualitative change in the convergence plots.
+     + [[file:plots_20170615/timesteps_Q.eps][Q with autoconversion]]
+     + [[file:plots_20170616/timesteps_Q_noauto.eps][Q without autoconversion]]
+     + [[file:plots_20170615/timesteps_QR.eps][QR with autoconversion]]
+     + [[file:plots_20170616/timesteps_QR_noauto.eps][QR without autoconversion]]
+** Changing the precipitation fraction method
+   - The ~precip_frac_method~ was changed from ~in_cloud~ to ~max_overlap~.
+   - This drastically reduces the size of the "kink".
+     + [[file:plots_20170615/timesteps_Q.eps][Q with in_cloud]]
+     + [[file:plots_20170616/timesteps_Q_max_overlap.eps][Q with max_overlap]]
+     + [[file:plots_20170615/timesteps_QR.eps][QR with in_cloud]]
+     + [[file:plots_20170616/timesteps_QR_max_overlap.eps][QR with max_overlap]]
+** CANCELED Turn off sedimentation entirely.
+   CLOSED: [2017-06-21 Wed 14:00]
+   - CLOSING NOTE [2017-06-21 Wed 14:00] \\
+     This trial seems unnecessary for now, since the NR limiter bug discovered
+     on [2017-06-20 Tue] seems to account for the strange NR conservation
+     issues.
+** DONE Should self-collection use rho**2 instead of rho?
+   CLOSED: [2017-06-21 Wed 14:01]
+   - CLOSING NOTE [2017-06-21 Wed 14:01] \\
+     Answer is no: number would be multiplied by rho on both sides, so assuming
+     a roughly constant density w.r.t. time, one of the ones on the RHS will
+     cancel with a rho on the LHS.
+* Daily notes [2017-06-19 Mon]
+** Rain number hypothesis
+   - Due to required LLNL training and broken A/C in the office, spent most of
+     this day working offline, trying to interpret results.
+   - Sent this email summarizing current thoughts about rain number convergence:
+#+begin_quote
+One of the processes in the microphysics is the “self-collection” of rain, which
+is currently calculated like this:
+ 
+nragg = -8._r8*nric*qric*rho
+ 
+nragg is effectively the tendency on nric. Now, rho is ~1, and qric is limited
+to be <= 0.01. Chris’s plots show that, at least at coarse timesteps, we
+actually hit that limiter, so qric actually is on the order of magnitude of
+10^-3 to 10^-2 at least some of the time.
+ 
+If you imagine a case where rain is heavy (qric is about 0.01), and we idealize
+by saying that self-collection is the only active process in a grid cell, the
+equation for rain number here looks roughly like:
+ 
+dN/dt = -0.08 * N
+ 
+Using the forward Euler method will only be stable on this equation for
+timesteps < 25 seconds, and IIRC, it will only lead to a monotonic decay if the
+timestep is <= 12.5 seconds.
+ 
+The attached plots show some evidence that this instability is responsible for
+some of the issues we’ve seen, though it’s not a 100% confirmation. What’s being
+plotted in each one is the timestep vs. the 2-norm of the “error” (with respect
+to a 1s timestep reference case), for a number of different cases. Looking at
+timesteps_QR.eps, there are some cases where there’s a “kink” in the graph,
+i.e. the solution doesn’t start to converge until a timestep of ~10s or smaller
+is used. If self-collection is turned off (timesteps_QR_nocollect.eps), that
+kink is not present, and though the rate of convergence may be sub-first-order,
+for a given case it still appears to follow some power law.
+ 
+I also did a test where I changed the “precip_frac_method” option. One effect of
+this is to significantly reduce qric in most cases; the kink in QR also goes
+away in this case (timesteps_QR_max_overlap.eps).
+ 
+I also looked at water vapor (Q). Because it is coupled to QR via evaporation,
+it also shows this distinctive “kink” (timestep_Q.eps). If self-collection is
+turned off, the kink goes away. If the precip_frac_method is changed, the kink
+becomes much less pronounced, and is not visible in all cases.
+ 
+There’s some further evidence that the issue affects rain number and mass first,
+and then affects water vapor only indirectly via evaporation. The “noevap” plots
+I’ve attached show a case where rain evaporation is turned off, which
+effectively decouples Q from QR (at least, it does for grid cells with no
+cloud). In this case, the water vapor (Q) shows no kink, but the kink for rain
+mass (QR) is highly exaggerated.
+#+end_quote
+
+* Daily notes [2017-06-20 Tue]
+** Test case evaluation
+   - A particular test case that shows a strong "kink" in the Q convergence
+     plots is in column 856 of the ACME-derived data file.
+   - This test case was examined at 1s and 15s time steps.
+   - The following quantities were plotted over vertical level and time:
+     + All forms of water mass (Q and all hydrometeor mixing ratios).
+     + Temperature
+     + NR
+     + Rain evaporation rate (mass tendency)
+     + Rain sedimentation rate (mass tendency)
+     + Rain autoconversion rate (mass tendency)
+     + Rain accretion rate (mass tendency)
+     + Self-collection rate (number tendency)
+     + Ratio used to scale rain number tendencies for conservation
+     + Precipitation fraction
+   - The last three outputs mentioned above had to be added to MG2, as they are
+     not output in the original code.
+   - Differences were also plotted between the 15s and 1s values.
+     + The relevant beginning-of-timestep values were used for state variables,
+       i.e. the 1s run was sliced with a stride of 15.
+     + For other variables, the 1s values were averaged over 15s intervals to
+       compare with the values from the 15s run.
+   - Relevant code and data are in [[file:./plots_20170620]].
+** Bug in NR limiter
+   Consider the following lines from MG2:
+#+begin_src f90
+  dum = ((-nsubr(i,k)+npracs(i,k)+nnuccr(i,k)+nnuccri(i,k)-nragg(i,k))*precip_frac(i,k)- &
+       nprc(i,k)*lcldm(i,k))*deltat
+
+  if (dum.gt.nr(i,k)) then
+     ratio = (nr(i,k)/deltat+nprc(i,k)*lcldm(i,k)/precip_frac(i,k))/ &
+          (-nsubr(i,k)+npracs(i,k)+nnuccr(i,k)+nnuccri(i,k)-nragg(i,k))*omsm
+     ! More stuff...
+  end if
+#+end_src
+   The factor of ~precip_frac~ that's used in the calculation of ~ratio~ should
+   apply to the whole expression (both ~nr~ and ~nprc~), not just ~nprc~.
+** Bug fix test
+   - Fixing this bug seems to cause the 15s case to behave similarly to the 1s
+     one.
+   - Relevant code and data are in [[file:./plots_20170620]], with the ~_bugfix~
+     suffix.
+** Convergence plots with bug fixed
+   - With the bug fix, convergence plots for Q, T, and hydrometeor masses were
+     recomputed.
+   - The "kink" feature has largely gone away in these plots.
+   - Relevant code and data are again in [[file:./plots_20170620]]. The code has the
+     ~bugfix~ suffix, whereas the plots have no special suffix (they simply
+     start with ~timesteps~).
+* Daily notes [2017-06-21 Wed]
+** TODO Investigate test case that doesn't converge with nr conservation fix.
+** TODO Add different "norms" for convergence plots, e.g. total water mass.
+** TODO See if the qric/qsic "limiters" should instead change precip_frac.
+   The variables ~qric~ and ~qsic~ are limited to no more than 10 g/kg when they
+   are calculated. However, these high values typically arise when the
+   ~in_cloud~ precipitation fraction calculation produces an unreasonably low
+   value, and so this limiter can be understood as implementing one of two
+   possible "band-aid" solutions to this issue:
+   1. The limiter can be understood as a way of declaring that some of the rain
+      is outside the area represented by ~precip_frac~. In this case, ~nric~ and
+      ~nsic~ should be modified as well. Under this interpretation, it is
+      reasonable that some of the rain does not undergo processes like
+      self-collection; it is more dubious that the "sparse" rain outside of the
+      main precipitation area would not evaporate.
+   2. The limiter can alternately understood as changing the precipitation
+      fraction, i.e. fixing an unreasonable value coming from the ~in_cloud~
+      calculation. In this case, the ~precip_frac~ itself should be changed, and
+      this should happen before ~nric~ and ~nsic~ are calculated, as well as
+      before all of the process rates.
+   Regardless of the interpretation of this limiter, it does not seem like
+   limiting the masses alone, without changing the number, is the best option,
+   particularly because this artificially decreases the particle sizes.
+* Daily notes [2017-06-22 Thu]
+** Non-convergent test case
+*** Plot details
+    - Test case was investigated at 1s and 5s time steps.
+    - Plotted variables include:
+      + All forms of water mass (Q and all hydrometeor mixing ratios).
+      + Temperature
+      + NR and NS
+      + Rain evaporation rate (mass tendency)
+      + Rain sedimentation rate (mass tendency)
+      + Rain autoconversion rate (mass tendency)
+      + Rain accretion rate (mass tendency)
+      + Ratio used to scale snow mass tendencies for conservation
+      + Snow precipitation fraction
+    - The conservation ratio had to be added as an output to MG2.
+    - Differences were also plotted between the 15s and 1s values.
+      + The relevant beginning-of-timestep values were used for state variables,
+        i.e. the 1s run was sliced with a stride of 5.
+      + For other variables, the 1s values were averaged over 5s intervals to
+        compare with the values from the 5s run.
+    - Plots are in [[file:./plots_20170622]].
+*** Conclusions
+    - Non-convergence in humidity seems to be the result of increased
+      sublimation of snow in the 5s case. The reason for this difference in the
+      sublimation rate is unclear.
+    - QS is not as affected, because snow is continually being generated,
+      falling, turning to rain, and hitting the surface. At any given moment the
+      excess sublimation has only a small effect on current snow mass, but Q and
+      PRECT are more affected, since changes in these values come from the
+      sublimation differences integrated over time.
+    - Snow fraction (freqs) changes significantly in the 5s run at the same time
+      as snow evaporation changes; there is likely a link accounting for this
+      shared discontinuous behavior.
+* Daily notes [2017-06-26 Mon]
+** More on the non-convergent test case
+*** Plot details
+    - Test plots from Thursday created again with some variations.
+    - This time, the bug fix for NR conservation was implemented (no significant
+      changes were seen as a result, however).
+    - Plotted variables included all of the previous ones, plus:
+      + Locations where QI and QC were nonzero (>= ~qsmall~).
+      + Log base ten of QI (for the purpose of determining how far above ~qsmall~
+        it was in the 1s case).
+      + The strength of the limiter on ~qsic~ that limits it to 0.01 kg/kg.
+      + The rate of accretion of ice onto snow (mass tendency).
+      + Total tendency on QI.
+    - The QI/QC-based plots had beginning-of-timestep values plotted as usual
+      for state variables, whereas the other plots used averages for the
+      difference plots.
+    - Plots and code in [[file:./plots_20170626]].
+*** Conclusions
+    - A small difference in QI between the runs leads to a large difference in
+      precipitation fraction, due to the limiter used in the ~in_cloud~
+      precipitation fraction calculation method.
+    - Because of this, the limiter on ~qsic~ triggers only in the 1s case.
+    - This means that less mass is available to participate in various processes
+      for the 1s case, and in particular there is less sublimation of snow.
+** Possible changes to precipitation fraction calculation
+   1. Derive ~precip_frac~ from cloud fraction inputs alone; this is basically
+      "punting" on the issue by having MG2 simply diagnose the precipitation
+      fraction based on what the macrophysics hands it, without updating it to
+      account for changes in state variables.
+      - Pros:
+        + Simple.
+        + Guaranteed to "work", in the sense of preventing runs with slightly
+          different time resolutions from using wildly different precipitation
+          fractions.
+      - Cons:
+        + May change answers significantly (?).
+        + May not be defensible in a broader context, i.e. the microphysics is
+          largely responsible for "understanding" precipitation, with the
+          macrophysics likely not designed with precipitation in mind.
+   2. Calculate ~precip_frac~ as a weighted average of cloud fraction at this
+      level and ~precip_frac~ on the level above, with weights depending in some
+      fashion on the ratio of flux due to sedimentation to local precip
+      production.
+      - Pros:
+        + Depending on weights chosen, can have arbitrarily good smoothness
+          properties.
+        + Justifiable on physical/statistical grounds, though some assumptions
+          must be spelled out to justify a given set of weights with any real
+          rigor.
+      - Cons:
+        + Not clear that this is always right; some precip may be "hanging
+          around" from previous timesteps, so that current process rates are not
+          the whole story.
+        + Chicken-and-egg problem: ~precip_frac~ can't be determined from local
+          process rates if those rates depend on ~precip_frac~, except by one of
+          these methods:
+          - Numerical root-finding (prohibitively expensive)
+          - Using previous timestep information (inconvenient to code, requires
+            more information to restart exactly, requires "bootstrap" on first
+            timestep)
+   3. Use a weighted average based not on process rates, but on the local value
+      of QR/QS vs. QR/QS in the level above (simple, but may be less rigorous
+      than using the actual rates).
+      - Pros:
+        + Arbitrarily good smoothness.
+        + Physically/statistically justifiable with the right assumptions.
+        + Perhaps the easiest such option to implement.
+        + May end up being similar to current method in many cases.
+      - Cons:
+        + Degree to which the "one-level-above" QR/QS is taken into account
+          implicitly reflects a judgment about the speed with which that
+          precipitation falls into the current level, unless code is reordered
+          to explicitly calculate fallspeeds at the level above before
+          calculating ~precip_frac~ at lower levels.
+        + Still some potential temporary problems with precipitation "hanging
+          around", i.e. even if the level above has run out of precipitation,
+          the precipitation on this level may have ultimately come from above.
+          - However, it seems likely in this case that the microphysics will
+            converge if /both/ the spatial and time scales are refined.
+* Daily notes [2017-07-10 Mon]
+** Convergence With Mass Gradient Precipitation Fraction
+   - New ~mass_gradient~ precipitation fraction calculation method implemented.
+   - ~qsmall~ used as the "nudge" parameter for stability.
+   - Constant parameters set to alpha=0.5, beta=0.5.
+   - Usual convergence plots generated.
+   - See [[file:plots_20170710]].
+   - Interpretation: Most variables in most test cases now converge to first
+     order. QR has some weird spikes in the worst case for timesteps >= 120s,
+     but there are no more issues with non-convergence down to sub-minute
+     timescales. Q and T may be converging at a sub-first-order rate in some
+     cases.
+* Daily notes [2017-07-12 Thu]
+** QR spike issue
+   - Looked at "outlier" that appeared to cause the QR convergence plot spike.
+   - See [[file:plots_20170712]].
+   - Interpretation: Due to the fall speed not being updated frequently enough,
+     the sedimentation code is causing rain mass to "bunch up" in certain
+     levels, where it then falls at a constant rate of one level per time step.
