@@ -25,7 +25,7 @@ use
 # compile source code
 # --------------------------------------------------------------------
 BUILD_ROOT=$PWD
-KID_ROOT=${HOME}/workspace/kid/KiD_2.3.2654
+KID_ROOT=${HOME}/workspace/micro_physics/KiD_2.3.2654
 
 cd $KID_ROOT
 make -j $1 CASE=1D all
