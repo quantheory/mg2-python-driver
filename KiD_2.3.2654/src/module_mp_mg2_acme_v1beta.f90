@@ -458,6 +458,13 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        evaporate_sublimate_precip, &
        bergeron_process_snow
 
+  use Sedimentation, only: &
+       sed_CalcFallVelocity, &
+       MG_LIQUID, &
+       MG_ICE, &
+       MG_RAIN,&
+       MG_SNOW
+
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
 
@@ -2417,6 +2424,23 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
   sed_col_loop: do i=1,mgncol
 
+     call sed_CalcFallVelocity(qc,qctend,nc,nctend,lcldm,rho,deltat,nlev,i,&
+      MG_LIQUID,g,acn,rhof,fc,fnc,&
+      ncons=nccons,nnst=ncnst)
+
+     call sed_CalcFallVelocity(qi,qitend,ni,nitend,icldm,rho,deltat,nlev,i,&
+      MG_ICE,g,ain,rhof,fi,fni,&
+      ncons=nicons,nnst=ninst,&
+      gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
+
+     call sed_CalcFallVelocity(qr,qrtend,nr,nrtend,precip_frac,rho,deltat,nlev,i,&
+      MG_RAIN,g,arn,rhof,fr,fnr,&
+      gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
+
+     call sed_CalcFallVelocity(qs,qstend,ns,nstend,precip_frac,rho,deltat,nlev,i,&
+      MG_SNOW,g,asn,rhof,fs,fns,&
+      gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
+
      do k=1,nlev
 
         ! calculate sedimentation for cloud water and ice
@@ -2458,21 +2482,23 @@ subroutine micro_mg2_acme_v1beta_tend ( &
         ! calculate number and mass weighted fall velocity for droplets and cloud ice
         !-------------------------------------------------------------------
 
-
         if (dumc(i,k).ge.qsmall) then
 
            vtrmc(i,k)=acn(i,k)*gamma(4._r8+bc+pgam(i,k))/ &
                 (lamc(i,k)**bc*gamma(pgam(i,k)+4._r8))
 
-           fc(k) = g*rho(i,k)*vtrmc(i,k)
+!           fc(k) = g*rho(i,k)*vtrmc(i,k)
 
-           fnc(k) = g*rho(i,k)* &
-                acn(i,k)*gamma(1._r8+bc+pgam(i,k))/ &
-                (lamc(i,k)**bc*gamma(pgam(i,k)+1._r8))
+!           fnc(k) = g*rho(i,k)* &
+!                acn(i,k)*gamma(1._r8+bc+pgam(i,k))/ &
+!                (lamc(i,k)**bc*gamma(pgam(i,k)+1._r8))
         else
-           fc(k) = 0._r8
-           fnc(k)= 0._r8
+!           fc(k) = 0._r8
+!           fnc(k)= 0._r8
         end if
+
+
+
 
         ! calculate number and mass weighted fall velocity for cloud ice
 
@@ -2481,12 +2507,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            vtrmi(i,k)=min(ain(i,k)*gamma_bi_plus4/(6._r8*lami(i,k)**bi), &
                 1.2_r8*rhof(i,k))
 
-           fi(k) = g*rho(i,k)*vtrmi(i,k)
-           fni(k) = g*rho(i,k)* &
-                min(ain(i,k)*gamma_bi_plus1/lami(i,k)**bi,1.2_r8*rhof(i,k))
+!           fi(k) = g*rho(i,k)*vtrmi(i,k)
+!           fni(k) = g*rho(i,k)* &
+!                min(ain(i,k)*gamma_bi_plus1/lami(i,k)**bi,1.2_r8*rhof(i,k))
         else
-           fi(k) = 0._r8
-           fni(k)= 0._r8
+  !         fi(k) = 0._r8
+  !         fni(k)= 0._r8
         end if
 
         ! fallspeed for rain
@@ -2501,12 +2527,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            unr(i,k) = min(arn(i,k)*gamma_br_plus1/lamr(i,k)**br,9.1_r8*rhof(i,k))
            umr(i,k) = min(arn(i,k)*gamma_br_plus4/(6._r8*lamr(i,k)**br),9.1_r8*rhof(i,k))
 
-           fr(k) = g*rho(i,k)*umr(i,k)
-           fnr(k) = g*rho(i,k)*unr(i,k)
+!           fr(k) = g*rho(i,k)*umr(i,k)
+!           fnr(k) = g*rho(i,k)*unr(i,k)
 
         else
-           fr(k)=0._r8
-           fnr(k)=0._r8
+!           fr(k)=0._r8
+!           fnr(k)=0._r8
         end if
 
         ! fallspeed for snow
@@ -2520,12 +2546,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
            ums(i,k) = min(asn(i,k)*gamma_bs_plus4/(6._r8*lams(i,k)**bs),1.2_r8*rhof(i,k))
            uns(i,k) = min(asn(i,k)*gamma_bs_plus1/lams(i,k)**bs,1.2_r8*rhof(i,k))
 
-           fs(k) = g*rho(i,k)*ums(i,k)
-           fns(k) = g*rho(i,k)*uns(i,k)
+!           fs(k) = g*rho(i,k)*ums(i,k)
+!           fns(k) = g*rho(i,k)*uns(i,k)
 
         else
-           fs(k)=0._r8
-           fns(k)=0._r8
+!           fs(k)=0._r8
+!           fns(k)=0._r8
         end if
 
         ! redefine dummy variables - sedimentation is calculated over grid-scale
