@@ -22,9 +22,9 @@ refrun = Run('warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',1,limiterList)
 
 for run in runList:
     f1, axarray1 = pyplot.subplots(3,len(limiterList),sharex=True,sharey=True,
-                                    num=run.dt,figsize=(8,6))
+                                    num=run.dt,figsize=(16,9))
     f2, axarray2 = pyplot.subplots(3,len(limiterList),sharex=True,sharey=True,
-                                    num=run.dt+1,figsize=(8,6))
+                                    num=run.dt+1,figsize=(16,9))
     for k in range(3):
       axarray1[k,0].set_ylabel('height')
       axarray2[k,0].set_ylabel('height')
@@ -63,7 +63,7 @@ for run in runList:
       maxvalue = np.amax(np.abs(value))
       cax = axarray2[2,k].pcolor(t,z,value,cmap=cmap,
             vmin=-min(1.0,maxvalue),vmax=min(1.0,maxvalue))
-      axarray2[2,k].set_title('normalized limiter error')
+      axarray2[2,k].set_title('accumulated limiter error')
       f2.colorbar(cax,ax=axarray2[2,k])
 
 pyplot.show()
