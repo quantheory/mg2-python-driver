@@ -2444,10 +2444,6 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      end do       !!! vertical loop
 
-     call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,nlev,i,&
-       MG_LIQUID,g,acn,rhof,fc,fnc,&
-       ncons=nccons,nnst=ncnst)
-
      call sed_CalcFallVelocity(dumi,qitend,dumni,nitend,icldm,rho,nlev,i,&
        MG_ICE,g,ain,rhof,fi,fni,&
        ncons=nicons,nnst=ninst,&
@@ -2502,21 +2498,38 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      !==============================================================
      ! calculate fall velocity from current dummy values
 
+     time_sed = deltat
 
+     call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,nlev,i,&
+       MG_LIQUID,g,acn,rhof,fc,fnc,&
+       ncons=nccons,nnst=ncnst)
      nstep = 1 + int(max( &
           maxval( fc/pdel(i,:)), &
           maxval(fnc/pdel(i,:))) &
-          * deltat)
+          * time_sed)
 
-     write(fid_nstep,'(I12,4X)',advance="no") nsteps_qc
-
-     do n = 1,nstep
-
-       call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat/nstep,nlev,i,MG_LIQUID,g, &
+     ! subcycle if necessary
+     do while (nstep > 1)
+       deltat_sed = time_sed/nstep
+       time_sed = time_sed - deltat_sed
+       call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat_sed,nlev,i,MG_LIQUID,g, &
          qctend,nctend,prect,qcsedten,&
          cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
-     end do
 
+       call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,nlev,i,&
+         MG_LIQUID,g,acn,rhof,fc,fnc,&
+         ncons=nccons,nnst=ncnst)
+       nstep = 1 + int(max( &
+            maxval( fc/pdel(i,:)), &
+            maxval(fnc/pdel(i,:))) &
+            * time_sed)
+     end do
+     deltat_sed = time_sed/nstep
+     call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat_sed,nlev,i,MG_LIQUID,g, &
+       qctend,nctend,prect,qcsedten,&
+       cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
+
+     !write(fid_nstep,'(I12,4X)',advance="no") nsteps_qc
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
@@ -2551,7 +2564,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
       qrtend,nrtend,prect,qrsedten)
 
 
-     write(fid_nstep,'(I12,4X)',advance="no") nsteps_qr
+     !write(fid_nstep,'(I12,4X)',advance="no") nsteps_qr
 
 
 
