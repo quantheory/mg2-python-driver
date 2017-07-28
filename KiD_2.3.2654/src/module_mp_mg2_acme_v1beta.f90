@@ -965,13 +965,16 @@ subroutine micro_mg2_acme_v1beta_tend ( &
   ! Array dummy variable
   real(r8) :: dum_2D(mgncol,nlev)
 
+  ! sedimentation substep loop variables
+  real(r8) :: deltat_sed, time_sed
+  ! number of sub-steps for loops over "n" (for sedimentation)
+  integer nstep
+
   ! loop array variables
   ! "i" and "k" are column/level iterators for internal (MG) variables
   ! "n" is used for other looping (currently just sedimentation)
   integer i, k, n
 
-  ! number of sub-steps for loops over "n" (for sedimentation)
-  integer nstep
 
   !cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
@@ -2441,20 +2444,20 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      end do       !!! vertical loop
 
-     call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,deltat,nlev,i,&
+     call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,nlev,i,&
+       MG_RAIN,g,arn,rhof,fr,fnr,&
+       gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
+
+     call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,nlev,i,&
        MG_LIQUID,g,acn,rhof,fc,fnc,&
        ncons=nccons,nnst=ncnst)
 
-     call sed_CalcFallVelocity(dumi,qitend,dumni,nitend,icldm,rho,deltat,nlev,i,&
+     call sed_CalcFallVelocity(dumi,qitend,dumni,nitend,icldm,rho,nlev,i,&
        MG_ICE,g,ain,rhof,fi,fni,&
        ncons=nicons,nnst=ninst,&
        gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
 
-     call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,deltat,nlev,i,&
-       MG_RAIN,g,arn,rhof,fr,fnr,&
-       gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
-
-     call sed_CalcFallVelocity(dums,qstend,dumns,nstend,precip_frac,rho,deltat,nlev,i,&
+     call sed_CalcFallVelocity(dums,qstend,dumns,nstend,precip_frac,rho,nlev,i,&
        MG_SNOW,g,asn,rhof,fs,fns,&
        gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
 
@@ -2492,53 +2495,51 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      do n = 1,nstep
 
         if (do_cldice) then
-          call sed_AdvanceOneStep(dumi,fi,dumni,fni,pdel,deltat,nstep,nlev,i,MG_ICE,g, &
+          call sed_AdvanceOneStep(dumi,fi,dumni,fni,pdel,deltat,deltat/nstep,nlev,i,MG_ICE,g, &
             qitend,nitend,preci,qisedten,&
             cloud_frac=icldm,qvlat=qvlat,tlat=tlat,xxl=xxls,preci=preci,qsevap=qisevap)
         end if
 
      end do
 
-     ! calculate number of split time steps to ensure courant stability criteria
-     ! for sedimentation calculations
-     !-------------------------------------------------------------------
+     ! loop over sedimentation sub-time step to ensure stability
+     !==============================================================
+     ! calculate fall velocity from current dummy values
+
+
      nstep = 1 + int(max( &
           maxval( fc/pdel(i,:)), &
           maxval(fnc/pdel(i,:))) &
           * deltat)
 
-     write(fid_nstep,'(I12,4X)',advance="no") nstep
-     nsteps_qc = nstep
+     write(fid_nstep,'(I12,4X)',advance="no") nsteps_qc
+
+     do n = 1,nstep
+
+       call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat/nstep,nlev,i,MG_LIQUID,g, &
+         qctend,nctend,prect,qcsedten,&
+         cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
+     end do
+
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
-     do n = 1,nstep
 
-       call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,nstep,nlev,i,MG_LIQUID,g, &
-         qctend,nctend,prect,qcsedten,&
-         cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
-
-     end do
-
-     ! calculate number of split time steps to ensure courant stability criteria
-     ! for sedimentation calculations
-     !-------------------------------------------------------------------
      nstep = 1 + int(max( &
           maxval( fr/pdel(i,:)), &
           maxval(fnr/pdel(i,:))) &
-          * deltat)
+          * (deltat-time_sed))
 
-     write(fid_nstep,'(I12,4X)',advance="no") nstep
-     nsteps_qr = nstep
-
-     ! loop over sedimentation sub-time step to ensure stability
-     !==============================================================
-     do n = 1,nstep
-
-       call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,nstep,nlev,i,MG_RAIN,g, &
-         qrtend,nrtend,prect,qrsedten)
+     ! subcycle if necessary
+     do n=1,nstep
+       call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat/nstep,nlev,i,MG_RAIN,g, &
+        qrtend,nrtend,prect,qrsedten)
 
      end do
+     
+     write(fid_nstep,'(I12,4X)',advance="no") nsteps_qr
+
+
 
      ! calculate number of split time steps to ensure courant stability criteria
      ! for sedimentation calculations
@@ -2555,7 +2556,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      !==============================================================
      do n = 1,nstep
 
-       call sed_AdvanceOneStep(dums,fs,dumns,fns,pdel,deltat,nstep,nlev,i,MG_SNOW,g, &
+       call sed_AdvanceOneStep(dums,fs,dumns,fns,pdel,deltat,deltat/nstep,nlev,i,MG_SNOW,g, &
         qstend,nstend,prect,qssedten,preci=preci)
 
      end do

@@ -11,7 +11,7 @@ module Sedimentation
 
 contains
 
-  subroutine sed_CalcFallVelocity(q,qtend,n,ntend,cloud_frac,rho,deltat,nlev,i, &
+  subroutine sed_CalcFallVelocity(q,qtend,n,ntend,cloud_frac,rho,nlev,i, &
     mg_type,g,an,rhof,fq,fn,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
     use micro_mg2_acme_v1beta_utils, only: size_dist_param_liq, &
                                            size_dist_param_basic, &
@@ -21,8 +21,7 @@ contains
     implicit none
     real(r8), intent(in)            :: q(:,:), qtend(:,:), n(:,:), ntend(:,:)
     real(r8), intent(in)            :: rho(:,:), an(:,:), rhof(:,:)
-    real(r8), intent(in)            :: cloud_frac(:,:)
-    real(r8), intent(in)            :: deltat, g
+    real(r8), intent(in)            :: cloud_frac(:,:), g
     integer,  intent(in)            :: nlev, i, mg_type
     real(r8), intent(in), optional  :: nnst, gamma_b_plus1, gamma_b_plus4
     logical, intent(in), optional   :: ncons
@@ -121,12 +120,12 @@ contains
 
   end subroutine sed_CalcFallVelocity
 
-  subroutine sed_AdvanceOneStep(q,fq,n,fn,pdel,deltat,nstep,nlev,i,mg_type,g, &
+  subroutine sed_AdvanceOneStep(q,fq,n,fn,pdel,deltat,deltat_sed,nlev,i,mg_type,g, &
     qtend,ntend,prect,qsedtend,cloud_frac,qvlat,tlat,xxl,preci,qsevap)
     implicit none
     real(r8), intent(in)              :: fq(:), fn(:), pdel(:,:)
-    real(r8), intent(in)              :: deltat, g
-    integer, intent(in)               :: nstep, nlev, i, mg_type
+    real(r8), intent(in)              :: deltat, deltat_sed, g
+    integer, intent(in)               :: nlev, i, mg_type
     real(r8), intent(inout)           :: q(:,:), qtend(:,:), n(:,:), ntend(:,:)
     real(r8), intent(inout)           :: prect(:)
     real(r8), intent(in), optional    :: cloud_frac(:,:), xxl
@@ -160,29 +159,29 @@ contains
       deltafluxQ = (fluxQ(k)-ratio(k)*fluxQ(k-1))/pdel(i,k)
       deltafluxN = (fluxN(k)-ratio(k)*fluxN(k-1))/pdel(i,k)
       ! add fallout terms to eulerian tendencies
-      qtend(i,k) = qtend(i,k) - deltafluxQ/nstep
-      ntend(i,k) = ntend(i,k) - deltafluxN/nstep
+      qtend(i,k) = qtend(i,k) - deltafluxQ*deltat_sed/deltat
+      ntend(i,k) = ntend(i,k) - deltafluxN*deltat_sed/deltat
       ! sedimentation tendency for output
-      qsedtend(i,k) = qsedtend(i,k) - deltafluxQ/nstep
+      qsedtend(i,k) = qsedtend(i,k) - deltafluxQ*deltat_sed/deltat
       if (mg_type == MG_ICE .or. mg_type == MG_LIQUID) then
         ! add terms to to evap/sub of cloud water
         deltafluxQ_evap = (ratio(k)-1._r8)*fluxQ(k-1)/pdel(i,k)
-        qvlat(i,k) = qvlat(i,k) - deltafluxQ_evap/nstep
-        qsevap(i,k) = qsevap(i,k) - deltafluxQ_evap/nstep
-        tlat(i,k) = tlat(i,k) + deltafluxQ_evap*xxl/nstep
+        qvlat(i,k) = qvlat(i,k) - deltafluxQ_evap*deltat_sed/deltat
+        qsevap(i,k) = qsevap(i,k) - deltafluxQ_evap*deltat_sed/deltat
+        tlat(i,k) = tlat(i,k) + deltafluxQ_evap*xxl*deltat_sed/deltat
       end if
 
-      q(i,k) = q(i,k) - deltat/nstep*deltafluxQ
-      n(i,k) = n(i,k) - deltat/nstep*deltafluxN
+      q(i,k) = q(i,k) - deltat_sed*deltafluxQ
+      n(i,k) = n(i,k) - deltat_sed*deltafluxN
     end do
 
     ! units below are m/s
     ! sedimentation flux at surface is added to precip flux at surface
     ! to get total precip (cloud + precip water) rate
 
-    prect(i) = prect(i)+fluxQ(nlev)/g/nstep/1000._r8
+    prect(i) = prect(i) + deltat_sed/deltat*fluxQ(nlev)/g/1000._r8
     if (mg_type == MG_ICE .or. mg_type == MG_SNOW) then
-      preci(i) = preci(i)+fluxQ(nlev)/g/nstep/1000._r8
+      preci(i) = preci(i) + deltat_sed/deltat*fluxQ(nlev)/g/1000._r8
     end if
 
   end subroutine
