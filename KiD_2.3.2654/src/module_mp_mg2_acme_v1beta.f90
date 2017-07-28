@@ -2444,10 +2444,6 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      end do       !!! vertical loop
 
-     call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,nlev,i,&
-       MG_RAIN,g,arn,rhof,fr,fnr,&
-       gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
-
      call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,nlev,i,&
        MG_LIQUID,g,acn,rhof,fc,fnc,&
        ncons=nccons,nnst=ncnst)
@@ -2525,18 +2521,36 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
 
+     time_sed = deltat
+
+     call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,nlev,i,&
+       MG_RAIN,g,arn,rhof,fr,fnr,&
+       gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
      nstep = 1 + int(max( &
           maxval( fr/pdel(i,:)), &
           maxval(fnr/pdel(i,:))) &
-          * (deltat-time_sed))
+          * time_sed)
 
      ! subcycle if necessary
-     do n=1,nstep
-       call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat/nstep,nlev,i,MG_RAIN,g, &
-        qrtend,nrtend,prect,qrsedten)
+     do while (nstep > 1)
+       deltat_sed = time_sed/nstep
+       time_sed = time_sed - deltat_sed
+       call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
+         qrtend,nrtend,prect,qrsedten)
 
+       call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,nlev,i,&
+         MG_RAIN,g,arn,rhof,fr,fnr,&
+         gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
+       nstep = 1 + int(max( &
+         maxval( fr/pdel(i,:)), &
+         maxval(fnr/pdel(i,:))) &
+         * time_sed)
      end do
-     
+     deltat_sed = time_sed/nstep
+     call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
+      qrtend,nrtend,prect,qrsedten)
+
+
      write(fid_nstep,'(I12,4X)',advance="no") nsteps_qr
 
 
