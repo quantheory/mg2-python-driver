@@ -64,6 +64,7 @@ class Run():
           self.variables[limiter.qName] = dataset.variables[limiter.qName][:]
         self.variables[limiter.magnitudeName] = dataset.variables[limiter.magnitudeName][:]
       self.mask = self.variables[limiterList[0].magnitudeName].mask
+      dataset.close()
 
 ################################################################################
 
