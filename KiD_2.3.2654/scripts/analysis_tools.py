@@ -1,16 +1,48 @@
 from netCDF4 import Dataset
 import numpy as np
 
+class Quantity():
+  def __init__(self, name):
+    self.name = name
+    self.runDictionary = {}
+    self.refrunDictionary = {}
+    self.errorDictionary = {}
+
+  def getQ(self,run):
+    if (run.name not in self.runDictionary.keys()):
+      q = run.variables[self.name][:]
+      q = np.ma.array(q,mask=run.mask)
+      self.runDictionary[run.name] = np.ma.compress_cols(q)
+    return self.runDictionary[run.name]
+
+  def getQRef(self,run,refrun):
+    if (run.name not in self.refrunDictionary.keys()):
+      qRef = refrun.variables[self.name][:]
+      qRef = np.ma.array(qRef,mask=run.mask)
+      self.refrunDictionary[run.name] = np.ma.compress_cols(qRef)
+    return self.refrunDictionary[run.name]
+
+  def computeQError(self,run,refrun=None):
+    if (run.name not in self.errorDictionary.keys()):
+      if (run.name not in self.runDictionary.keys()):
+        q = getQ(run)
+      else:
+        q = self.runDictionary[run.name]
+      if (run.name not in self.refrunDictionary.keys()):
+        qRef = getQRef(run,refrun)
+      else:
+        qRef = self.refrunDictionary[run.name]
+      self.errorDictionary[run.name] = np.abs(q-qRef)
+    return self.errorDictionary[run.name]
+
 class Limiter():
 
   def __init__(self, name, magnitudeName, qName, limiterType='other', description=None):
     self.name = name
     self.magnitudeName = magnitudeName
-    self.qName = qName
+    self.q = Quantity(qName)
     self.limiterType = limiterType
     self.description = description
-    self.qDictionary = {}
-    self.qRefDictionary = {}
     self.limiterErrorDictionary = {}
     self.cumulativeLimiterErrorDictionary = {}
     self.qErrorDictionary = {}
@@ -30,26 +62,14 @@ class Limiter():
       self.cumulativeLimiterErrorDictionary[run.name] = cumulativeError
     return self.cumulativeLimiterErrorDictionary[run.name]
 
-  def getQ(self,run):
-    if (run.name not in self.qDictionary.keys()):
-      q = run.variables[self.qName][:]
-      q = np.ma.array(q,mask=run.mask)
-      self.qDictionary[run.name] = np.ma.compress_cols(q)
-    return self.qDictionary[run.name]
+  def getQ(self,run): # for backwards compatibility
+    return self.q.getQ(run)
 
-  def getQRef(self,run,refrun):
-    if (run.name not in self.qRefDictionary.keys()):
-      qRef = refrun.variables[self.qName][:]
-      qRef = np.ma.array(qRef,mask=run.mask)
-      self.qRefDictionary[run.name] = np.ma.compress_cols(qRef)
-    return self.qRefDictionary[run.name]
+  def getQRef(self,run,refrun): # for backwards compatibility
+    return self.q.getQRef(run, refrun)
 
-  def computeQError(self,run,refrun):
-    if (run.name not in self.qErrorDictionary.keys()):
-      q = self.getQ(run)
-      qRef = self.getQRef(run,refrun)
-      self.qErrorDictionary[run.name] = np.abs(q-qRef)
-    return self.qErrorDictionary[run.name]
+  def computeQError(self,run,refrun): # for backwards compatibility
+    return self.q.computeQError(run,refrun)
 
 class Run():
 
@@ -60,8 +80,8 @@ class Run():
       print('Loading ' + runName)
       dataset = Dataset(runName,mode='r')
       for limiter in limiterList:
-        if (limiter.qName not in self.variables.keys()):
-          self.variables[limiter.qName] = dataset.variables[limiter.qName][:]
+        if (limiter.q.name not in self.variables.keys()):
+          self.variables[limiter.q.name] = dataset.variables[limiter.q.name][:]
         self.variables[limiter.magnitudeName] = dataset.variables[limiter.magnitudeName][:]
       self.mask = self.variables[limiterList[0].magnitudeName].mask
       dataset.close()
