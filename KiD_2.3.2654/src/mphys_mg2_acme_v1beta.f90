@@ -18,17 +18,17 @@ module mphys_mg2_acme_v1beta
 
   use diagnostics, only: save_dg, i_dgtime
   use common_physics, only : qsaturation, qisaturation
-  
+
   use wv_sat_methods, only: wv_sat_qsat_water, wv_sat_qsat_ice, wv_sat_methods_init
 
   use module_mp_mg2_acme_v1beta, only: micro_mg2_acme_v1beta_init, &
        micro_mg2_acme_v1beta_tend
 
   use mphys_stats
-  
+
   implicit none
-  
-  ! Logical switches 
+
+  ! Logical switches
   logical :: micro_unset=.True.
   integer:: ih, imom
   character(max_char_len) :: name, units
@@ -38,7 +38,7 @@ contains
   subroutine mphys_mg2_acme_v1beta_interface
 
     real :: t1d(nz), p1d(nz), dz1d(nz),qv1d(nz),qc1d(nz) &
-         , qi1d(nz), ni1d(nz) & 
+         , qi1d(nz), ni1d(nz) &
          , qr1d(nz), qs1d(nz) &
          , ns1d(nz), nr1d(nz) &
          , w1d(nz)
@@ -46,10 +46,10 @@ contains
     real :: wvar1d(nz)
 
     real :: qc_tend1d(nz), ni_tend1d(nz)  &
-         ,  qi_tend1d(nz), qni_tend1d(nz) & 
+         ,  qi_tend1d(nz), qni_tend1d(nz) &
          ,  qv_tend1d(nz), t_tend1d(nz)   &
          ,  qr_tend1d(nz), nr_tend1d(nz)  &
-         ,  qs_tend1d(nz), ns_tend1d(nz) 
+         ,  qs_tend1d(nz), ns_tend1d(nz)
     !         qg_tend1d(nz), ng_tend1d(nz)
 
     real :: precprt1d, snowrt1d
@@ -63,7 +63,7 @@ contains
          qnisten(nz), qcsten(nz)
 
     ! KiD_2D diag arrays
-    real :: qrsten_2d(nz,nx),precprt2d(nx), snowrt2d(nx) 
+    real :: qrsten_2d(nz,nx),precprt2d(nx), snowrt2d(nx)
 
     integer :: kts, kte, i, j, k
 
@@ -99,7 +99,7 @@ contains
     real(r8) :: h2otrip_in
     real(r8) :: tboil_in
     real(r8) :: ttrice_in
-    real(r8) :: epsilo_in 
+    real(r8) :: epsilo_in
 
     ! From shr_const_mod.F90
     real(R8),parameter :: SHR_CONST_G       = 9.80616_R8      ! acceleration of gravity ~ m/s^2
@@ -110,7 +110,7 @@ contains
     real(R8),parameter :: SHR_CONST_MWWV    = 18.016_R8       ! molecular weight water vapor
     real(R8),parameter :: SHR_CONST_RDAIR   = SHR_CONST_RGAS/SHR_CONST_MWDAIR  ! Dry air gas constant     ~ J/K/kg
     real(R8),parameter :: SHR_CONST_RWV     = SHR_CONST_RGAS/SHR_CONST_MWWV    ! Water vapor gas constant ~ J/K/kg
-    real(R8),parameter :: SHR_CONST_TKFRZ   = 273.15_R8       ! freezing T of fresh water          ~ K 
+    real(R8),parameter :: SHR_CONST_TKFRZ   = 273.15_R8       ! freezing T of fresh water          ~ K
     real(R8),parameter :: SHR_CONST_LATICE  = 3.337e5_R8      ! latent heat of fusion      ~ J/kg
     real(R8),parameter :: SHR_CONST_LATVAP  = 2.501e6_R8      ! latent heat of evaporation ~ J/kg
     real(R8),parameter :: SHR_CONST_CPDAIR  = 1.00464e3_R8    ! specific heat of dry air   ~ J/kg/K
@@ -214,7 +214,7 @@ contains
     real(r8) :: vtrmco(nx,nz)        ! mass-weighted cloud water fallspeed (m/s)
     real(r8) :: vtrmio(nx,nz)        ! mass-weighted cloud ice fallspeed (m/s)
     !++ag
-    real(r8) :: umso(nx,nz)   ! mass weighted snow fallspeed (m/s) 
+    real(r8) :: umso(nx,nz)   ! mass weighted snow fallspeed (m/s)
     real(r8) :: umro(nx,nz)   ! mass weighted rain fallspeed (m/s)
     real(r8) :: satadj(nx,nz) ! saturation adjustment tendency (kg kg-1 s-1)
     !--ag
@@ -225,7 +225,7 @@ contains
     real(r8) :: qssedteno(nx,nz)    ! qi sedimentation tendency (1/s)
 
     ! microphysical process rates for output (mixing ratio tendencies) (all have units of 1/s)
-    real(r8) :: prao(nx,nz)         ! accretion of cloud by rain 
+    real(r8) :: prao(nx,nz)         ! accretion of cloud by rain
     real(r8) :: prco(nx,nz)         ! autoconversion of cloud to rain
     real(r8) :: mnuccco(nx,nz)      ! mixing ratio tend due to immersion freezing
     real(r8) :: mnuccto(nx,nz)      ! mixing ratio tend due to contact freezing
@@ -246,11 +246,11 @@ contains
     real(r8) :: mnuccdo(nx,nz)      ! mass tendency from ice nucleation
     real(r8) :: nrouto(nx,nz)       ! rain number concentration (1/m3)
     real(r8) :: nsouto(nx,nz)       ! snow number concentration (1/m3)
-    real(r8) :: reflo(nx,nz)        ! analytic radar reflectivity        
+    real(r8) :: reflo(nx,nz)        ! analytic radar reflectivity
     real(r8) :: areflo(nx,nz)       ! average reflectivity will zero points outside valid range
     real(r8) :: areflzo(nx,nz)      ! average reflectivity in z.
     real(r8) :: freflo(nx,nz)       ! fractional occurrence of radar reflectivity
-    real(r8) :: csrflo(nx,nz)       ! cloudsat reflectivity 
+    real(r8) :: csrflo(nx,nz)       ! cloudsat reflectivity
     real(r8) :: acsrflo(nx,nz)      ! cloudsat average
     real(r8) :: fcsrflo(nx,nz)      ! cloudsat fractional occurrence of radar reflectivity
     real(r8) :: rercldo(nx,nz)      ! effective radius calculation for rain + cloud
@@ -280,19 +280,19 @@ contains
     real(r8) ::flip_qcn(nx,nz)
     real(r8) ::flip_ncn(nx,nz)
     real(r8) ::flip_qin(nx,nz)
-    real(r8) ::flip_nin(nx,nz) 
+    real(r8) ::flip_nin(nx,nz)
     real(r8) ::flip_qrn(nx,nz)
     real(r8) ::flip_nrn(nx,nz)
     real(r8) ::flip_qsn(nx,nz)
-    real(r8) ::flip_nsn(nx,nz) 
+    real(r8) ::flip_nsn(nx,nz)
 
     real(r8) ::flip_relvarn(nx,nz)
-    real(r8) ::flip_accre_enhann(nx,nz) 
+    real(r8) ::flip_accre_enhann(nx,nz)
 
     real(r8) ::flip_cldn(nx,nz)
     real(r8) ::flip_liqcldf(nx,nz)
-    real(r8) ::flip_icecldf(nx,nz)  
-    real(r8) ::flip_naain(nx,nz) 
+    real(r8) ::flip_icecldf(nx,nz)
+    real(r8) ::flip_naain(nx,nz)
     real(r8) ::flip_npccnin(nx,nz)
 
     ! -----------------------------------------------------------------------------
@@ -312,9 +312,9 @@ contains
     real(r8) ::flip_nstendo(nx,nz)
     !other (for output)
     real(r8) ::flip_qrouto(nx,nz)
-    real(r8) ::flip_nrouto(nx,nz) 
+    real(r8) ::flip_nrouto(nx,nz)
     real(r8) ::flip_qrouto2(nx,nz)
-    real(r8) ::flip_nrouto2(nx,nz)  
+    real(r8) ::flip_nrouto2(nx,nz)
     real(r8) ::flip_prao(nx,nz)
     real(r8) ::flip_prco(nx,nz)
     real(r8) ::flip_vtrmco(nx,nz)
@@ -348,22 +348,22 @@ contains
     !--ag
 
     ! -----------------------------------------------------------------------------
-    ! Generic Flipped arrays 
+    ! Generic Flipped arrays
     ! -----------------------------------------------------------------------------
     real(r8) :: flip_data(nx,nz) ! temporary fliped data array
 
 #ifdef ADJUST_SATURATION_BEFORE
     ! internal variables for saturation adjustment
-    real(r8) :: qvlato_adj(nx,nz)  
-    real(r8) :: tlato_adj(nx,nz)   
-    real(r8) :: qctendo_adj(nx,nz) 
-    real(r8) :: nctendo_adj(nx,nz) 
-    real(r8) :: qitendo_adj(nx,nz) 
-    real(r8) :: nitendo_adj(nx,nz) 
+    real(r8) :: qvlato_adj(nx,nz)
+    real(r8) :: tlato_adj(nx,nz)
+    real(r8) :: qctendo_adj(nx,nz)
+    real(r8) :: nctendo_adj(nx,nz)
+    real(r8) :: qitendo_adj(nx,nz)
+    real(r8) :: nitendo_adj(nx,nz)
 #endif
-    
+
     !note different order of i,k for MG...
-    !also: MG is top down, kid arrays are bottom up.    
+    !also: MG is top down, kid arrays are bottom up.
 
     kts = 1
     kte = nz
@@ -381,7 +381,7 @@ contains
        precio(i) = 0.0_wp
 
        !interface pressures
-       pint(i,:) = 100.0_wp * pmb_half(:,i) 
+       pint(i,:) = 100.0_wp * pmb_half(:,i)
 
        do k=1,nz
           ! zero some of these for safety
@@ -421,7 +421,7 @@ contains
           if (qn(i,k).lt.qsmall) qn(i,k) = 0.0_wp
 
           ! cloud water mass
-          ! qcn(i,k) = hydrometeors(k,i,1)%moments(1,1) & 
+          ! qcn(i,k) = hydrometeors(k,i,1)%moments(1,1) &
           !      + (dhydrometeors_adv(k,i,1)%moments(1,1) &
           !      + dhydrometeors_div(k,i,1)%moments(11,))*dt
           qcn(i,k) = hydrometeors(k,i,1)%moments(1,1)
@@ -430,16 +430,16 @@ contains
 
           ! cloud water number
           if (num_h_moments(1) >= 2) &
-               ! ncn(i,k) = hydrometeors(k,i,1)%moments(1,2)& 
+               ! ncn(i,k) = hydrometeors(k,i,1)%moments(1,2)&
                ! + (dhydrometeors_adv(k,i,1)%moments(1,2) &
                ! + dhydrometeors_div(k,i,1)%moments(1,2))*dt
                ncn(i,k) = hydrometeors(k,i,1)%moments(1,2)
-          
+
           if (qcn(i,k).lt.qsmall) ncn(i,k) = 0.0_wp
 
           ! cloud ice mass
           if (num_h_moments(3) >= 1) &
-               ! qin(i,k) = hydrometeors(k,i,3)%moments(1,1)& 
+               ! qin(i,k) = hydrometeors(k,i,3)%moments(1,1)&
                ! + (dhydrometeors_adv(k,i,3)%moments(1,1) &
                ! + dhydrometeors_div(k,i,3)%moments(1,1))*dt
                qin(i,k) = hydrometeors(k,i,3)%moments(1,1)
@@ -448,7 +448,7 @@ contains
 
           ! cloud ice number
           if (num_h_moments(3) >= 2) &
-               ! nin(i,k) = hydrometeors(k,i,3)%moments(1,2)& 
+               ! nin(i,k) = hydrometeors(k,i,3)%moments(1,2)&
                ! + (dhydrometeors_adv(k,i,3)%moments(1,2) &
                ! + dhydrometeors_div(k,i,3)%moments(1,2))*dt
                nin(i,k) = hydrometeors(k,i,3)%moments(1,2)
@@ -457,16 +457,16 @@ contains
 
           ! rain mass
           if (num_h_moments(2) >= 1) &
-               ! qrn(i,k) = hydrometeors(k,i,2)%moments(1,1)& 
+               ! qrn(i,k) = hydrometeors(k,i,2)%moments(1,1)&
                ! + (dhydrometeors_adv(k,i,2)%moments(1,1) &
                ! + dhydrometeors_div(k,i,2)%moments(1,1))*dt
                qrn(i,k) = hydrometeors(k,i,2)%moments(1,1)
 
-          if (qrn(i,k).lt.qsmall) qrn(i,k)=0.0_wp 
+          if (qrn(i,k).lt.qsmall) qrn(i,k)=0.0_wp
 
           ! rain number
           if (num_h_moments(2) >= 2) &
-               ! nrn(i,k) = hydrometeors(k,i,2)%moments(1,2)& 
+               ! nrn(i,k) = hydrometeors(k,i,2)%moments(1,2)&
                ! + (dhydrometeors_adv(k,i,2)%moments(1,2) &
                ! + dhydrometeors_div(k,i,2)%moments(1,2))*dt
                nrn(i,k) = hydrometeors(k,i,2)%moments(1,2)
@@ -475,7 +475,7 @@ contains
 
           ! snow mass
           if (num_h_moments(4) >= 1) &
-               ! qsn(i,k) = hydrometeors(k,i,4)%moments(1,1)& 
+               ! qsn(i,k) = hydrometeors(k,i,4)%moments(1,1)&
                ! + (dhydrometeors_adv(k,i,4)%moments(1,1) &
                ! + dhydrometeors_div(k,i,4)%moments(1,1))*dt
                qsn(i,k) = hydrometeors(k,i,4)%moments(1,1)
@@ -484,7 +484,7 @@ contains
 
           ! snow number
           if (num_h_moments(4) >= 2) &
-               ! nsn(i,k) = hydrometeors(k,i,4)%moments(1,2)& 
+               ! nsn(i,k) = hydrometeors(k,i,4)%moments(1,2)&
                ! + (dhydrometeors_adv(k,i,4)%moments(1,2) &
                ! + dhydrometeors_div(k,i,4)%moments(1,2))*dt
                nsn(i,k) = hydrometeors(k,i,4)%moments(1,2)
@@ -502,9 +502,9 @@ contains
 
           !set activated aerosol number (uniform for now)
           !          if (tn(i,k) > tmelt_in) &
-          npccnin = 10.0e6_wp   ! #/m3   
+          npccnin = 10.0e6_wp   ! #/m3
           !          if (tn(i,k) < tmelt_in - 10.) &
-          naain = 0.0e6_wp   ! #/m3             
+          naain = 0.0e6_wp   ! #/m3
 
        end do
     end do
@@ -526,7 +526,7 @@ contains
 
        rhmini_in = 0.8_wp       ! Minimum rh for ice cloud fraction > 0.
 
-       micro_mg_dcs      = 195.0e-6_wp ! dcs = 90.e-6_r8 
+       micro_mg_dcs      = 195.0e-6_wp ! dcs = 90.e-6_r8
        micro_mg_dcs_tdep = .true.      ! false to get old ice autoconversion
 
        microp_uniform_in      = .true.  ! true in old MG2 (false in ACME but causes KiD to fail)
@@ -547,7 +547,7 @@ contains
        h2otrip_in = 273.16_wp
        tboil_in   = 373.16_wp
        ttrice_in  = 20.0_wp
-       epsilo_in  =  SHR_CONST_MWWV / SHR_CONST_MWDAIR  
+       epsilo_in  =  SHR_CONST_MWWV / SHR_CONST_MWDAIR
 
        call wv_sat_methods_init(kind, tmelt_in, h2otrip_in, tboil_in, &
             ttrice_in, epsilo_in, errstring)
@@ -569,7 +569,7 @@ contains
     mgncol    = nx
     mgcols(:) = 1
     nlev      = nz
-    top_lev   = 1  
+    top_lev   = 1
     deltatin  = dt
 
     !set dust information (for contact freezing):
@@ -583,21 +583,21 @@ contains
 
 #ifdef ADJUST_SATURATION_BEFORE
     ! zero saturation adjustment tendencies
-    qvlato_adj(i,k)  = 0.0_wp 
-    tlato_adj(i,k)   = 0.0_wp 
-    qctendo_adj(i,k) = 0.0_wp 
-    nctendo_adj(i,k) = 0.0_wp 
-    qitendo_adj(i,k) = 0.0_wp 
-    nitendo_adj(i,k) = 0.0_wp 
+    qvlato_adj(i,k)  = 0.0_wp
+    tlato_adj(i,k)   = 0.0_wp
+    qctendo_adj(i,k) = 0.0_wp
+    nctendo_adj(i,k) = 0.0_wp
+    qitendo_adj(i,k) = 0.0_wp
+    nitendo_adj(i,k) = 0.0_wp
 
     ! Add saturation adjustment...based on m2005
     do i=1,nx
        do k=1,nz
           !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
           ! NOW CALCULATE SATURATION ADJUSTMENT TO CONDENSE EXTRA VAPOR ABOVE
-          ! WATER SATURATION  
+          ! WATER SATURATION
 
-          DUMT  = tn(i,k) !+ dt*tlato(i,k) 
+          DUMT  = tn(i,k) !+ dt*tlato(i,k)
           DUMQV = qn(i,k) !+ dt*qvlato(i,k)
 
           call wv_sat_qsat_water(DUMT, pn(i,k), ESL, QVL, 1)
@@ -614,9 +614,9 @@ contains
 
           DUMS = DUMQV-DUMQSS
 
-          CPM = cpair*(1.0_wp+0.887_wp*DUMQC) 
+          CPM = cpair*(1.0_wp+0.887_wp*DUMQC)
 
-          ! Do condensation only (doesnt seem to work without a positive limit warm2: 
+          ! Do condensation only (doesnt seem to work without a positive limit warm2:
           ! why doesn't evap work?)
           !             if (DUMS.GT.qsmall) &
           PCC = DUMS / (1.+ latvap**2 * DUMQSS/(CPM * rh2o * DUMT**2)) / dt
@@ -641,15 +641,15 @@ contains
           ! if (i.eq.1.and.k.eq. 25) &
           !      print*, 'z,pmb,DUMT,DUMqv,DUMQS,DUMQC,pcc,dnc,tlato=',&
           !      z(k),pmb(k,i),DUMT,DUMQV,QVL,DUMQC,PCC,DNC,tlato(k,i)
-          
+
           ! apply tendencies
           qvlato_adj(i,k)  = -PCC
           tlato_adj(i,k)   = PCC * latvap/CPM
           qctendo_adj(i,k) = PCC
-          nctendo_adj(i,k) = DNC 
+          nctendo_adj(i,k) = DNC
 
-          ! limters to make sure if 
-          ! (a) non negative mass and number and 
+          ! limters to make sure if
+          ! (a) non negative mass and number and
           ! (b) no mass, then no number
           if (qn(i,k) + dt * qvlato(i,k).lt.qsmall) then !+++djg
              qvlato_adj(i,k) = -qn(i,k)/dt
@@ -676,14 +676,14 @@ contains
           if (tn(i,k) < 0.0d0) then
              write(*,*) "Error: negative temperature"
           end if
-         
+
           ! set small values are zero
           if (qn(i,k).lt.qsmall)  qn(i,k)  = 0.0_wp
           if (qcn(i,k).lt.qsmall) qcn(i,k) = 0.0_wp
           if (qcn(i,k).lt.qsmall) ncn(i,k) = 0.0_wp
           if (qin(i,k).lt.qsmall) qin(i,k) = 0.0_wp
           if (qin(i,k).lt.qsmall) nin(i,k) = 0.0_wp
-          
+
        end do
     end do
 #endif
@@ -727,7 +727,7 @@ contains
     ! e-mail: morrison@ucar.edu, andrew@ucar.edu, caldwell19@llnl.gov
 
     call micro_mg2_acme_v1beta_tend ( &
-         ! Input 
+         ! Input
          mgncol, mgcols,               nlev, top_lev,                    &
          deltatin,                                                       &
          flip_tn,                      flip_qn,                          &
@@ -813,23 +813,23 @@ contains
 
     qcsedteno(:,:) = flip_qcsedteno(:,nz:1:-1)
     qisedteno(:,:) = flip_qisedteno(:,nz:1:-1)
-    mnuccco(:,:)   = flip_mnuccco(:,nz:1:-1)  
-    mnuccto(:,:)   = flip_mnuccto(:,nz:1:-1) 
-    msacwio(:,:)   = flip_msacwio(:,nz:1:-1)  
-    psacwso(:,:)   = flip_psacwso(:,nz:1:-1)  
-    bergso(:,:)    = flip_bergso(:,nz:1:-1)   
-    bergo(:,:)     = flip_bergo(:,nz:1:-1)    
-    melto(:,:)     = flip_melto(:,nz:1:-1)    
-    homoo(:,:)     = flip_homoo(:,nz:1:-1)  
-    qcreso(:,:)    = flip_qcreso(:,nz:1:-1)             
-    prcio(:,:)     = flip_prcio(:,nz:1:-1)    
-    praio(:,:)     = flip_praio(:,nz:1:-1)    
-    qireso(:,:)    = flip_qireso(:,nz:1:-1)             
-    mnuccro(:,:)   = flip_mnuccro(:,nz:1:-1)  
-    pracso(:,:)    = flip_pracso(:,nz:1:-1)   
-    meltsdto(:,:)  = flip_meltsdto(:,nz:1:-1) 
-    frzrdto(:,:)   = flip_frzrdto(:,nz:1:-1) 
-    mnuccdo(:,:)   = flip_mnuccdo(:,nz:1:-1)       
+    mnuccco(:,:)   = flip_mnuccco(:,nz:1:-1)
+    mnuccto(:,:)   = flip_mnuccto(:,nz:1:-1)
+    msacwio(:,:)   = flip_msacwio(:,nz:1:-1)
+    psacwso(:,:)   = flip_psacwso(:,nz:1:-1)
+    bergso(:,:)    = flip_bergso(:,nz:1:-1)
+    bergo(:,:)     = flip_bergo(:,nz:1:-1)
+    melto(:,:)     = flip_melto(:,nz:1:-1)
+    homoo(:,:)     = flip_homoo(:,nz:1:-1)
+    qcreso(:,:)    = flip_qcreso(:,nz:1:-1)
+    prcio(:,:)     = flip_prcio(:,nz:1:-1)
+    praio(:,:)     = flip_praio(:,nz:1:-1)
+    qireso(:,:)    = flip_qireso(:,nz:1:-1)
+    mnuccro(:,:)   = flip_mnuccro(:,nz:1:-1)
+    pracso(:,:)    = flip_pracso(:,nz:1:-1)
+    meltsdto(:,:)  = flip_meltsdto(:,nz:1:-1)
+    frzrdto(:,:)   = flip_frzrdto(:,nz:1:-1)
+    mnuccdo(:,:)   = flip_mnuccdo(:,nz:1:-1)
 
 #ifdef ADJUST_SATURATION_AFTER
     !Add saturation adjustment...based on m2005
@@ -837,7 +837,7 @@ contains
        do k=1,nz
           !CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
           ! NOW CALCULATE SATURATION ADJUSTMENT TO CONDENSE EXTRA VAPOR ABOVE
-          ! WATER SATURATION  
+          ! WATER SATURATION
 
           DUMT = tn(i,k) + dt*tlato(i,k)
           DUMQV = qn(i,k) + dt*qvlato(i,k)
@@ -856,7 +856,7 @@ contains
 
           DUMS = DUMQV-DUMQSS
 
-          CPM = cpair*(1.0_wp+0.887_wp*DUMQC) 
+          CPM = cpair*(1.0_wp+0.887_wp*DUMQC)
 
           !Do condensation only (doesnt seem to work without a positive limit warm2: why doesn't evap work?)
           !             if (DUMS.GT.qsmall) &
@@ -888,7 +888,7 @@ contains
           qvlato(i,k) = qvlato(i,k) - PCC
           tlato(i,k) = tlato(i,k) + PCC * latvap/CPM
           qctendo(i,k) = qctendo(i,k) + PCC
-          nctendo(i,k) = nctendo(i,k) + DNC 
+          nctendo(i,k) = nctendo(i,k) + DNC
 
           !limters to make sure if (a) non negative mass and number and (b) no mass, then no number
           if (qcn(i,k) + dt * qctendo(i,k).lt.qsmall) then
@@ -908,8 +908,8 @@ contains
     do i=1,nx
        do k=1,nz
           ! add in saturation from before microphysics to output tendencies
-          qvlato(i,k)  = qvlato(i,k)  + qvlato_adj(i,k) 
-          tlato(i,k)   = tlato(i,k)   + tlato_adj(i,k)  
+          qvlato(i,k)  = qvlato(i,k)  + qvlato_adj(i,k)
+          tlato(i,k)   = tlato(i,k)   + tlato_adj(i,k)
           qctendo(i,k) = qctendo(i,k) + qctendo_adj(i,k)
           nctendo(i,k) = nctendo(i,k) + nctendo_adj(i,k)
           qitendo(i,k) = qitendo(i,k) + qitendo_adj(i,k)
@@ -918,7 +918,7 @@ contains
           ! limiters?
        end do
     end do
-#endif   
+#endif
 
     !=================================================
     ! 9. WRITE OUTPUT:
@@ -945,7 +945,16 @@ contains
     end do
 
     ! Save some diagnostics
+    flip_data(:,:) = qn(:,nz:1:-1)
+    name='vapor_mixing_ratio'
+    units='kg kg-1'
+    if (nx == 1) then
+       call save_dg(flip_data(1,:), name, i_dgtime,  units, dim='z')
+    else
+       call save_dg(flip_data(1:nx,:), name, i_dgtime,  units, dim='z')
+    endif
     !Rain/Snow (what are units?)
+
 
     name='total_surface_ppt'
     units='m s-1'
@@ -970,7 +979,7 @@ contains
     !       call save_dg(qrouto(1,:), name, i_dgtime,  units, dim='z')
     !    else
     !       call save_dg(qrouto(1:nx,:), name, i_dgtime,  units, dim='z')
-    !    endif   
+    !    endif
 
     !    name='rain_number'
     !    units='kg-1'
@@ -978,7 +987,7 @@ contains
     !       call save_dg(nrouto(1,:), name, i_dgtime,  units, dim='z')
     !    else
     !       call save_dg(nrouto(1:nx,:), name, i_dgtime,  units, dim='z')
-    !    endif   
+    !    endif
 
 
     name='autoconversion_rate'
@@ -1226,7 +1235,7 @@ contains
     ! ---------------------------------------------------------------------------
     ! output limiter information
     ! ---------------------------------------------------------------------------
-     
+
     flip_data(:,:) = qric_limiter(:,nz:1:-1)
     name='qric_lim'
     units=''
@@ -1669,7 +1678,7 @@ contains
        call save_dg(1.0*nsteps_qs, name, i_dgtime,  units, dim='time')
     endif
 
-    ! ---------------------------------------------------------------------------  
+    ! ---------------------------------------------------------------------------
 
   end Subroutine mphys_mg2_acme_v1beta_interface
 
