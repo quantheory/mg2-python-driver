@@ -131,12 +131,12 @@ for j,size in enumerate(convergenceSizes):
   qrL2ErrorAllTime[0,j] = np.sqrt(np.sum(np.square(qr0-qrRef))/120*original.dt)
   qrL2ErrorAllTime[1,j] = np.sqrt(np.sum(np.square(qr1-qrRef))/120*original.dt)
   qrL2ErrorAllTime[2,j] = np.sqrt(np.sum(np.square(qr2-qrRef))/120*original.dt)
-  qcLIErrorAllTime[0,j] = abs(np.amax(qc0-qcRef))
-  qcLIErrorAllTime[1,j] = abs(np.amax(qc1-qcRef))
-  qcLIErrorAllTime[2,j] = abs(np.amax(qc2-qcRef))
-  qrLIErrorAllTime[0,j] = abs(np.amax(qr0-qrRef))
-  qrLIErrorAllTime[1,j] = abs(np.amax(qr1-qrRef))
-  qrLIErrorAllTime[2,j] = abs(np.amax(qr2-qrRef))
+  qcLIErrorAllTime[0,j] = np.amax(abs(qc0-qcRef))
+  qcLIErrorAllTime[1,j] = np.amax(abs(qc1-qcRef))
+  qcLIErrorAllTime[2,j] = np.amax(abs(qc2-qcRef))
+  qrLIErrorAllTime[0,j] = np.amax(abs(qr0-qrRef))
+  qrLIErrorAllTime[1,j] = np.amax(abs(qr1-qrRef))
+  qrLIErrorAllTime[2,j] = np.amax(abs(qr2-qrRef))
 
 f,axarray = pyplot.subplots(2,2,num=1,figsize=(10,10))
 coeff = qcL2ErrorFinalTime[0,0]/dtlist[0]
