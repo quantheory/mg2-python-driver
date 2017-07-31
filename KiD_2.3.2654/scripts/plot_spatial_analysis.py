@@ -40,11 +40,11 @@ for run in runList:
       # figure for reference solution, limited solution, limiter error
       cax = axarray1[0,k].pcolor(t,z,qRef,cmap=cmap,
             vmin=-np.amax(abs(qRef)),vmax=np.amax(abs(qRef)))
-      axarray1[0,k].set_title(limiter.qName + ' (reference)')
+      axarray1[0,k].set_title(limiter.q.name + ' (reference)')
       f1.colorbar(cax,ax=axarray1[0,k])
       cax = axarray1[1,k].pcolor(t,z,q,cmap=cmap,
             vmin=-np.amax(abs(qRef)),vmax=np.amax(abs(qRef)))
-      axarray1[1,k].set_title(limiter.qName + ' (' + limiter.name + ')')
+      axarray1[1,k].set_title(limiter.q.name + ' (' + limiter.name + ')')
       f1.colorbar(cax,ax=axarray1[1,k])
       cax = axarray1[2,k].pcolor(t,z,limiterError,cmap=cmap,
             vmin=-np.amax(abs(limiterError)),vmax=np.amax(abs(limiterError)))
@@ -53,11 +53,11 @@ for run in runList:
       # figure for limited solution, q error, cumulative error ratio
       cax = axarray2[0,k].pcolor(t,z,q,cmap=cmap,
             vmin=-np.amax(abs(qRef)),vmax=np.amax(abs(qRef)))
-      axarray2[0,k].set_title(limiter.qName + ' (' + limiter.name + ')')
+      axarray2[0,k].set_title(limiter.q.name + ' (' + limiter.name + ')')
       f2.colorbar(cax,ax=axarray2[0,k])
       cax = axarray2[1,k].pcolor(t,z,qError,cmap=cmap,
             vmin=-np.amax(qError),vmax=np.amax(qError))
-      axarray2[1,k].set_title(limiter.qName + ' error')
+      axarray2[1,k].set_title(limiter.q.name + ' error')
       f2.colorbar(cax,ax=axarray2[1,k])
       value = cumulativeLimiterError/(qError+1e-12)
       maxvalue = np.amax(np.abs(value))
