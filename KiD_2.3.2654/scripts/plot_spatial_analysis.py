@@ -14,9 +14,9 @@ limiterList = [Limiter('qr_conserv','qr_conserv_mag','rain_mass','rescale'),
                Limiter('qc_conserv','qc_conserv_mag','cloud_mass','rescale'),
                Limiter('nc_conserv','nc_conserv_mag','cloud_number','rescale')]
 #runList = getDefaultRunList(limiterList)
-runList = [Run('warm1_mg2_acme_v1beta_dt1.0_mstep30.nc',30,limiterList),
-           Run('warm1_mg2_acme_v1beta_dt1.0_mstep120.nc',120,limiterList),
-           Run('warm1_mg2_acme_v1beta_dt1.0_mstep300.nc',300,limiterList)]
+runList = [Run('warm1_mg2_acme_v1beta_dt1.0_mstep30.nc',30,limiterList=limiterList),
+           Run('warm1_mg2_acme_v1beta_dt1.0_mstep120.nc',120,limiterList=limiterList),
+           Run('warm1_mg2_acme_v1beta_dt1.0_mstep300.nc',300,limiterList=limiterList)]
 
 refrun = Run('warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',1,limiterList)
 
