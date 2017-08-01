@@ -134,13 +134,35 @@ contains
     real(r8), intent(out)             :: qsedtend(:,:)
 
     real(r8) :: fluxQ(0:nlev), fluxN(0:nlev), ratio(nlev), deltaFluxQ, deltaFluxN
-    real(r8) :: deltafluxQ_evap
+    real(r8) :: deltafluxQ_evap, dfluxp, dfluxm
     integer :: k
 
+    ! set physical flux at top boundary (bottom boundary is outflow)
     fluxQ(0) = 0._r8
-    fluxQ(1:nlev) = fq * q(i,:)
     fluxN(0) = 0._r8
-    fluxN(1:nlev) = fn * n(i,:)
+
+    ! compute cell interface fluxes using 2nd order ENO scheme
+    fluxQ(1) = fq(1)*q(i,1)
+    fluxN(1) = fn(1)*n(i,1)
+    fluxQ(nlev) = fq(nlev)*q(i,nlev)
+    fluxN(nlev) = fn(nlev)*n(i,nlev)
+
+    do k = 2,nlev-1
+      dfluxp = (fq(k+1)*q(i,k+1)-fq(k)*q(i,k))/(0.5_r8*(pdel(i,k+1)+pdel(i,k)))
+      dfluxm = (fq(k)*q(i,k)-fq(k-1)*q(i,k-1))/(0.5_r8*(pdel(i,k)+pdel(i,k-1)))
+      if (abs(dfluxm) < abs(dfluxp)) then
+        fluxQ(k) = fq(k)*q(i,k) + 0.5_r8*pdel(i,k)*dfluxm
+      else
+        fluxQ(k) = fq(k)*q(i,k) + 0.5_r8*pdel(i,k)*dfluxp
+      end if
+      dfluxp = (fn(k+1)*n(i,k+1)-fn(k)*n(i,k))/(0.5_r8*(pdel(i,k+1)+pdel(i,k)))
+      dfluxm = (fn(k)*n(i,k)-fn(k-1)*n(i,k-1))/(0.5_r8*(pdel(i,k)+pdel(i,k-1)))
+      if (abs(dfluxm) < abs(dfluxp)) then
+        fluxN(k) = fn(k)*n(i,k) + 0.5_r8*pdel(i,k)*dfluxm
+      else
+        fluxN(k) = fn(k)*n(i,k) + 0.5_r8*pdel(i,k)*dfluxp
+      end if
+    end do
 
     ! for cloud liquid and ice, if cloud fraction increases with height
     ! then add flux from above to both vapor and cloud water of current level
@@ -173,6 +195,12 @@ contains
 
       q(i,k) = q(i,k) - deltat_sed*deltafluxQ
       n(i,k) = n(i,k) - deltat_sed*deltafluxN
+
+      if (q(i,k) < 0._r8) then
+        stop "q negative"
+      else if (n(i,k) < 0._r8) then
+        stop "n negative"
+      end if
     end do
 
     ! units below are m/s

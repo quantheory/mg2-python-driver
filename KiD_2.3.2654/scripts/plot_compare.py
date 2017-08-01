@@ -3,12 +3,13 @@ import numpy as np
 import matplotlib.pyplot as pyplot
 from analysis_tools import *
 
-runDirectory = '/home/vogl2/Desktop/temp/warm1_v0'
-runDirectory_adaptive = '/home/vogl2/Desktop/temp/warm1_v1_R'
-runDirectory_adaptive2 = '/home/vogl2/Desktop/temp/warm1_v2_RC'
+workdir='/p/lscratchd/vogl2/KiD'
+runDirectory = workdir + '/warm1_v0'
+runDirectory_adaptive = workdir + '/warm1_v1_R'
+runDirectory_adaptive2 = workdir + '/warm1'
 
 quantityDict = {'Rain Mass':Quantity('rain_mass'),
-                'Cloud Mass':Quantity('cloud_mass')}
+                'Vapour':Quantity('vapour')}
 
 runDict = {'mstep1':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',1,quantityList=quantityDict.values()),
            'mstep1_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',1,quantityList=quantityDict.values()),
@@ -45,7 +46,7 @@ runDict = {'mstep1':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',
            'mstep1200_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep1200.nc',1200,quantityList=quantityDict.values())
            }
 
-comparisonSizes = (1,30,120,300)
+comparisonSizes = (30,300) #1,30,120,300)
 convergenceSizes = (5,10,15,30,60,120,300,600,900,1200)
 
 
