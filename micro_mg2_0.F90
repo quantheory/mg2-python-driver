@@ -202,6 +202,8 @@ real(r8) :: rainfrze    ! what temp to freeze all rain: currently -5 degrees C
 real(r8) :: alpha_grad, beta_grad
 
 ! additional constants to help speed up code
+real(r8) :: gamma_br_plus1
+real(r8) :: gamma_br_plus4
 real(r8) :: gamma_bs_plus1
 real(r8) :: gamma_bs_plus4
 real(r8) :: gamma_bi_plus1
@@ -333,6 +335,8 @@ subroutine micro_mg_init( &
   icenuct  = tmelt - 5._r8
 
   ! Define constants to help speed up code (this limits calls to gamma function)
+  gamma_br_plus1=gamma(1._r8+br)
+  gamma_br_plus4=gamma(4._r8+br)
   gamma_bs_plus1=gamma(1._r8+bs)
   gamma_bs_plus4=gamma(4._r8+bs)
   gamma_bi_plus1=gamma(1._r8+bi)
@@ -413,8 +417,7 @@ subroutine micro_mg_tend ( &
        size_dist_param_ice, &
 !!== KZ_DCS 
        size_dist_param_basic, &
-       avg_diameter, &
-       rain_fall_speeds
+       avg_diameter
 
   ! Microphysical processes.
   use micro_mg_utils, only: &
@@ -432,8 +435,7 @@ subroutine micro_mg_tend ( &
        self_collection_rain, &
        accrete_cloud_ice_snow, &
        evaporate_sublimate_precip, &
-       bergeron_process_snow, &
-       sedimentation
+       bergeron_process_snow
 
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
@@ -763,8 +765,8 @@ subroutine micro_mg_tend ( &
   real(r8) :: falouti(nlev)
   real(r8) :: faloutni(nlev)
 
-  real(r8) :: sed_tend_qr(nlev)
-  real(r8) :: sed_tend_nr(nlev)
+  real(r8) :: faloutr(nlev)
+  real(r8) :: faloutnr(nlev)
   real(r8) :: falouts(nlev)
   real(r8) :: faloutns(nlev)
 
@@ -775,7 +777,8 @@ subroutine micro_mg_tend ( &
   real(r8) :: faltndqie
   real(r8) :: faltndqce
 
-  real(r8) :: flux_surf_qr
+  real(r8) :: faltndr
+  real(r8) :: faltndnr
   real(r8) :: faltnds
   real(r8) :: faltndns
 
@@ -806,10 +809,6 @@ subroutine micro_mg_tend ( &
   real(r8) :: qt(mgncol,2)
   ! Weighting used in mass_gradient method.
   real(r8) :: weight(mgncol)
-  ! Times used to track adaptive step size in sedimentation.
-  ! These are the current time step, current time elapsed in the loop, and ratio
-  ! of sedimentation to MG2 timestep, respectively.
-  real(r8) :: sed_deltat, sed_time, sed_step_ratio
 
   ! loop array variables
   ! "i" and "k" are column/level iterators for internal (MG) variables
@@ -1375,7 +1374,17 @@ subroutine micro_mg_tend ( &
      call size_dist_param_basic(mg_rain_props, qric(:,k), nric(:,k), &
           lamr(:,k), n0r(:,k))
 
-     call rain_fall_speeds(qric(:,k), lamr(:,k), rhof(:,k), umr(:,k), unr(:,k))
+     where (lamr(:,k) >= qsmall)
+
+        ! provisional rain number and mass weighted mean fallspeed (m/s)
+
+        unr(:,k) = min(arn(:,k)*gamma_br_plus1/lamr(:,k)**br,9.1_r8*rhof(:,k))
+        umr(:,k) = min(arn(:,k)*gamma_br_plus4/(6._r8*lamr(:,k)**br),9.1_r8*rhof(:,k))
+
+     elsewhere
+        umr(:,k) = 0._r8
+        unr(:,k) = 0._r8
+     end where
 
      !......................................................................
      ! snow
@@ -2104,6 +2113,26 @@ subroutine micro_mg_tend ( &
            fni(k)= 0._r8
         end if
 
+        ! fallspeed for rain
+
+        call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), &
+             lamr(i,k))
+
+        if (lamr(i,k).ge.qsmall) then
+
+           ! 'final' values of number and mass weighted mean fallspeed for rain (m/s)
+
+           unr(i,k) = min(arn(i,k)*gamma_br_plus1/lamr(i,k)**br,9.1_r8*rhof(i,k))
+           umr(i,k) = min(arn(i,k)*gamma_br_plus4/(6._r8*lamr(i,k)**br),9.1_r8*rhof(i,k))
+
+           fr(k) = g*rho(i,k)*umr(i,k)
+           fnr(k) = g*rho(i,k)*unr(i,k)
+
+        else
+           fr(k)=0._r8
+           fnr(k)=0._r8
+        end if
+
         ! fallspeed for snow
 
         call size_dist_param_basic(mg_snow_props, dums(i,k), dumns(i,k), &
@@ -2130,7 +2159,7 @@ subroutine micro_mg_tend ( &
         dumnc(i,k) = max((nc(i,k)+nctend(i,k)*deltat),0._r8)
         dumi(i,k) = (qi(i,k)+qitend(i,k)*deltat)
         dumni(i,k) = max((ni(i,k)+nitend(i,k)*deltat),0._r8)
-        dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat, 0._r8)
+        dumr(i,k) = (qr(i,k)+qrtend(i,k)*deltat)
         dumnr(i,k) = max((nr(i,k)+nrtend(i,k)*deltat),0._r8)
         dums(i,k) = (qs(i,k)+qstend(i,k)*deltat)
         dumns(i,k) = max((ns(i,k)+nstend(i,k)*deltat),0._r8)
@@ -2287,61 +2316,56 @@ subroutine micro_mg_tend ( &
 
      end do
 
-     ! Start clock for adaptive time step loop.
+     ! calculate number of split time steps to ensure courant stability criteria
+     ! for sedimentation calculations
      !-------------------------------------------------------------------
-     sed_time = 0.
-     nstep = 0
+     nstep = 1 + int(max( &
+          maxval( fr/pdel(i,:)), &
+          maxval(fnr/pdel(i,:))) &
+          * deltat)
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
-     rain_sed: do
+     do n = 1,nstep
 
-        nstep = nstep + 1
+        faloutr  = fr  * dumr(i,:)
+        faloutnr = fnr * dumnr(i,:)
 
-        ! recalculate fallspeed for rain
-        call size_dist_param_basic(mg_rain_props, dumr(i,:), dumnr(i,:), &
-             lamr(i,:))
+        ! top of model
+        k = 1
 
-        call rain_fall_speeds(dumr(i,:), lamr(i,:), rhof(i,:), umr(i,:), unr(i,:))
-
-        ! Convert fall speeds to pressure coordinates.
-        fr = g * rho(i,:) * umr(i,:)
-        fnr = g * rho(i,:) * unr(i,:)
-
-        ! Size of this time step.  Note that the limiter of 1.e-6 is only here
-        ! in case fr is everywhere 0 (or ridiculously small). Unless running MG2
-        ! at a ridiculously long time step, it should not impact the answer at
-        ! all (not even roundoff-level).
-        sed_deltat = 0.5/max(maxval(fr/pdel(i,:)), maxval(fnr/pdel(i,:)), 1.e-6)
-        ! Make sure we don't go past the end of the time step.
-        if (sed_time + sed_deltat >= deltat) then
-           sed_deltat = deltat - sed_time
-           sed_time = deltat
-        else
-           ! Time we will advance to if taking this step size.
-           sed_time = sed_time + sed_deltat
-        end if
-        sed_step_ratio = sed_deltat / deltat
-
-        call sedimentation(dumr(i,:), fr, pdel(i,:), sed_tend_qr, flux_surf_qr)
-        call sedimentation(dumnr(i,:), fnr, pdel(i,:), sed_tend_nr)
-
-        qrtend(i,:) = qrtend(i,:)+sed_tend_qr*sed_step_ratio
-        nrtend(i,:) = nrtend(i,:)+sed_tend_nr*sed_step_ratio
+        ! add fallout terms to microphysical tendencies
+        faltndr = faloutr(k)/pdel(i,k)
+        faltndnr = faloutnr(k)/pdel(i,k)
+        qrtend(i,k) = qrtend(i,k)-faltndr/nstep
+        nrtend(i,k) = nrtend(i,k)-faltndnr/nstep
 
         ! sedimentation tendency for output
-        qrsedten(i,:)=qrsedten(i,:)+sed_tend_qr*sed_step_ratio
+        qrsedten(i,k)=qrsedten(i,k)-faltndr/nstep
 
-        dumr(i,:) = dumr(i,:)+sed_tend_qr*sed_deltat
-        dumnr(i,:) = dumnr(i,:)+sed_tend_nr*sed_deltat
+        dumr(i,k) = dumr(i,k)-faltndr*deltat/real(nstep)
+        dumnr(i,k) = dumnr(i,k)-faltndnr*deltat/real(nstep)
 
-        prect(i) = prect(i)+flux_surf_qr*sed_step_ratio/g/1000._r8
+        do k = 2,nlev
 
-        if (sed_time >= deltat) then
-           exit rain_sed
-        end if
+           faltndr=(faloutr(k)-faloutr(k-1))/pdel(i,k)
+           faltndnr=(faloutnr(k)-faloutnr(k-1))/pdel(i,k)
 
-     end do rain_sed
+           ! add fallout terms to eulerian tendencies
+           qrtend(i,k) = qrtend(i,k)-faltndr/nstep
+           nrtend(i,k) = nrtend(i,k)-faltndnr/nstep
+
+           ! sedimentation tendency for output
+           qrsedten(i,k)=qrsedten(i,k)-faltndr/nstep
+
+           dumr(i,k) = dumr(i,k)-faltndr*deltat/real(nstep)
+           dumnr(i,k) = dumnr(i,k)-faltndnr*deltat/real(nstep)
+
+        end do
+
+        prect(i) = prect(i)+faloutr(nlev)/g/real(nstep)/1000._r8
+
+     end do
 
      nstep_rain(i) = nstep
 
