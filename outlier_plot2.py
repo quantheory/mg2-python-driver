@@ -10,7 +10,7 @@ from mg2 import micro_mg2_0 as mg
 
 from mg2_constants import *
 
-HIST_FILE_NAME = "/global/homes/s/santos/project/MG2_data_collection/run/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
+HIST_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
 
 file = nc4.Dataset(HIST_FILE_NAME, 'r')
 
@@ -19,8 +19,9 @@ lev = len(file.dimensions['lev'])
 ilev = len(file.dimensions['ilev'])
 
 errstring = wsm.wv_sat_methods_init(kind, tmelt, h2otrip, tboil, ttrice, epsilo)
-if str(errstring).strip() != '':
-    print("wv_sat_methods initialization error: ", errstring)
+
+assert errstring.decode().strip() == '', \
+    "wv_sat_methods initialization error: "+errstring.decode()
 
 errstring = mg.micro_mg_init(kind, gravit, rair, rh2o, cpair, tmelt, latvap,
                              latice, rhmini, dcs, dcs_tdep, uniform, do_cldice,
@@ -28,8 +29,9 @@ errstring = mg.micro_mg_init(kind, gravit, rair, rh2o, cpair, tmelt, latvap,
                              berg_eff_factor, allow_sed_supersat, ice_sed_ai,
                              prc_coef1, prc_exp, prc_exp1, cld_sed,
                              mg_prc_coeff_fix, alpha_grad, beta_grad)
-if str(errstring).strip() != '':
-    print("MG2 initialization error: ", errstring)
+
+assert errstring.decode().strip() == '', \
+    "MG2 initialization error: "+errstring.decode()
 
 mgncol = 1
 t = file.variables["MG2IN_T"]
@@ -106,24 +108,24 @@ var_names = sorted(list(loc_arrays.keys()))
 finals = {}
 roughs = {}
 for name in var_names:
-    finals[name] = np.zeros((1 + final_time / timesteps[0], lev))
-    roughs[name] = np.zeros((1 + final_time / timesteps[1], lev))
+    finals[name] = np.zeros((1 + final_time // timesteps[0], lev))
+    roughs[name] = np.zeros((1 + final_time // timesteps[1], lev))
 
-rain_evap_fine = np.zeros((final_time / timesteps[0], lev))
-rain_evap_coarse = np.zeros((final_time / timesteps[1], lev))
-rain_sed_fine = np.zeros((final_time / timesteps[0], lev))
-rain_sed_coarse = np.zeros((final_time / timesteps[1], lev))
-rain_auto_fine = np.zeros((final_time / timesteps[0], lev))
-rain_auto_coarse = np.zeros((final_time / timesteps[1], lev))
-rain_accr_fine = np.zeros((final_time / timesteps[0], lev))
-rain_accr_coarse = np.zeros((final_time / timesteps[1], lev))
+rain_evap_fine = np.zeros((final_time // timesteps[0], lev))
+rain_evap_coarse = np.zeros((final_time // timesteps[1], lev))
+rain_sed_fine = np.zeros((final_time // timesteps[0], lev))
+rain_sed_coarse = np.zeros((final_time // timesteps[1], lev))
+rain_auto_fine = np.zeros((final_time // timesteps[0], lev))
+rain_auto_coarse = np.zeros((final_time // timesteps[1], lev))
+rain_accr_fine = np.zeros((final_time // timesteps[0], lev))
+rain_accr_coarse = np.zeros((final_time // timesteps[1], lev))
 
 max_ind = 1532
 
 for it in range(timesteps.size):
     print("Starting timestep=", timesteps[it])
     assert final_time % timesteps[it] == 0
-    nsteps = final_time / timesteps[it]
+    nsteps = final_time // timesteps[it]
     deltat = float(timesteps[it])
 
     t_loc[:,:] = t[0,:,max_ind].transpose()
@@ -216,7 +218,10 @@ for it in range(timesteps.size):
 
         # Do something with final columns.
 
-levels = file.variables["ilev"]
+# Highest level to plot.
+top = 0
+
+levels = file.variables["ilev"][top:]
 times_fine = np.linspace(0., final_time, finals['Q'].shape[0])
 times_coarse = np.linspace(0., final_time, roughs['Q'].shape[0])
 
@@ -224,26 +229,34 @@ times_fine, lev_fine = np.meshgrid(times_fine, levels)
 times_coarse, lev_coarse = np.meshgrid(times_coarse, levels)
 
 assert timesteps[1] % timesteps[0] == 0
-stride = timesteps[1] / timesteps[0]
+stride = timesteps[1] // timesteps[0]
+
+cmap = plt.get_cmap('Greens')
 
 for name in var_names:
-    plt.pcolormesh(times_fine, lev_fine, finals[name].transpose())
+    # This is to get the two plots to use the same color bar.
+    # Note skipping the last values below, since they are not plotted.
+    color_min = min(finals[name][:-1,top:].min(), roughs[name][:-1,top:].min())
+    color_max = max(finals[name][:-1,top:].max(), roughs[name][:-1,top:].max())
+    plt.pcolormesh(times_fine, lev_fine, finals[name].transpose()[top:,:], cmap=cmap)
     plt.xlabel("Time (s)")
     plt.ylabel("Reference pressure (mb)")
     plt.axis('tight')
     plt.gca().invert_yaxis()
+    plt.clim(color_min, color_max)
     plt.colorbar()
     plt.savefig('./outlier_time{}s_{}.eps'.format(timesteps[0], name))
     plt.close()
-    plt.pcolormesh(times_coarse, lev_coarse, roughs[name].transpose())
+    plt.pcolormesh(times_coarse, lev_coarse, roughs[name].transpose()[top:,:], cmap=cmap)
     plt.xlabel("Time (s)")
     plt.ylabel("Reference pressure (mb)")
     plt.axis('tight')
     plt.gca().invert_yaxis()
+    plt.clim(color_min, color_max)
     plt.colorbar()
     plt.savefig('./outlier_time{}s_{}.eps'.format(timesteps[1], name))
     plt.close()
-    plt.pcolormesh(times_coarse, lev_coarse, roughs[name].transpose() - finals[name][::stride,:].transpose())
+    plt.pcolormesh(times_coarse, lev_coarse, roughs[name].transpose()[top:,:] - finals[name][::stride,top:].transpose(), cmap=cmap)
     plt.xlabel("Time (s)")
     plt.ylabel("Reference pressure (mb)")
     plt.axis('tight')
@@ -251,118 +264,3 @@ for name in var_names:
     plt.colorbar()
     plt.savefig('./outlier_{}s-{}s_{}.eps'.format(timesteps[1], timesteps[0], name))
     plt.close()
-
-# Store coarse tendency averages from the fine tendency.
-mean_fine = np.empty(rain_evap_coarse.transpose().shape)
-
-plt.pcolormesh(times_fine, lev_fine, rain_evap_fine.transpose())
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_time{}s_rain_evap.eps'.format(timesteps[0], name))
-plt.close()
-plt.pcolormesh(times_coarse, lev_coarse, rain_evap_coarse.transpose())
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_time{}s_rain_evap.eps'.format(timesteps[1], name))
-plt.close()
-for k in range(mean_fine.shape[0]):
-    for n in range(mean_fine.shape[1]):
-        mean_fine[k,n] = rain_evap_fine[stride*n:stride*(n+1),k].mean()
-plt.pcolormesh(times_coarse, lev_coarse, rain_evap_coarse.transpose() - mean_fine)
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_{}s-{}s_rain_evap.eps'.format(timesteps[1], timesteps[0], name))
-plt.close()
-
-plt.pcolormesh(times_fine[:,1:], lev_fine[:,1:], rain_sed_fine.transpose())
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_time{}s_rain_sed.eps'.format(timesteps[0], name))
-plt.close()
-plt.pcolormesh(times_coarse[:,1:], lev_coarse[:,1:], rain_sed_coarse.transpose())
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_time{}s_rain_sed.eps'.format(timesteps[1], name))
-plt.close()
-for k in range(mean_fine.shape[0]):
-    for n in range(mean_fine.shape[1]):
-        mean_fine[k,n] = rain_sed_fine[stride*n:stride*(n+1),k].mean()
-plt.pcolormesh(times_coarse, lev_coarse, rain_sed_coarse.transpose() - mean_fine)
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_{}s-{}s_rain_sed.eps'.format(timesteps[1], timesteps[0], name))
-plt.close()
-
-plt.pcolormesh(times_fine[:,1:], lev_fine[:,1:], rain_auto_fine.transpose())
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_time{}s_rain_auto.eps'.format(timesteps[0], name))
-plt.close()
-plt.pcolormesh(times_coarse[:,1:], lev_coarse[:,1:], rain_auto_coarse.transpose())
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_time{}s_rain_auto.eps'.format(timesteps[1], name))
-plt.close()
-for k in range(mean_fine.shape[0]):
-    for n in range(mean_fine.shape[1]):
-        mean_fine[k,n] = rain_auto_fine[stride*n:stride*(n+1),k].mean()
-plt.pcolormesh(times_coarse, lev_coarse, rain_auto_coarse.transpose() - mean_fine)
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_{}s-{}s_rain_auto.eps'.format(timesteps[1], timesteps[0], name))
-plt.close()
-
-plt.pcolormesh(times_fine[:,1:], lev_fine[:,1:], rain_accr_fine.transpose())
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_time{}s_rain_accr.eps'.format(timesteps[0], name))
-plt.close()
-plt.pcolormesh(times_coarse[:,1:], lev_coarse[:,1:], rain_accr_coarse.transpose())
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_time{}s_rain_accr.eps'.format(timesteps[1], name))
-plt.close()
-for k in range(mean_fine.shape[0]):
-    for n in range(mean_fine.shape[1]):
-        mean_fine[k,n] = rain_accr_fine[stride*n:stride*(n+1),k].mean()
-plt.pcolormesh(times_coarse, lev_coarse, rain_accr_coarse.transpose() - mean_fine)
-plt.xlabel("Time (s)")
-plt.ylabel("Reference pressure (mb)")
-plt.axis('tight')
-plt.gca().invert_yaxis()
-plt.colorbar()
-plt.savefig('./outlier_{}s-{}s_rain_accr.eps'.format(timesteps[1], timesteps[0], name))
-plt.close()

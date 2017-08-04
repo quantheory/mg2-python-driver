@@ -10,7 +10,7 @@ from mg2 import micro_mg2_0 as mg
 
 from mg2_constants import *
 
-HIST_FILE_NAME = "/global/homes/s/santos/project/MG2_data_collection/run/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
+HIST_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
 
 file = nc4.Dataset(HIST_FILE_NAME, 'r')
 
@@ -19,8 +19,9 @@ lev = len(file.dimensions['lev'])
 ilev = len(file.dimensions['ilev'])
 
 errstring = wsm.wv_sat_methods_init(kind, tmelt, h2otrip, tboil, ttrice, epsilo)
-if str(errstring).strip() != '':
-    print("wv_sat_methods initialization error: ", errstring)
+
+assert errstring.decode().strip() == '', \
+    "wv_sat_methods initialization error: "+errstring.decode()
 
 errstring = mg.micro_mg_init(kind, gravit, rair, rh2o, cpair, tmelt, latvap,
                              latice, rhmini, dcs, dcs_tdep, uniform, do_cldice,
@@ -28,8 +29,9 @@ errstring = mg.micro_mg_init(kind, gravit, rair, rh2o, cpair, tmelt, latvap,
                              berg_eff_factor, allow_sed_supersat, ice_sed_ai,
                              prc_coef1, prc_exp, prc_exp1, cld_sed,
                              mg_prc_coeff_fix, alpha_grad, beta_grad)
-if str(errstring).strip() != '':
-    print("MG2 initialization error: ", errstring)
+
+assert errstring.decode().strip() == '', \
+    "MG2 initialization error: "+errstring.decode()
 
 mgncol = 128
 t = file.variables["MG2IN_T"]
@@ -90,7 +92,11 @@ frzimm_loc = np.empty((mgncol, frzimm.shape[1]), order='F')
 frzcnt_loc = np.empty((mgncol, frzcnt.shape[1]), order='F')
 frzdep_loc = np.empty((mgncol, frzdep.shape[1]), order='F')
 
-total_columns = 2048
+total_columns = 256
+# Annoying limitation on code (should be fixed)
+assert total_columns % mgncol == 0, \
+        "total columns ({}) does not divide MG2 batch size ({})".format(total_columns, mgncol)
+
 final_time = 1800
 
 timesteps = np.array([1, 2, 5, 10, 15, 30, 60, 90, 100, 120, 150, 180, 300, 360, 450, 600, 900, 1800])
@@ -109,13 +115,17 @@ for name in var_names:
     norms[name] = np.zeros((total_columns, timesteps.size - 1))
     finals[name] = np.zeros((total_columns, lev))
 
+# Check to make sure timestep size is valid before entering loop.
+for it in range(timesteps.size):
+    assert final_time % timesteps[it] == 0, \
+        "timestep ({}) does not divide final time ({})".format(timesteps[it], final_time)
+
 for it in range(timesteps.size):
     print("Starting timestep=", timesteps[it])
-    assert final_time % timesteps[it] == 0
-    nsteps = final_time / timesteps[it]
+    nsteps = final_time // timesteps[it]
     deltat = float(timesteps[it])
 
-    for offset in range(total_columns / mgncol):
+    for offset in range(total_columns // mgncol):
         t_loc[:,:] = t[0,:,offset*mgncol:(offset+1)*mgncol].transpose()
         q_loc[:,:] = q[0,:,offset*mgncol:(offset+1)*mgncol].transpose()
         qc_loc[:,:] = qc[0,:,offset*mgncol:(offset+1)*mgncol].transpose()
