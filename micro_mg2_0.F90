@@ -396,7 +396,7 @@ subroutine micro_mg_tend ( &
      nfice,                        qcrat,                        &
      errstring, & ! Below arguments are "optional" (pass null pointers to omit).
      tnd_qsnow,          tnd_nsnow,          re_ice,             &
-     prer_evap,                                                      &
+     prer_evap, nstep_rain,                                      &
      frzimm,             frzcnt,             frzdep)
 
   ! Constituent properties.
@@ -569,6 +569,8 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: qcrat(mgncol,nlev)        ! limiter for qc process rates (1=no limit --> 0. no qc)
 
   real(r8), intent(out) :: prer_evap(mgncol,nlev)
+
+  integer, intent(out) :: nstep_rain(mgncol)
 
   character(128),   intent(out) :: errstring  ! output status (non-blank for error return)
 
@@ -2288,10 +2290,13 @@ subroutine micro_mg_tend ( &
      ! Start clock for adaptive time step loop.
      !-------------------------------------------------------------------
      sed_time = 0.
+     nstep = 0
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      rain_sed: do
+
+        nstep = nstep + 1
 
         ! recalculate fallspeed for rain
         call size_dist_param_basic(mg_rain_props, dumr(i,:), dumnr(i,:), &
@@ -2337,6 +2342,8 @@ subroutine micro_mg_tend ( &
         end if
 
      end do rain_sed
+
+     nstep_rain(i) = nstep
 
      ! calculate number of split time steps to ensure courant stability criteria
      ! for sedimentation calculations
