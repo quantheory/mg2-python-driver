@@ -51,6 +51,7 @@ public :: &
 !!== KZ_DCS
      size_dist_param_basic, &
      avg_diameter, &
+     rain_fall_speeds, &
      rising_factorial, &
      ice_deposition_sublimation, &
      kk2000_liq_autoconversion, &
@@ -66,7 +67,8 @@ public :: &
      self_collection_rain, &
      accrete_cloud_ice_snow, &
      evaporate_sublimate_precip, &
-     bergeron_process_snow
+     bergeron_process_snow, &
+     sedimentation
 
 ! 8 byte real and integer
 integer, parameter, public :: r8 = selected_real_kind(12)
@@ -194,6 +196,8 @@ real(r8) :: xlf         ! freezing
 real(r8) :: xxls        ! sublimation
 
 ! additional constants to help speed up code
+real(r8), public :: gamma_br_plus1
+real(r8), public :: gamma_br_plus4
 real(r8) :: gamma_bs_plus3
 real(r8) :: gamma_half_br_plus5
 real(r8) :: gamma_half_bs_plus5
@@ -268,6 +272,8 @@ subroutine micro_mg_utils_init( kind, rh2o, cpair, tmelt_in, latvap, &
   xxls = xxlv + xlf     ! latent heat of sublimation
 
   ! Define constants to help speed up code (this limits calls to gamma function)
+  gamma_br_plus1=gamma(1._r8+br)
+  gamma_br_plus4=gamma(4._r8+br)
   gamma_bs_plus3=gamma(3._r8+bs)
   gamma_half_br_plus5=gamma(5._r8/2._r8+br/2._r8)
   gamma_half_bs_plus5=gamma(5._r8/2._r8+bs/2._r8)
@@ -1413,7 +1419,56 @@ return
 end subroutine get_dcst_sc
 !!== KZ_DCS
 
+! Find the sedimentation rates for a quantity, given fall speeds.
+! Uses a basic 1D finite volume method.
+subroutine sedimentation(q, f, pdel, qtend, flux_surf)
+  ! mass or number (units of kg/kg and #/kg, respectively)
+  real(r8), intent(in) :: q(:)
+  ! mass or number fall speed (in pressure coordinates, units of Pa/s)
+  real(r8), intent(in) :: f(:)
+  ! width of levels (units of Pa)
+  real(r8), intent(in) :: pdel(:)
+  ! mass or number tendency (units of kg/kg/s and #/kg, respectively)
+  real(r8), intent(out) :: qtend(:)
+  ! flux through bottom of column
+  real(r8), intent(out), optional :: flux_surf
 
+  ! Calculate net fluxes through the bottom of each level.
+  qtend = f * q
+  ! Save flux to surface.
+  if (present(flux_surf)) flux_surf = qtend(size(qtend))
+  ! Except at the very top level, subtract fluxes through top from fluxes
+  ! through bottom to get net fluxes.
+  qtend(2:) = qtend(2:) - qtend(:size(qtend-1))
+  ! Convert to tendency on grid cell.
+  qtend = - qtend / pdel
+end subroutine sedimentation
+
+subroutine rain_fall_speeds(qr, lamr, rhof, umr, unr)
+  ! rain mass (kg/kg)
+  real(r8), intent(in) :: qr(:)
+  ! 1 / mean diameter of rain (1/m)
+  real(r8), intent(in) :: lamr(:)
+  ! density correction factor for fall speeds (unitless)
+  real(r8), intent(in) :: rhof(:)
+  ! fall speed of rain mass (m/s)
+  real(r8), intent(out) :: umr(:)
+  ! fall speed of rain number (m/s)
+  real(r8), intent(out) :: unr(:)
+
+  where (qr >= qsmall)
+     ! number and mass weighted mean fallspeed for rain
+     ! Note: If lambda bounds are tight enough, the 9.1 limiter will not
+     ! actually do anything. If the lambda limiters are stable and this
+     ! line is slow, it may be possible to remove these without changing
+     ! answers.
+     umr = rhof * min(ar*gamma_br_plus4 / (6._r8 * lamr**br), 9.1_r8)
+     unr = rhof * min(ar*gamma_br_plus1 / lamr**br, 9.1_r8)
+  elsewhere
+     umr = 0._r8
+     unr = 0._r8
+  end where
+end subroutine rain_fall_speeds
 
 !========================================================================
 !UTILITIES
