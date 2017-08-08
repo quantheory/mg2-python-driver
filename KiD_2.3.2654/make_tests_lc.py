@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # ==============================================================================
 # This python script will create a set of namelist input files for KiD and save
 # them in the directory specified by rundir.
@@ -24,10 +24,16 @@ import numpy as np # math functions
 import os          # operating system functions
 import sys
 
-wrkdir = '/home/vogl2/workspace/kid/KiD_2.3.2654/output'
+hostname = os.getenv('HOSTNAME',default='MOODYBLUES')
+if ("cab" in hostname):
+  system = 'cab'
+  wrkdir = os.getenv('S') + '/KiD'
+elif ("MOODYBLUES" in hostname):
+  system = 'moodyblues'
+  wrkdir = os.getenv('PWD') + '/output'
 
 # test case: warm1, warm2, warm3, warm7, mixed1, mixed3
-casename = 'warm1'
+casenames = ('warm1',)
 # casename = 'mixed1'
 
 #mphys='thompson09'
@@ -42,36 +48,38 @@ mstepvals = [ 1, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200]
 
 # ------------------------------------------------------------------------------
 # make KiD
-command = "./make_kid_tux.sh 1 " + wrkdir + '/' + casename
+command = "./make_kid_lc.sh"
 ierr = subprocess.call(command, shell=True)
 
-if (ierr != 0):
-       print "ERROR: Build Failed"
-       sys.exit()
-
 # ------------------------------------------------------------------------------
-# make name lists
+# create test directories
+for casename in casenames:
 
-TestDir = wrkdir+'/'+casename
-if not os.path.exists(TestDir):
-       os.makedirs(TestDir)
+  TestDir = wrkdir+'/'+casename
+  if not os.path.exists(TestDir):
+    os.makedirs(TestDir)
+  os.system('cp ./build_' + system + '/bin/KiD_1D.exe ' + TestDir + '/')
+  os.system('rm -f ' + TestDir + '/run_batch.sh')
+  os.system('ln -s ' + os.getenv('PWD') + '/runkid_batch_' + system + '.sh ' +
+            TestDir + '/run_batch.sh')
 
-for dt in dtvals:
-       for mstep in mstepvals:
+  # make name lists
+  for dt in dtvals:
+    for mstep in mstepvals:
 
-              infile  = open(casename+'.nml','r')
+      infile  = open('./tests/'+casename+'.nml','r')
 
-              testname = casename+'_'+mphys+'_dt'+str(dt)+'_mstep'+str(mstep)
-              nmlname  = testname+'.nml'
-              outfile  = open(TestDir+'/'+nmlname,'w')
+      testname = casename+'_'+mphys+'_dt'+str(dt)+'_mstep'+str(mstep)
+      nmlname  = testname+'.nml'
+      outfile  = open(TestDir+'/'+nmlname,'w')
 
-              for line in infile:
-                     if 'MPHYS' in line:
-                            line = line.replace('MPHYS', '\''+str(mphys)+'\'')
-                     if 'DT' in line:
-                            line = line.replace('DT', str(dt))
-                     if 'MSTEP' in line:
-                            line = line.replace('MSTEP', str(mstep))
-                     outfile.write(line)
-              outfile.close()
-              infile.close()
+      for line in infile:
+        if 'MPHYS' in line:
+          line = line.replace('MPHYS', '\''+str(mphys)+'\'')
+        if 'DT' in line:
+          line = line.replace('DT', str(dt))
+        if 'MSTEP' in line:
+          line = line.replace('MSTEP', str(mstep))
+        outfile.write(line)
+      outfile.close()
+      infile.close()
