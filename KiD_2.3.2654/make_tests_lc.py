@@ -22,15 +22,21 @@
 import subprocess  # launch subprocesses
 import numpy as np # math functions
 import os          # operating system functions
-import sys
+import socket
 
-hostname = os.getenv('HOSTNAME',default='MOODYBLUES')
+hostname = socket.gethostname()
 if ("cab" in hostname):
   system = 'cab'
   wrkdir = os.getenv('S') + '/KiD'
+elif ("tux" in hostname):
+  system = 'tux'
+  wrkdir = os.getenv('PWD') + '/output'
 elif ("MOODYBLUES" in hostname):
   system = 'moodyblues'
   wrkdir = os.getenv('PWD') + '/output'
+else:
+  print "Script not implemented for this system"
+  exit()
 
 # test case: warm1, warm2, warm3, warm7, mixed1, mixed3
 casenames = ('warm1',)

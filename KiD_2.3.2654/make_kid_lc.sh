@@ -17,10 +17,19 @@ if [[ $HOSTNAME == "cab"* ]]; then
   use python                              # Load python for use in makefile 
   COMPILER=ifort
   NCPATH=/usr/local/tools/netcdf-intel-4.1.3
-else
+elif [[ $HOSTNAME == "tux"* ]]; then
+  SYSTEM=tux
+  source /usr/apps/intel/15.5.223/composer_xe_2015.5.223/bin/iccvars.sh intel64
+  source /usr/apps/intel/15.5.223/composer_xe_2015.5.223/bin/ifortvars.sh intel64
+  COMPILER=ifort
+  NCPATH=$HOME/local/netcdf-intel-4.1.3
+elif [[ $HOSTNAME == "MOODYBLUES" ]]; then
   SYSTEM=moodyblues
   COMPILER=gfortran
   NCPATH=/usr
+else
+  echo "Script not implement for this system"
+  exit -1
 fi
 
 # compile source code
