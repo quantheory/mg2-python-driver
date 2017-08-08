@@ -583,12 +583,12 @@ contains
 
 #ifdef ADJUST_SATURATION_BEFORE
     ! zero saturation adjustment tendencies
-    qvlato_adj(i,k)  = 0.0_wp 
-    tlato_adj(i,k)   = 0.0_wp 
-    qctendo_adj(i,k) = 0.0_wp 
-    nctendo_adj(i,k) = 0.0_wp 
-    qitendo_adj(i,k) = 0.0_wp 
-    nitendo_adj(i,k) = 0.0_wp 
+    qvlato_adj  = 0.0_wp
+    tlato_adj   = 0.0_wp
+    qctendo_adj = 0.0_wp
+    nctendo_adj = 0.0_wp
+    qitendo_adj = 0.0_wp
+    nitendo_adj = 0.0_wp
 
     ! Add saturation adjustment...based on m2005
     do i=1,nx
