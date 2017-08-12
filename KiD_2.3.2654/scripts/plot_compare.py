@@ -1,11 +1,17 @@
 from netCDF4 import Dataset
 import numpy as np
 import matplotlib.pyplot as pyplot
+import socket
+import os
 from analysis_tools import *
 
-runDirectory = '/home/vogl2/Desktop/temp/warm1_v0'
-runDirectory_adaptive = '/home/vogl2/Desktop/temp/warm1_v1_R'
-runDirectory_adaptive2 = '/home/vogl2/Desktop/temp/warm1_v2_RC'
+hostname = socket.gethostname()
+if ("tux" in hostname):
+  wrkdir = os.getenv('HOME') + '/workspace/micro_physics/KiD_2.3.2654/output'
+
+runDirectory = wrkdir + '/warm1_v1'
+runDirectory_adaptive = wrkdir + '/warm1_v1'
+runDirectory_adaptive2 = wrkdir + '/warm1_v1'
 
 quantityDict = {'Rain Mass':Quantity('rain_mass'),
                 'Cloud Mass':Quantity('cloud_mass')}
