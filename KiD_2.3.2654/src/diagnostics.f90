@@ -799,13 +799,13 @@ contains
     if (nx == 1) then 
        
        maxn_dgtimes=max(maxn_dgtimes, int(n_dgtimes*dt/dg_dt)+1)
-       allocate(dgStore%data(nz, maxn_dgtimes))
+       allocate(dgStore%data(nz, 0:maxn_dgtimes))
        dgStore%data=unset_real
        
     else
 
        maxn_dgtimes=max(maxn_dgtimes, int(n_dgtimes*dt/dg_dt)+1)
-       allocate(dgStore%data(1:nx, maxn_dgtimes))
+       allocate(dgStore%data(1:nx, 0:maxn_dgtimes))
        dgStore%data=unset_real      
 
     endif
@@ -849,7 +849,7 @@ contains
     n_dgtimes = n_times - n_offset 
 
     maxn_dgtimes=max(maxn_dgtimes, int(n_dgtimes*dt/dg_dt)+1)
-    allocate(dgStore%data(maxn_dgtimes))
+    allocate(dgStore%data(0:maxn_dgtimes))
     dgStore%data=unset_real
 
   end subroutine allocate_dgs_ScalarTS

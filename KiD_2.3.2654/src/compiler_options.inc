@@ -1,14 +1,10 @@
 
-#COMPILER=gfortran  # Gnu 
+#COMPILER=gfortran  # Gnu
 #COMPILER=pgf90    # Portland
 COMPILER=ifort    # Intel
-#COMPILER=nagfor   # NAG 
+#COMPILER=nagfor   # NAG
 
 VPATH = ./:./UM_source
-
-#NCPATH=/usr/local/netcdf/$(COMPILER)/
-#NCPATH=/usr/local/tools/netcdf-pgi-4.1.3 
-NCPATH=/usr/local/tools/netcdf-intel-4.1.3
 
 #blank ver doesn't test, other does
 #TESTING=True #PMC for testing.
@@ -36,7 +32,7 @@ endif
 ifeq ($(COMPILER), pgf90)
 FPP= -Mpreprocess
 ifdef TESTING
-OPTS=-g -Mbounds -Mchkstk -Mchkptr -Mchkfpstk -Minform=inform -C 
+OPTS=-g -Mbounds -Mchkstk -Mchkptr -Mchkfpstk -Minform=inform -C
 else
 OPTS=-O3 -pg -g
 endif
@@ -62,5 +58,5 @@ LDFLAGS=$(INCDF) $(LNCDF)
 
 EXECUTABLE=$(MODEL)_$(CASE).exe
 
-F2PY=/usr/local/cdat/bin/f2py 
-F2PY_OPTS=--fcompiler-exec=$(COMPILER) $(LDFLAGS) 
+F2PY=/usr/local/cdat/bin/f2py
+F2PY_OPTS=--fcompiler-exec=$(COMPILER) $(LDFLAGS)
