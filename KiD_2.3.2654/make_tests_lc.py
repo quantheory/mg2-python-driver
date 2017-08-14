@@ -65,9 +65,11 @@ for casename in casenames:
   if not os.path.exists(TestDir):
     os.makedirs(TestDir)
   os.system('cp ./build_' + system + '/bin/KiD_1D.exe ' + TestDir + '/')
-  os.system('rm -f ' + TestDir + '/run_batch.sh')
-  os.system('ln -s ' + os.getenv('PWD') + '/runkid_batch_' + system + '.sh ' +
-            TestDir + '/run_batch.sh')
+  os.system('rm -f ' + TestDir + '/runkid_batch.sh')
+  os.system('ln -s ' + os.getenv('PWD') + '/runkid_batch.sh ' + TestDir + '/runkid_batch.sh')
+  os.system('rm -f ' + TestDir + '/runkid.sh')
+  os.system('ln -s ' + os.getenv('PWD') + '/runkid_' + system + '.sh ' +
+            TestDir + '/runkid.sh')
 
   # make name lists
   for dt in dtvals:

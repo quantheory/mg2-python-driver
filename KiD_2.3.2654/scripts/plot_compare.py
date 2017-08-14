@@ -9,9 +9,9 @@ hostname = socket.gethostname()
 if ("tux" in hostname):
   wrkdir = os.getenv('HOME') + '/workspace/micro_physics/KiD_2.3.2654/output'
 
-runDirectory = wrkdir + '/warm1_v1'
+runDirectory = wrkdir + '/warm1_v0'
 runDirectory_adaptive = wrkdir + '/warm1_v1'
-runDirectory_adaptive2 = wrkdir + '/warm1_v1'
+runDirectory_adaptive2 = wrkdir + '/warm1'
 
 quantityDict = {'Rain Mass':Quantity('rain_mass'),
                 'Vapour':Quantity('vapour')}
