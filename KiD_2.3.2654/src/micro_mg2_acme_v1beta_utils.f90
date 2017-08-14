@@ -419,13 +419,22 @@ elemental subroutine size_dist_param_liq(props, qcic, ncic, rho, pgam, lamc)
 end subroutine size_dist_param_liq
 
 ! Basic routine for getting size distribution parameters.
-elemental subroutine size_dist_param_basic(props, qic, nic, lam, n0)
+elemental subroutine size_dist_param_basic(props, qic, nic, lam, n0, &
+                                          qic_dlam_dqic, nic_dlam_dqic, &
+                                          qic_dlam_dnic, nic_dlam_dnic)
   type(MGHydrometeorProps), intent(in) :: props
   real(r8), intent(in) :: qic
   real(r8), intent(inout) :: nic
 
   real(r8), intent(out) :: lam
-  real(r8), intent(out), optional :: n0
+  real(r8), intent(out), optional :: n0, qic_dlam_dqic, nic_dlam_dqic
+  real(r8), intent(out), optional ::  qic_dlam_dnic, nic_dlam_dnic
+
+  logical :: deriv_info
+
+  ! flag used to indicate whether derivative information should be obtained
+  deriv_info = present(qic_dlam_dqic).or.present(nic_dlam_dqic).or. &
+               present(qic_dlam_dnic).or.present(nic_dlam_dnic)
 
   if (qic > qsmall) then
 
@@ -435,21 +444,52 @@ elemental subroutine size_dist_param_basic(props, qic, nic, lam, n0)
         nic = min(nic, qic / props%min_mean_mass)
      end if
 
-     ! lambda = (c n/q)^(1/d)
+     ! lambda = (c nic/qic)^(1/d)
      lam = (props%shape_coef * nic/qic)**(1._r8/props%eff_dim)
+
+     if (deriv_info) then
+       ! dlambda_dqic = -(1/d)(c nic/qic)^(1/d)*(1/qic) = -lambda/d/qic
+       ! qic_dlambda_dqic = -lambda/d
+       ! nic_dlambda_dqic = -lambda^(1+d)/c/d
+       qic_dlam_dqic = -lam/props%eff_dim
+       nic_dlam_dqic = -lam**(1._r8+props%eff_dim)/props%shape_coef/props%eff_dim
+       ! dlambda_dnic = (1/d)(c nic/qic)^(1/d)*(1/nic) = lambda/d/nic
+       ! qic_dlambda_dnic = lambda^(1-d)*c/d
+       ! nic_dlambda_dnic = lambda/d
+       qic_dlam_dnic = lam**(1._r8-props%eff_dim)*props%shape_coef/props%eff_dim
+       nic_dlam_dnic = lam/props%eff_dim
+     end if
 
      ! check for slope
      ! adjust vars
      if (lam < props%lambda_bounds(1)) then
         lam = props%lambda_bounds(1)
         nic = lam**(props%eff_dim) * qic/props%shape_coef
+        if (deriv_info) then
+          qic_dlam_dqic = 0._r8
+          nic_dlam_dqic = 0._r8
+          qic_dlam_dnic = 0._r8
+          nic_dlam_dnic = 0._r8
+        end if
      else if (lam > props%lambda_bounds(2)) then
         lam = props%lambda_bounds(2)
         nic = lam**(props%eff_dim) * qic/props%shape_coef
+        if (deriv_info) then
+          qic_dlam_dqic = 0._r8
+          nic_dlam_dqic = 0._r8
+          qic_dlam_dnic = 0._r8
+          nic_dlam_dnic = 0._r8
+        end if
      end if
 
   else
      lam = 0._r8
+     if (deriv_info) then
+       qic_dlam_dqic = 0._r8
+       nic_dlam_dqic = 0._r8
+       qic_dlam_dnic = 0._r8
+       nic_dlam_dnic = 0._r8
+     end if
   end if
 
   if (present(n0)) n0 = nic * lam
@@ -599,12 +639,12 @@ elemental subroutine ice_deposition_sublimation(t, qv, qi, ni, &
 !!== KZ_DCS
 
      !Get slope and intercept of gamma distn for ice.
-     if(dcs_tdep) then  
+     if(dcs_tdep) then
         call size_dist_param_ice(mg_ice_props, dcst, qiic, niic, lami, n0i)
      else
         call size_dist_param_basic(mg_ice_props, qiic, niic, lami, n0i)
-     end if 
-!!== KZ_DCS 
+     end if
+!!== KZ_DCS
 
      !Get depletion timescale=1/eps
      epsi = 2._r8*pi*n0i*rho*Dv/(lami*lami)
@@ -715,7 +755,7 @@ elemental subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, dcst, dcs_tdep,
 !!== KZ_DCS
   real(r8), intent(in) :: dcs
   real(r8), intent(in) :: dcst
-  logical,  intent(in) :: dcs_tdep 
+  logical,  intent(in) :: dcs_tdep
 !!== KZ_DCS
 
   real(r8), intent(out) :: prci
@@ -737,7 +777,7 @@ elemental subroutine ice_autoconversion(t, qiic, lami, n0i, dcs, dcst, dcs_tdep,
      else
         d_rat = lami*dcs
      end if
-!!== KZ_DCS 
+!!== KZ_DCS
 
 
      ! Rate of ice particle conversion (number).

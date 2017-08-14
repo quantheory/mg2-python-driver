@@ -11,8 +11,8 @@ module Sedimentation
 
 contains
 
-  subroutine sed_CalcFallVelocity(q,qtend,n,ntend,cloud_frac,rho,nlev,i, &
-    mg_type,g,an,rhof,fq,fn,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
+  subroutine sed_CalcFallVelocity(q,qtend,n,ntend,cloud_frac,rho,pdel,nlev,i, &
+    mg_type,deltat,g,an,rhof,fq,fn,cfl,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
     use micro_mg2_acme_v1beta_utils, only: size_dist_param_liq, &
                                            size_dist_param_basic, &
                                            mg_ice_props, mg_liq_props, &
@@ -20,102 +20,120 @@ contains
                                            qsmall, bi, bc, br, bs
     implicit none
     real(r8), intent(in)            :: q(:,:), qtend(:,:), n(:,:), ntend(:,:)
-    real(r8), intent(in)            :: rho(:,:), an(:,:), rhof(:,:)
-    real(r8), intent(in)            :: cloud_frac(:,:), g
+    real(r8), intent(in)            :: rho(:,:), pdel(:,:), an(:,:), rhof(:,:)
+    real(r8), intent(in)            :: cloud_frac(:,:), deltat, g
     integer,  intent(in)            :: nlev, i, mg_type
     real(r8), intent(in), optional  :: nnst, gamma_b_plus1, gamma_b_plus4
     logical, intent(in), optional   :: ncons
-    real(r8), intent(out)           :: fq(:), fn(:)
+    real(r8), intent(out)           :: cfl, fq(:), fn(:)
 
     real(r8) :: qtemp(nlev), ntemp(nlev), lam(nlev), pgam(nlev)
+    real(r8) :: qic_dlam(2,nlev), nic_dlam(2,nlev)
+    real(r8) :: qdfq(2), ndfn(2), s1, s2, tr, det
     integer :: k, nstep
 
+    ! initialize values to zero
+    fq = 0._r8
+    fn = 0._r8
+    cfl = 0._r8
+
+    ! use quantity in cloud
+    qtemp = q(i,:)/cloud_frac(i,:)
+    ntemp = n(i,:)/cloud_frac(i,:)
+    where(ntemp < 0._r8) ntemp = 0._r8
+    ! switch for specification of droplet and crystal number or ice cloud number
+    if ((mg_type == MG_LIQUID  .or. mg_type == MG_ICE) .and. ncons) then
+      ntemp = nnst/rho(i,:)
+    end if
+
+    ! compute lam and pgam using elemental function call
+    if (mg_type == MG_LIQUID) then
+      call size_dist_param_liq(mg_liq_props, qtemp(:), ntemp(:), rho(i,:), &
+                               pgam(:), lam(:))
+
+    else if (mg_type == MG_ICE) then
+      call size_dist_param_basic(mg_ice_props, qtemp(:), ntemp(:), lam(:))
+
+    else if (mg_type == MG_RAIN) then
+      call size_dist_param_basic(mg_rain_props, qtemp(:), ntemp(:), lam(:), &
+                                 qic_dlam_dqic=qic_dlam(1,:), &
+                                 nic_dlam_dqic=nic_dlam(1,:), &
+                                 qic_dlam_dnic=qic_dlam(2,:), &
+                                 nic_dlam_dnic=nic_dlam(2,:))
+
+    else if (mg_type == MG_SNOW) then
+       call size_dist_param_basic(mg_snow_props, qtemp(:), ntemp(:), lam(:))
+    else
+       print *, "Invalid mg_type to mg2_sedimentation"
+       stop
+    end if
+
+    ! Loop through levels to compute fq and fn while updating the CFL number
     do k=1,nlev
 
-      ! calculate sedimentation for cloud water and ice
-      !================================================================================
-
-      ! update in-cloud cloud mixing ratio and number concentration
-      ! with microphysical tendencies to calculate sedimentation, assign to dummy vars
-      ! note: these are in-cloud values***, hence we divide by cloud fraction
-
-      qtemp(k) = q(i,k)/cloud_frac(i,k)
-      ntemp(k) = max(n(i,k)/cloud_frac(i,k),0._r8)
-
-      ! switch for specification of droplet and crystal number or ice cloud number
-      if ((mg_type == MG_LIQUID  .or. mg_type == MG_ICE) .and. ncons) then
-        ntemp(k) = nnst/rho(i,k)
-      end if
+      ! initialize derivative quantities to zero
+      qdfq = 0.d0
+      ndfn = 0.d0
 
       if(mg_type == MG_LIQUID) then
-        ! obtain new slope parameter to avoid possible singularity
-        ! NOTE: original variables were pgam(i,k), lamc(i,k)
-        call size_dist_param_liq(mg_liq_props, qtemp(k), ntemp(k), rho(i,k), &
-             pgam(k), lam(k))
-        ! calculate number and mass weighted fall velocity for droplets and cloud ice
-        !-------------------------------------------------------------------
         if (qtemp(k) .ge. qsmall) then
-          ! NOTE: original variable was vtrmc(i,k) = everything after g*rho
           fq(k) = g*rho(i,k)*an(i,k)*gamma(4._r8+bc+pgam(k))/ &
                (lam(k)**bc*gamma(pgam(k)+4._r8))
 
           fn(k) = g*rho(i,k)* &
                an(i,k)*gamma(1._r8+bc+pgam(k))/ &
                (lam(k)**bc*gamma(pgam(k)+1._r8))
-        else
-          fq(k) = 0._r8
-          fn(k)= 0._r8
         end if
 
       else if (mg_type == MG_ICE) then
-        ! obtain new slope parameter to avoid possible singularity
-        ! NOTE: original variables were ntemp(i,k),lami(i,k)
-        call size_dist_param_basic(mg_ice_props, qtemp(k), ntemp(k), lam(k))
-        ! calculate number and mass weighted fall velocity for cloud ice
         if (qtemp(k) .ge. qsmall) then
-          ! NOTE: original variable was vtrmi(i,k) = everything after g*rho
           fq(k) = g*rho(i,k)*min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bi), &
                 1.2_r8*rhof(i,k))
           fn(k) = g*rho(i,k)* &
                 min(an(i,k)*gamma_b_plus1/lam(k)**bi,1.2_r8*rhof(i,k))
-        else
-          fq(k) = 0._r8
-          fn(k)= 0._r8
         end if
 
       else if (mg_type == MG_RAIN) then
-        ! fallspeed for rain
-        ! NOTE: original variables were ntemp(i,k),lamr(i,k)
-        call size_dist_param_basic(mg_rain_props, qtemp(k), ntemp(k), lam(k))
         if (lam(k) .ge. qsmall) then
-           ! 'final' values of number and mass weighted mean fallspeed for rain (m/s)
-           ! NOTE: original variables were unr(i,k) and umr(i,k) = everything after g*rho
-           fq(k) = g*rho(i,k)* &
-              min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**br),9.1_r8*rhof(i,k))
-           fn(k) = g*rho(i,k)* &
-              min(an(i,k)*gamma_b_plus1/lam(k)**br,9.1_r8*rhof(i,k))
-        else
-           fq(k)=0._r8
-           fn(k)=0._r8
+          fq(k) = g*rho(i,k)* &
+            min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**br),9.1_r8*rhof(i,k))
+          fn(k) = g*rho(i,k)* &
+            min(an(i,k)*gamma_b_plus1/lam(k)**br,9.1_r8*rhof(i,k))
+          ! if fq wasn't capped, compute q*dfq/dq and q*dfq/dn
+          if (fq(k) < g*rho(i,k)*9.1_r8*rhof(i,k)) then
+            qdfq(:) = g*rho(i,k)* &
+              an(i,k)*(-br)*gamma_b_plus4/(6._r8*lam(k)**(br+1._r8))*qic_dlam(:,k)
+          end if
+          ! if fn wasn't capped, compute n*dfn/dq and n*dfn/dn
+          if (fn(k) < g*rho(i,k)*9.1_r8*rhof(i,k)) then
+            ndfn(:) = g*rho(i,k)* &
+              an(i,k)*(-br)*gamma_b_plus1/lam(k)**(br+1._r8)*nic_dlam(:,k)
+          end if
         end if
 
       else if (mg_type == MG_SNOW) then
-        ! fallspeed for snow
-        ! NOTE: original variables were ntemp(i,k),lams(i,k)
-        call size_dist_param_basic(mg_snow_props, qtemp(k), ntemp(k), lam(k))
         if (lam(k) .ge. qsmall) then
-           ! 'final' values of number and mass weighted mean fallspeed for snow (m/s)
-           ! NOTE: original variables were uns(i,k) and ums(i,k) = everything after g*rho
            fq(k) = g*rho(i,k)* &
               min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bs),1.2_r8*rhof(i,k))
            fn(k) = g*rho(i,k)* &
               min(an(i,k)*gamma_b_plus1/lam(k)**bs,1.2_r8*rhof(i,k))
-        else
-           fq(k)=0._r8
-           fn(k)=0._r8
         end if
       end if
 
+      ! original approach assumes Jacobian(F)(q,n,p) = [fq, 0; 0, fn], giving eigenvalues
+      ! of fq and fn for propagation speeds... however this is incorrect.
+      ! Noting that Jacobian(F)(q,n,p) = [fq + q*dfq/dq, q*dfq/dn; n*dfn/dq, fn + n*dfn/dn],
+      ! the eigenvalues are computed numerically.  The dependence of F explicitly
+      ! on p can be ignored.
+
+      ! obtain eigenvalues of F_q for propagation speeds
+      tr = fq(k) + qdfq(1) + fn(k) + ndfn(2)
+      det = (fq(k) + qdfq(1))*(fn(k) + ndfn(2)) - qdfq(2)*ndfn(1)
+      s1 = 0.5_r8*(tr + sqrt(tr*tr - 4._r8*det))
+      s2 = 0.5_r8*(tr - sqrt(tr*tr - 4._r8*det))
+
+      ! Update CFL number
+      cfl = max(cfl,s1*deltat/pdel(i,k),s2*deltat/pdel(i,k))
     end do
 
   end subroutine sed_CalcFallVelocity
@@ -151,16 +169,16 @@ contains
       dfluxp = (fq(k+1)*q(i,k+1)-fq(k)*q(i,k))/(0.5_r8*(pdel(i,k+1)+pdel(i,k)))
       dfluxm = (fq(k)*q(i,k)-fq(k-1)*q(i,k-1))/(0.5_r8*(pdel(i,k)+pdel(i,k-1)))
       if (abs(dfluxm) < abs(dfluxp)) then
-        fluxQ(k) = fq(k)*q(i,k) + 0.5_r8*pdel(i,k)*dfluxm
+        fluxQ(k) = fq(k)*q(i,k)! + 0.5_r8*pdel(i,k)*dfluxm
       else
-        fluxQ(k) = fq(k)*q(i,k) + 0.5_r8*pdel(i,k)*dfluxp
+        fluxQ(k) = fq(k)*q(i,k)! + 0.5_r8*pdel(i,k)*dfluxp
       end if
       dfluxp = (fn(k+1)*n(i,k+1)-fn(k)*n(i,k))/(0.5_r8*(pdel(i,k+1)+pdel(i,k)))
       dfluxm = (fn(k)*n(i,k)-fn(k-1)*n(i,k-1))/(0.5_r8*(pdel(i,k)+pdel(i,k-1)))
       if (abs(dfluxm) < abs(dfluxp)) then
-        fluxN(k) = fn(k)*n(i,k) + 0.5_r8*pdel(i,k)*dfluxm
+        fluxN(k) = fn(k)*n(i,k)! + 0.5_r8*pdel(i,k)*dfluxm
       else
-        fluxN(k) = fn(k)*n(i,k) + 0.5_r8*pdel(i,k)*dfluxp
+        fluxN(k) = fn(k)*n(i,k)! + 0.5_r8*pdel(i,k)*dfluxp
       end if
     end do
 

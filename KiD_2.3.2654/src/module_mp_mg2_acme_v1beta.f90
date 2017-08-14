@@ -2444,16 +2444,6 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      end do       !!! vertical loop
 
-     call sed_CalcFallVelocity(dumi,qitend,dumni,nitend,icldm,rho,nlev,i,&
-       MG_ICE,g,ain,rhof,fi,fni,&
-       ncons=nicons,nnst=ninst,&
-       gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
-
-     call sed_CalcFallVelocity(dums,qstend,dumns,nstend,precip_frac,rho,nlev,i,&
-       MG_SNOW,g,asn,rhof,fs,fns,&
-       gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
-
-
      where (dumc(i,:) .lt. qsmall) dumc(i,:) = 0._r8
      where (dumi(i,:) .lt. qsmall) dumi(i,:) = 0._r8
      where (dumr(i,:) .lt. qsmall) dumr(i,:) = 0._r8
@@ -2474,10 +2464,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      ! calculate number of split time steps to ensure courant stability criteria
      ! for sedimentation calculations
      !-------------------------------------------------------------------
-     nstep = 1 + int(max( &
-          maxval( fi/pdel(i,:)), &
-          maxval(fni/pdel(i,:))) &
-          * deltat)
+     call sed_CalcFallVelocity(dumi,qitend,dumni,nitend,icldm,rho,pdel,nlev,i,&
+       MG_ICE,deltat,g,ain,rhof,fi,fni,dum,&
+       ncons=nicons,nnst=ninst,&
+       gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
+     ! ensure CFL number is below 1
+     nstep = 1 + int(dum)
 
      write(fid_nstep,'(I12,4X,I12,4X)',advance="no") mphys_calls, nstep
      nsteps_qi = nstep
@@ -2500,13 +2492,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      time_sed = deltat
 
-     call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,nlev,i,&
-       MG_LIQUID,g,acn,rhof,fc,fnc,&
+     call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,pdel,nlev,i,&
+       MG_LIQUID,time_sed,g,acn,rhof,fc,fnc,dum,&
        ncons=nccons,nnst=ncnst)
-     nstep = 1 + int(max( &
-          maxval( fc/pdel(i,:)), &
-          maxval(fnc/pdel(i,:))) &
-          * time_sed)
+     ! ensure CFL number is below 1
+     nstep = 1 + int(dum)
 
      ! subcycle if necessary
      do while (nstep > 1)
@@ -2516,13 +2506,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
          qctend,nctend,prect,qcsedten,&
          cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
 
-       call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,nlev,i,&
-         MG_LIQUID,g,acn,rhof,fc,fnc,&
+       call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,pdel,nlev,i,&
+         MG_LIQUID,time_sed,g,acn,rhof,fc,fnc,dum,&
          ncons=nccons,nnst=ncnst)
-       nstep = 1 + int(max( &
-            maxval( fc/pdel(i,:)), &
-            maxval(fnc/pdel(i,:))) &
-            * time_sed)
+       nstep = 1 + int(dum)
      end do
      deltat_sed = time_sed/nstep
      call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat_sed,nlev,i,MG_LIQUID,g, &
@@ -2536,13 +2523,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      time_sed = deltat
 
-     call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,nlev,i,&
-       MG_RAIN,g,arn,rhof,fr,fnr,&
+     call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
+       MG_RAIN,time_sed,g,arn,rhof,fr,fnr,dum,&
        gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
-     nstep = 1 + int(max( &
-          maxval( fr/pdel(i,:)), &
-          maxval(fnr/pdel(i,:))) &
-          * time_sed)
+     ! ensure CFL number is below 1
+     nstep = 1 + int(dum)
 
      ! subcycle if necessary
      do while (nstep > 1)
@@ -2551,13 +2536,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
          qrtend,nrtend,prect,qrsedten)
 
-       call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,nlev,i,&
-         MG_RAIN,g,arn,rhof,fr,fnr,&
+       call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
+         MG_RAIN,time_sed,g,arn,rhof,fr,fnr,dum,&
          gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
-       nstep = 1 + int(max( &
-         maxval( fr/pdel(i,:)), &
-         maxval(fnr/pdel(i,:))) &
-         * time_sed)
+       nstep = 1 + int(dum)
      end do
      deltat_sed = time_sed/nstep
      call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
@@ -2571,10 +2553,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      ! calculate number of split time steps to ensure courant stability criteria
      ! for sedimentation calculations
      !-------------------------------------------------------------------
-     nstep = 1 + int(max( &
-          maxval( fs/pdel(i,:)), &
-          maxval(fns/pdel(i,:))) &
-          * deltat)
+     call sed_CalcFallVelocity(dums,qstend,dumns,nstend,precip_frac,rho,pdel,nlev,i,&
+       MG_SNOW,deltat,g,asn,rhof,fs,fns,dum,&
+       gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
+     ! ensure CFL number is below 1
+     nstep = 1 + int(dum)
 
      write(fid_nstep,'(I12,4X)') nstep
      nsteps_qs = nstep
