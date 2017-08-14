@@ -94,7 +94,7 @@ frzdep_loc = np.empty((mgncol, frzdep.shape[1]), order='F')
 
 final_time = 1800
 
-timesteps = np.array([60, 120])
+timesteps = np.array([1, 15])
 loc_arrays = {
     'T': t_loc,
     'Q': q_loc,
@@ -120,7 +120,7 @@ rain_auto_coarse = np.zeros((final_time // timesteps[1], lev))
 rain_accr_fine = np.zeros((final_time // timesteps[0], lev))
 rain_accr_coarse = np.zeros((final_time // timesteps[1], lev))
 
-max_ind = 1532
+max_ind = 1519
 
 for it in range(timesteps.size):
     print("Starting timestep=", timesteps[it])
