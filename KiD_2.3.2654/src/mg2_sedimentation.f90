@@ -4,10 +4,11 @@ module Sedimentation
   private
   save
   public :: sed_CalcFallVelocity, sed_AdvanceOneStep
-  integer, parameter, public :: MG_LIQUID = 1
-  integer, parameter, public :: MG_ICE = 2
-  integer, parameter, public :: MG_RAIN = 3
-  integer, parameter, public :: MG_SNOW = 4
+  integer, parameter, public  :: MG_LIQUID = 1
+  integer, parameter, public  :: MG_ICE = 2
+  integer, parameter, public  :: MG_RAIN = 3
+  integer, parameter, public  :: MG_SNOW = 4
+  real(r8), parameter, public :: CFL = 0.99_r8
 
 contains
 

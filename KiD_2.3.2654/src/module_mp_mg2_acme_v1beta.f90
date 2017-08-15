@@ -464,7 +464,8 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        MG_LIQUID, &
        MG_ICE, &
        MG_RAIN,&
-       MG_SNOW
+       MG_SNOW, &
+       CFL
 
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
@@ -2461,115 +2462,104 @@ subroutine micro_mg2_acme_v1beta_tend ( &
              position="append", action="write")
      end if
 
-     ! calculate number of split time steps to ensure courant stability criteria
-     ! for sedimentation calculations
-     !-------------------------------------------------------------------
-     call sed_CalcFallVelocity(dumi,qitend,dumni,nitend,icldm,rho,pdel,nlev,i,&
-       MG_ICE,deltat,g,ain,rhof,fi,fni,dum,&
-       ncons=nicons,nnst=ninst,&
-       gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
-     ! ensure CFL number is below 1
-     nstep = 1 + int(dum)
-
-     write(fid_nstep,'(I12,4X,I12,4X)',advance="no") mphys_calls, nstep
-     nsteps_qi = nstep
-
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
-     do n = 1,nstep
+     if (do_cldice) then
+       deltat_sed = deltat
+       time_sed = deltat
+     else
+       time_sed = 0._r8
+     end if
+     nstep = 0
 
-        if (do_cldice) then
-          call sed_AdvanceOneStep(dumi,fi,dumni,fni,pdel,deltat,deltat/nstep,nlev,i,MG_ICE,g, &
-            qitend,nitend,preci,qisedten,&
-            cloud_frac=icldm,qvlat=qvlat,tlat=tlat,xxl=xxls,preci=preci,qsevap=qisevap)
-        end if
-
+     ! subcycle
+     do while (time_sed > qsmall)
+       ! obtain fall speeds
+       call sed_CalcFallVelocity(dumi,qitend,dumni,nitend,icldm,rho,pdel,nlev,i,&
+         MG_ICE,deltat,g,ain,rhof,fi,fni,dum,&
+         ncons=nicons,nnst=ninst,&
+         gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
+       ! update deltat_sed for target CFL number
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       ! advance cloud ice sedimentation
+       time_sed = time_sed - deltat_sed
+       nstep = nstep+1
+       call sed_AdvanceOneStep(dumi,fi,dumni,fni,pdel,deltat,deltat_sed,nlev,i,MG_ICE,g, &
+         qitend,nitend,preci,qisedten,&
+         cloud_frac=icldm,qvlat=qvlat,tlat=tlat,xxl=xxls,preci=preci,qsevap=qisevap)
      end do
 
+     write(fid_nstep,'(I12,4X,I12,4X)',advance="no") mphys_calls, nstep
+
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
-     ! calculate fall velocity from current dummy values
-
+     deltat_sed = deltat
      time_sed = deltat
+     nstep = 0
 
-     call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,pdel,nlev,i,&
-       MG_LIQUID,time_sed,g,acn,rhof,fc,fnc,dum,&
-       ncons=nccons,nnst=ncnst)
-     ! ensure CFL number is below 1
-     nstep = 1 + int(dum)
-
-     ! subcycle if necessary
-     do while (nstep > 1)
-       deltat_sed = time_sed/nstep
-       time_sed = time_sed - deltat_sed
-       call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat_sed,nlev,i,MG_LIQUID,g, &
-         qctend,nctend,prect,qcsedten,&
-         cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
-
+     ! subcycle
+     do while (time_sed > qsmall)
+       ! obtain fall speeds
        call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,pdel,nlev,i,&
          MG_LIQUID,time_sed,g,acn,rhof,fc,fnc,dum,&
          ncons=nccons,nnst=ncnst)
-       nstep = 1 + int(dum)
+       ! update deltat_sed for target CFL number
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       ! advance cloud liquid sedimentation
+       time_sed = time_sed - deltat_sed
+       nstep = nstep + 1
+       call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat_sed,nlev,i,MG_LIQUID,g, &
+         qctend,nctend,prect,qcsedten,&
+         cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
      end do
-     deltat_sed = time_sed/nstep
-     call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat_sed,nlev,i,MG_LIQUID,g, &
-       qctend,nctend,prect,qcsedten,&
-       cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
 
-     !write(fid_nstep,'(I12,4X)',advance="no") nsteps_qc
+     write(fid_nstep,'(I12,4X)',advance="no") nstep
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
-
+     deltat_sed = deltat
      time_sed = deltat
+     nstep = 0
 
-     call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
-       MG_RAIN,time_sed,g,arn,rhof,fr,fnr,dum,&
-       gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
-     ! ensure CFL number is below 1
-     nstep = 1 + int(dum)
-
-     ! subcycle if necessary
-     do while (nstep > 1)
-       deltat_sed = time_sed/nstep
+     ! subcycle
+     do while (time_sed > qsmall)
+       ! obtain fall speeds
+       call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
+         MG_RAIN,deltat_sed,g,arn,rhof,fr,fnr,dum,&
+         gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
+       ! update deltat_sed for target CFL number
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       ! advance rain sedimentation
        time_sed = time_sed - deltat_sed
+       nstep = nstep + 1
        call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
          qrtend,nrtend,prect,qrsedten)
-
-       call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
-         MG_RAIN,time_sed,g,arn,rhof,fr,fnr,dum,&
-         gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
-       nstep = 1 + int(dum)
      end do
-     deltat_sed = time_sed/nstep
-     call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
-      qrtend,nrtend,prect,qrsedten)
 
-
-     !write(fid_nstep,'(I12,4X)',advance="no") nsteps_qr
-
-
-
-     ! calculate number of split time steps to ensure courant stability criteria
-     ! for sedimentation calculations
-     !-------------------------------------------------------------------
-     call sed_CalcFallVelocity(dums,qstend,dumns,nstend,precip_frac,rho,pdel,nlev,i,&
-       MG_SNOW,deltat,g,asn,rhof,fs,fns,dum,&
-       gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
-     ! ensure CFL number is below 1
-     nstep = 1 + int(dum)
-
-     write(fid_nstep,'(I12,4X)') nstep
-     nsteps_qs = nstep
+     write(fid_nstep,'(I12,4X)',advance="no") nstep
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
-     do n = 1,nstep
+     deltat_sed = deltat
+     time_sed = deltat
+     nstep = 0
 
-       call sed_AdvanceOneStep(dums,fs,dumns,fns,pdel,deltat,deltat/nstep,nlev,i,MG_SNOW,g, &
-        qstend,nstend,prect,qssedten,preci=preci)
-
+     ! subcycle
+     do while (time_sed > qsmall)
+       ! obtain fall speeds
+       call sed_CalcFallVelocity(dums,qstend,dumns,nstend,precip_frac,rho,pdel,nlev,i,&
+         MG_SNOW,deltat,g,asn,rhof,fs,fns,dum,&
+         gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
+       ! update deltat_sed for target CFL number
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       ! advance snow sedimentation
+       time_sed = time_sed - deltat_sed
+       nstep = nstep + 1
+       call sed_AdvanceOneStep(dums,fs,dumns,fns,pdel,deltat,deltat_sed,nlev,i,MG_SNOW,g, &
+         qstend,nstend,prect,qssedten,preci=preci)
      end do
+
+     write(fid_nstep,'(I12,4X)') nstep
 
      ! close sedimentation step file
      close(fid_nstep)

@@ -155,5 +155,13 @@ for k,qname in enumerate(quantityDict.keys()):
   axarray[1,1].set_title(qname + ' Error (Linf, All Time)')
   axarray[1,1].legend()
   f.savefig(quantityDict[qname].name + '_convergence.png')
+  tmp = np.concatenate(([dtlist],l2ErrorFinalTime),axis=0)
+  np.savetxt(quantityDict[qname].name + '_l2ErrorFinalTime.txt', tmp.T)
+  tmp = np.concatenate(([dtlist],l2ErrorAllTime),axis=0)
+  np.savetxt(quantityDict[qname].name + '_l2ErrorAllTime.txt', tmp.T)
+  tmp = np.concatenate(([dtlist],lIErrorFinalTime),axis=0)
+  np.savetxt(quantityDict[qname].name + '_lIErrorFinalTime.txt', tmp.T)
+  tmp = np.concatenate(([dtlist],lIErrorAllTime),axis=0)
+  np.savetxt(quantityDict[qname].name + '_lIErrorAllTime.txt', tmp.T)
 
 pyplot.show()
