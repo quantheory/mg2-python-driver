@@ -437,6 +437,15 @@ subroutine micro_mg_tend ( &
        evaporate_sublimate_precip, &
        bergeron_process_snow
 
+  use micro_mg_utils, only: &
+       sed_CalcFallVelocity, &
+       sed_AdvanceOneStep, &
+       MG_LIQUID, &
+       MG_ICE, &
+       MG_RAIN,&
+       MG_SNOW, &
+       CFL
+
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
 
@@ -815,6 +824,8 @@ subroutine micro_mg_tend ( &
   ! "n" is used for other looping (currently just sedimentation)
   integer i, k, n
 
+  ! sedimentation substep loop variables
+  real(r8) :: deltat_sed, time_sed
   ! number of sub-steps for loops over "n" (for sedimentation)
   integer nstep
 
@@ -2159,7 +2170,7 @@ subroutine micro_mg_tend ( &
         dumnc(i,k) = max((nc(i,k)+nctend(i,k)*deltat),0._r8)
         dumi(i,k) = (qi(i,k)+qitend(i,k)*deltat)
         dumni(i,k) = max((ni(i,k)+nitend(i,k)*deltat),0._r8)
-        dumr(i,k) = (qr(i,k)+qrtend(i,k)*deltat)
+        dumr(i,k) = max(qr(i,k)+qrtend(i,k)*deltat, 0._r8)
         dumnr(i,k) = max((nr(i,k)+nrtend(i,k)*deltat),0._r8)
         dums(i,k) = (qs(i,k)+qstend(i,k)*deltat)
         dumns(i,k) = max((ns(i,k)+nstend(i,k)*deltat),0._r8)
@@ -2316,55 +2327,25 @@ subroutine micro_mg_tend ( &
 
      end do
 
-     ! calculate number of split time steps to ensure courant stability criteria
-     ! for sedimentation calculations
-     !-------------------------------------------------------------------
-     nstep = 1 + int(max( &
-          maxval( fr/pdel(i,:)), &
-          maxval(fnr/pdel(i,:))) &
-          * deltat)
-
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
-     do n = 1,nstep
+     deltat_sed = deltat
+     time_sed = deltat
+     nstep = 0
 
-        faloutr  = fr  * dumr(i,:)
-        faloutnr = fnr * dumnr(i,:)
-
-        ! top of model
-        k = 1
-
-        ! add fallout terms to microphysical tendencies
-        faltndr = faloutr(k)/pdel(i,k)
-        faltndnr = faloutnr(k)/pdel(i,k)
-        qrtend(i,k) = qrtend(i,k)-faltndr/nstep
-        nrtend(i,k) = nrtend(i,k)-faltndnr/nstep
-
-        ! sedimentation tendency for output
-        qrsedten(i,k)=qrsedten(i,k)-faltndr/nstep
-
-        dumr(i,k) = dumr(i,k)-faltndr*deltat/real(nstep)
-        dumnr(i,k) = dumnr(i,k)-faltndnr*deltat/real(nstep)
-
-        do k = 2,nlev
-
-           faltndr=(faloutr(k)-faloutr(k-1))/pdel(i,k)
-           faltndnr=(faloutnr(k)-faloutnr(k-1))/pdel(i,k)
-
-           ! add fallout terms to eulerian tendencies
-           qrtend(i,k) = qrtend(i,k)-faltndr/nstep
-           nrtend(i,k) = nrtend(i,k)-faltndnr/nstep
-
-           ! sedimentation tendency for output
-           qrsedten(i,k)=qrsedten(i,k)-faltndr/nstep
-
-           dumr(i,k) = dumr(i,k)-faltndr*deltat/real(nstep)
-           dumnr(i,k) = dumnr(i,k)-faltndnr*deltat/real(nstep)
-
-        end do
-
-        prect(i) = prect(i)+faloutr(nlev)/g/real(nstep)/1000._r8
-
+     ! subcycle
+     do while (time_sed > qsmall)
+       ! obtain fall speeds
+       call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
+         MG_RAIN,deltat_sed,g,arn,rhof,fr,fnr,dum,&
+         gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
+       ! update deltat_sed for target CFL number
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       ! advance rain sedimentation
+       time_sed = time_sed - deltat_sed
+       nstep = nstep + 1
+       call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
+         qrtend,nrtend,prect,qrsedten)
      end do
 
      nstep_rain(i) = nstep
