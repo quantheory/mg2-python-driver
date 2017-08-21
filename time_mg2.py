@@ -197,8 +197,9 @@ for offset in range(total_columns // mgncol):
 end_time = time.perf_counter()
 
 print("Time elapsed was {} seconds.".format(end_time - start_time))
+print("Mean number of steps was {}.".format(rain_steps.mean()))
 
 plt.hist(rain_steps, bins=20, normed=True)
 plt.xlabel("Number of steps")
 plt.ylabel("Probability density over columns")
-plt.savefig('./rain_sedimentation_steps_nonadaptive.eps')
+plt.savefig('./rain_sedimentation_steps_adaptive.eps')

@@ -466,11 +466,11 @@ elemental subroutine size_dist_param_basic(props, qic, nic, lam, n0, &
        ! qic_dlambda_dqic = -lambda/d
        ! nic_dlambda_dqic = -lambda^(1+d)/c/d
        qic_dlam_dqic = -lam/props%eff_dim
-       nic_dlam_dqic = -lam**(1._r8+props%eff_dim)/props%shape_coef/props%eff_dim
+       nic_dlam_dqic = -lam * nic/qic/props%eff_dim
        ! dlambda_dnic = (1/d)(c nic/qic)^(1/d)*(1/nic) = lambda/d/nic
        ! qic_dlambda_dnic = lambda^(1-d)*c/d
        ! nic_dlambda_dnic = lambda/d
-       qic_dlam_dnic = lam**(1._r8-props%eff_dim)*props%shape_coef/props%eff_dim
+       qic_dlam_dnic = lam * qic/nic/props%eff_dim
        nic_dlam_dnic = lam/props%eff_dim
      end if
 
