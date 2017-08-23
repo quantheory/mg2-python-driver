@@ -2454,11 +2454,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      do while (time_sed > qsmall)
        ! obtain fall speeds
        call sed_CalcFluxAndCFL(dumi,qitend,dumni,nitend,icldm,rho,pdel,nlev,i,&
-         MG_ICE,deltat,g,ain,rhof,fi,fni,dum,&
+         MG_ICE,time_sed,g,ain,rhof,fi,fni,dum,&
          ncons=nicons,nnst=ninst,&
          gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
        ! update deltat_sed for target CFL number
-       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       deltat_sed = min(time_sed*CFL/dum,time_sed)
        ! advance cloud ice sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep+1
@@ -2482,7 +2482,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
          MG_LIQUID,time_sed,g,acn,rhof,fc,fnc,dum,&
          ncons=nccons,nnst=ncnst)
        ! update deltat_sed for target CFL number
-       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       deltat_sed = min(time_sed*CFL/dum,time_sed)
        ! advance cloud liquid sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1
@@ -2503,10 +2503,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      do while (time_sed > qsmall)
        ! obtain fall speeds
        call sed_CalcFluxAndCFL(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
-         MG_RAIN,deltat_sed,g,arn,rhof,fr,fnr,dum,&
+         MG_RAIN,time_sed,g,arn,rhof,fr,fnr,dum,&
          gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
        ! update deltat_sed for target CFL number
-       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       deltat_sed = min(time_sed*CFL/dum,time_sed)
        ! advance rain sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1
@@ -2526,10 +2526,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      do while (time_sed > qsmall)
        ! obtain fall speeds
        call sed_CalcFluxAndCFL(dums,qstend,dumns,nstend,precip_frac,rho,pdel,nlev,i,&
-         MG_SNOW,deltat,g,asn,rhof,fs,fns,dum,&
+         MG_SNOW,time_sed,g,asn,rhof,fs,fns,dum,&
          gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
        ! update deltat_sed for target CFL number
-       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
+       deltat_sed = min(time_sed*CFL/dum,time_sed)
        ! advance snow sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1

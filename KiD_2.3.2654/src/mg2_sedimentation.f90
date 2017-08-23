@@ -8,7 +8,7 @@ module Sedimentation
   integer, parameter, public  :: MG_ICE = 2
   integer, parameter, public  :: MG_RAIN = 3
   integer, parameter, public  :: MG_SNOW = 4
-  real(r8), parameter, public :: CFL = 0.9_r8
+  real(r8), parameter, public :: CFL = 0.99_r8
 
 contains
 
@@ -134,7 +134,6 @@ contains
                cn*(1._r8 + br/mg_rain_props%eff_dim)
           sqrtdisc = sqrt( (1._r8 + br/mg_rain_props%eff_dim)**2 - &
                            4._r8*br/mg_rain_props%eff_dim * cq/(cq-cn) )
-
           s1(k) = 0.5_r8/lambr * (tr - (cq-cn)*sqrtdisc)
           s2(k) = 0.5_r8/lambr * (tr + (cq-cn)*sqrtdisc)
         end if
@@ -200,15 +199,15 @@ contains
       ratio(k)=min(ratio(k),1._r8)
       deltafluxQ = (fq(k)-ratio(k)*fq(k-1))/pdel(i,k)
       deltafluxN = (fn(k)-ratio(k)*fn(k-1))/pdel(i,k)
-      ! adjust fluxes if needed to maintain positivity
-      if (q(i,k) - deltat_sed*deltafluxQ < 0._r8) then
-        fq(k) = ratio(k)*fq(k-1) + pdel(i,k)/deltat_sed*q(i,k)
-        deltafluxQ = (fq(k)-ratio(k)*fq(k-1))/pdel(i,k)
-      end if
-      if (n(i,k) - deltat_sed*deltafluxN < 0._r8) then
-        fn(k) = ratio(k)*fn(k-1) + pdel(i,k)/deltat_sed*n(i,k)
-        deltafluxN = (fn(k)-ratio(k)*fn(k-1))/pdel(i,k)
-      end if
+      ! ! adjust fluxes if needed to maintain positivity
+      ! if (q(i,k) - deltat_sed*deltafluxQ < 0._r8) then
+      !   fq(k) = ratio(k)*fq(k-1) + pdel(i,k)/deltat_sed*q(i,k)
+      !   deltafluxQ = (fq(k)-ratio(k)*fq(k-1))/pdel(i,k)
+      ! end if
+      ! if (n(i,k) - deltat_sed*deltafluxN < 0._r8) then
+      !   fn(k) = ratio(k)*fn(k-1) + pdel(i,k)/deltat_sed*n(i,k)
+      !   deltafluxN = (fn(k)-ratio(k)*fn(k-1))/pdel(i,k)
+      ! end if
       ! add fallout terms to eulerian tendencies
       qtend(i,k) = qtend(i,k) - deltafluxQ*deltat_sed/deltat
       ntend(i,k) = ntend(i,k) - deltafluxN*deltat_sed/deltat
