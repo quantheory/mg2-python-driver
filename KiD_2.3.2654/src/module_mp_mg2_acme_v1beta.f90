@@ -459,7 +459,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        bergeron_process_snow
 
   use Sedimentation, only: &
-       sed_CalcFallVelocity, &
+       sed_CalcFluxAndCFL, &
        sed_AdvanceOneStep, &
        MG_LIQUID, &
        MG_ICE, &
@@ -904,37 +904,15 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 !!== KZ_DCS
 
   ! parameters for cloud water and cloud ice sedimentation calculations
-  real(r8) :: fc(nlev)
-  real(r8) :: fnc(nlev)
-  real(r8) :: fi(nlev)
-  real(r8) :: fni(nlev)
+  real(r8) :: fc(0:nlev)
+  real(r8) :: fnc(0:nlev)
+  real(r8) :: fi(0:nlev)
+  real(r8) :: fni(0:nlev)
 
-  real(r8) :: fr(nlev)
-  real(r8) :: fnr(nlev)
-  real(r8) :: fs(nlev)
-  real(r8) :: fns(nlev)
-
-  real(r8) :: faloutc(nlev)
-  real(r8) :: faloutnc(nlev)
-  real(r8) :: falouti(nlev)
-  real(r8) :: faloutni(nlev)
-
-  real(r8) :: faloutr(nlev)
-  real(r8) :: faloutnr(nlev)
-  real(r8) :: falouts(nlev)
-  real(r8) :: faloutns(nlev)
-
-  real(r8) :: faltndc
-  real(r8) :: faltndnc
-  real(r8) :: faltndi
-  real(r8) :: faltndni
-  real(r8) :: faltndqie
-  real(r8) :: faltndqce
-
-  real(r8) :: faltndr
-  real(r8) :: faltndnr
-  real(r8) :: faltnds
-  real(r8) :: faltndns
+  real(r8) :: fr(0:nlev)
+  real(r8) :: fnr(0:nlev)
+  real(r8) :: fs(0:nlev)
+  real(r8) :: fns(0:nlev)
 
   ! sum of source/sink terms for diagnostic precip
   real(r8) :: qstend(mgncol,nlev)     ! snow mixing ratio
@@ -2475,7 +2453,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      ! subcycle
      do while (time_sed > qsmall)
        ! obtain fall speeds
-       call sed_CalcFallVelocity(dumi,qitend,dumni,nitend,icldm,rho,pdel,nlev,i,&
+       call sed_CalcFluxAndCFL(dumi,qitend,dumni,nitend,icldm,rho,pdel,nlev,i,&
          MG_ICE,deltat,g,ain,rhof,fi,fni,dum,&
          ncons=nicons,nnst=ninst,&
          gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
@@ -2500,7 +2478,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      ! subcycle
      do while (time_sed > qsmall)
        ! obtain fall speeds
-       call sed_CalcFallVelocity(dumc,qctend,dumnc,nctend,lcldm,rho,pdel,nlev,i,&
+       call sed_CalcFluxAndCFL(dumc,qctend,dumnc,nctend,lcldm,rho,pdel,nlev,i,&
          MG_LIQUID,time_sed,g,acn,rhof,fc,fnc,dum,&
          ncons=nccons,nnst=ncnst)
        ! update deltat_sed for target CFL number
@@ -2524,7 +2502,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      ! subcycle
      do while (time_sed > qsmall)
        ! obtain fall speeds
-       call sed_CalcFallVelocity(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
+       call sed_CalcFluxAndCFL(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
          MG_RAIN,deltat_sed,g,arn,rhof,fr,fnr,dum,&
          gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
        ! update deltat_sed for target CFL number
@@ -2547,7 +2525,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      ! subcycle
      do while (time_sed > qsmall)
        ! obtain fall speeds
-       call sed_CalcFallVelocity(dums,qstend,dumns,nstend,precip_frac,rho,pdel,nlev,i,&
+       call sed_CalcFluxAndCFL(dums,qstend,dumns,nstend,precip_frac,rho,pdel,nlev,i,&
          MG_SNOW,deltat,g,asn,rhof,fs,fns,dum,&
          gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
        ! update deltat_sed for target CFL number

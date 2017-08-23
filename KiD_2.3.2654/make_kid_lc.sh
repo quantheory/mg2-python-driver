@@ -22,7 +22,7 @@ elif [[ $HOSTNAME == "tux"* ]]; then
   source /usr/apps/intel/15.5.223/composer_xe_2015.5.223/bin/iccvars.sh intel64
   source /usr/apps/intel/15.5.223/composer_xe_2015.5.223/bin/ifortvars.sh intel64
   COMPILER=ifort
-  NCPATH=$HOME/local/netcdf-intel-4.1.3
+  NCPATH=$HOME/local/netcdf-4.1.3_tux_intel_opt
 elif [[ $HOSTNAME == "MOODYBLUES" ]]; then
   SYSTEM=moodyblues
   COMPILER=gfortran
