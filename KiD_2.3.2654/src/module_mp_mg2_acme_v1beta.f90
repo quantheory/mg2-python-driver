@@ -904,15 +904,15 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 !!== KZ_DCS
 
   ! parameters for cloud water and cloud ice sedimentation calculations
-  real(r8) :: fc(0:nlev)
-  real(r8) :: fnc(0:nlev)
-  real(r8) :: fi(0:nlev)
-  real(r8) :: fni(0:nlev)
+  real(r8) :: fc(0:nlev,2)
+  real(r8) :: fnc(0:nlev,2)
+  real(r8) :: fi(0:nlev,2)
+  real(r8) :: fni(0:nlev,2)
 
-  real(r8) :: fr(0:nlev)
-  real(r8) :: fnr(0:nlev)
-  real(r8) :: fs(0:nlev)
-  real(r8) :: fns(0:nlev)
+  real(r8) :: fr(0:nlev,2)
+  real(r8) :: fnr(0:nlev,2)
+  real(r8) :: fs(0:nlev,2)
+  real(r8) :: fns(0:nlev,2)
 
   ! sum of source/sink terms for diagnostic precip
   real(r8) :: qstend(mgncol,nlev)     ! snow mixing ratio

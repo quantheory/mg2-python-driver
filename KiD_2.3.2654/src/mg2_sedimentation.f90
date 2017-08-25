@@ -8,7 +8,7 @@ module Sedimentation
   integer, parameter, public  :: MG_ICE = 2
   integer, parameter, public  :: MG_RAIN = 3
   integer, parameter, public  :: MG_SNOW = 4
-  real(r8), parameter, public :: CFL = 0.99_r8
+  real(r8), parameter, public :: CFL = 0.9_r8
 
 contains
 
@@ -27,19 +27,19 @@ contains
     integer,  intent(in)            :: nlev, i, mg_type
     real(r8), intent(in), optional  :: nnst, gamma_b_plus1, gamma_b_plus4
     logical, intent(in), optional   :: ncons
-    real(r8), intent(out)           :: cfl, fq(:), fn(:)
+    real(r8), intent(out)           :: cfl, fq(:,:), fn(:,:)
 
     real(r8) :: qic(nlev), nic(nlev)
-    real(r8) :: qicedge(nlev), nicedge(nlev), qedge(nlev), nedge(nlev)
     real(r8) :: alphaq(nlev), alphan(nlev), lambda_bounds(2)
-    real(r8) :: lam(nlev), pgam(nlev), cq, cn, clam, tr, sqrtdisc, lambr
-    real(r8) :: s1(nlev), s2(nlev)
+    real(r8) :: lam(nlev), pgam(nlev), cq, cn, clam, tr, sqrtdisc, lambr(nlev)
+    real(r8) :: s1(nlev), s2(nlev), a, b, c, d, dq, dn, coeff(2)
     integer :: k, nstep
+    logical :: limited(nlev)
 
     ! initialize values to zero
-    alphaq = 0._r8
-    alphan = 0._r8
     cfl = 0._r8
+    fq = 0._r8
+    fn = 0._r8
 
     ! use quantity in cloud
     qic = q(i,:)/cloud_frac(i,:)
@@ -50,26 +50,43 @@ contains
       nic = nnst/rho(i,:)
     end if
 
-    ! compute edge values qedge(j) := q(p_{j+1/2}) from cell values q(i,j) := q(p_j)
-    ! first order approximation
-    qedge = q(i,:)
-    nedge = n(i,:)
-    qicedge = qic
-    nicedge = nic
-
     ! compute lam and pgam using elemental function call
     if (mg_type == MG_LIQUID) then
-      call size_dist_param_liq(mg_liq_props, qicedge(:), nicedge(:), rho(i,:), &
-                               pgam(:), lam(:))
+      call size_dist_param_liq(mg_liq_props, qic, nic, rho(i,:), &
+                               pgam, lam)
 
     else if (mg_type == MG_ICE) then
-      call size_dist_param_basic(mg_ice_props, qicedge(:), nicedge(:), lam(:))
+      call size_dist_param_basic(mg_ice_props, qic, nic, lam)
 
     else if (mg_type == MG_RAIN) then
       lambda_bounds(1) = mg_rain_props%lambda_bounds(1)**br
       lambda_bounds(2) = mg_rain_props%lambda_bounds(2)**br
+      do k=1,nlev
+        if (qic(k) > qsmall) then
+          ! add upper limit to in-cloud number concentration to prevent
+          ! numerical error
+          if (limiter_is_on(mg_rain_props%min_mean_mass)) then
+            nic(k) = min(nic(k), qic(k) / mg_rain_props%min_mean_mass)
+          end if
+          ! lambda^b = (c nic/qic)^(b/d)
+          lambr(k) = (mg_rain_props%shape_coef * nic(k)/qic(k))**(br/mg_rain_props%eff_dim)
+          ! check for slope
+          ! adjust vars
+          limited(k) = .false.
+          if (lambr(k) < lambda_bounds(1)) then
+            lambr(k) = lambda_bounds(1)
+            nic(k) = lambr(k)**(mg_rain_props%eff_dim/br) * qic(k)/mg_rain_props%shape_coef
+            limited(k) = .true.
+          else if (lambr(k) > lambda_bounds(2)) then
+            lambr(k) = lambda_bounds(2)
+            nic(k) = lambr(k)**(mg_rain_props%eff_dim/br) * qic(k)/mg_rain_props%shape_coef
+            limited(k) = .true.
+          end if
+        end if
+      end do
+
     else if (mg_type == MG_SNOW) then
-       call size_dist_param_basic(mg_snow_props, qicedge(:), nicedge(:), lam(:))
+       call size_dist_param_basic(mg_snow_props, qic, nic, lam)
     else
        print *, "Invalid mg_type to mg2_sedimentation"
        stop
@@ -83,7 +100,7 @@ contains
       s2 = 0._r8
 
       if(mg_type == MG_LIQUID) then
-        if (qicedge(k) .ge. qsmall) then
+        if (qic(k) .ge. qsmall) then
           alphaq(k) = g*rho(i,k)*an(i,k)*gamma(4._r8+bc+pgam(k))/ &
                (lam(k)**bc*gamma(pgam(k)+4._r8))
 
@@ -92,50 +109,123 @@ contains
                (lam(k)**bc*gamma(pgam(k)+1._r8))
           s1(k) = alphaq(k)
           s2(k) = alphan(k)
+          ! update fluxes
+          fq(k,:) = s1(k)*q(i,k)
+          fn(k,:) = s2(k)*n(i,k)
         end if
 
       else if (mg_type == MG_ICE) then
-        if (qicedge(k) .ge. qsmall) then
+        if (qic(k) .ge. qsmall) then
           alphaq(k) = g*rho(i,k)*min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bi), &
                 1.2_r8*rhof(i,k))
           alphan(k) = g*rho(i,k)* &
                 min(an(i,k)*gamma_b_plus1/lam(k)**bi,1.2_r8*rhof(i,k))
           s1(k) = alphaq(k)
           s2(k) = alphan(k)
+          ! update fluxes
+          fq(k,:) = s1(k)*q(i,k)
+          fn(k,:) = s2(k)*n(i,k)
         end if
 
       else if (mg_type == MG_RAIN) then
 
         if (qic(k) > qsmall) then
-          ! add upper limit to in-cloud number concentration to prevent
-          ! numerical error
-          if (limiter_is_on(mg_rain_props%min_mean_mass)) then
-            nic(k) = min(nic(k), qic(k) / mg_rain_props%min_mean_mass)
-          end if
-
-          ! lambda^b = (c nic/qic)^(b/d)
-          lambr = (mg_rain_props%shape_coef * nic(k)/qic(k))**(br/mg_rain_props%eff_dim)
-          ! check for slope
-          ! adjust vars
-          if (lambr < lambda_bounds(1)) then
-            lambr = lambda_bounds(1)
-            nic(k) = lambr**(mg_rain_props%eff_dim/br) * qic(k)/mg_rain_props%shape_coef
-          else if (lambr > lambda_bounds(2)) then
-            lambr = lambda_bounds(2)
-            nic(k) = lambr**(mg_rain_props%eff_dim/br) * qic(k)/mg_rain_props%shape_coef
-          end if
-
-          ! new defs
+          ! define flux coefficients
           cq = g*rho(i,k)*an(i,k)*gamma_b_plus4/6._r8
           cn = g*rho(i,k)*an(i,k)*gamma_b_plus1
-          alphaq(k) = min(cq/lambr, 9.1_r8*g*rho(i,k)*rhof(i,k))
-          alphan(k) = min(cn/lambr, 9.1_r8*g*rho(i,k)*rhof(i,k))
-          tr = cq*(1._r8 - br/mg_rain_props%eff_dim) + &
-               cn*(1._r8 + br/mg_rain_props%eff_dim)
-          sqrtdisc = sqrt( (1._r8 + br/mg_rain_props%eff_dim)**2 - &
-                           4._r8*br/mg_rain_props%eff_dim * cq/(cq-cn) )
-          s1(k) = 0.5_r8/lambr * (tr - (cq-cn)*sqrtdisc)
-          s2(k) = 0.5_r8/lambr * (tr + (cq-cn)*sqrtdisc)
+          alphaq(k) = min(cq/lambr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
+          alphan(k) = min(cn/lambr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
+          ! use wave propagation algorithm to determine flux modifiers
+          ! if (.not.limited(k)) then
+          !   ! waves come from eigenvectors and eigenvalues of
+          !   ! Jacobian([alphaq(q,n)*q, alphan(q,n)*n]^T) =
+          !   ! [alphaq + q*dalphaq/dq,          q*dalphaq/dn
+          !   !           n*dalphan/dq, alphan + n*dalphan/dn]
+          !   tr = cq*(1._r8 - br/mg_rain_props%eff_dim) + &
+          !        cn*(1._r8 + br/mg_rain_props%eff_dim)
+          !   sqrtdisc = sqrt( (1._r8 + br/mg_rain_props%eff_dim)**2 - &
+          !                    4._r8*br/mg_rain_props%eff_dim * cq/(cq-cn) )
+          !   s1(k) = 0.5_r8/lambr(k) * (tr - (cq-cn)*sqrtdisc)
+          !   s2(k) = 0.5_r8/lambr(k) * (tr + (cq-cn)*sqrtdisc)
+          !   ! update fluxes: f(k) is flux at x_{k+1/2} edge, so finite volume
+          !   ! values at x_k and x_{k-1} are used to update f(k-1) flux
+          !   if (k > 1) then
+          !     dq = q(i,k-1) - q(i,k)
+          !     dn = n(i,k-1) - n(i,k)
+          !     ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
+          !     ! where
+          !     ! w1 = [q/n, -0.5*d/b/cq*( cq*(1-b/d) - cn(1+b/d) + (cq-cn)*sqrtdisc )]^T
+          !     ! w2 = [q/n, -0.5*d/b/cq*( cq*(1-b/d) - cn(1+b/d) - (cq-cn)*sqrtdisc )]^T
+          !     a = qic(k)/nic(k)
+          !     b = qic(k)/nic(k)
+          !     c = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
+          !         ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
+          !           cn*(1._r8 + br/mg_rain_props%eff_dim) + (cq-cn)*sqrtdisc )
+          !     d = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
+          !         ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
+          !           cn*(1._r8 + br/mg_rain_props%eff_dim) - (cq-cn)*sqrtdisc )
+          !     if (abs(a*d - b*c) < 1.d-12) then
+          !       print *, lambr
+          !       print *, q(i,k), n(i,k)
+          !       print *, a, b, c, d
+          !       stop "matrix nearly singular"
+          !     end if
+          !     coeff(1) = (d*dq - b*dn)/(a*d - b*c)
+          !     coeff(2) = (a*dn - c*dq)/(a*d - b*c)
+          !     ! update fluxes to include the waves coeff1*w1 and coeff2*w2
+          !     fq(k-1,2) = s1(k)*coeff(1)*a + s2(k)*coeff(2)*b
+          !     fn(k-1,2) = s1(k)*coeff(1)*c + s2(k)*coeff(2)*d
+          !     ! DEBUG
+          !     !print *, s1(k), (cq*(1._r8 - br/mg_rain_props%eff_dim)*a + br/mg_rain_props%eff_dim*cq*a*c)/lambr/a
+          !     !print *, s1(k), (cn*(1._r8 + br/mg_rain_props%eff_dim)*c - br/mg_rain_props%eff_dim*cn/a*a)/lambr/c
+          !     !print *, s2(k), (cq*(1._r8 - br/mg_rain_props%eff_dim)*b + br/mg_rain_props%eff_dim*cq*a*d)/lambr/b
+          !     !print *, s2(k), (cn*(1._r8 + br/mg_rain_props%eff_dim)*d - br/mg_rain_props%eff_dim*cn/a*b)/lambr/d
+          !     !print *, dq, coeff(1)*a + coeff(2)*b
+          !     !print *, dn, coeff(1)*c + coeff(2)*d
+          !     !stop
+          !   end if
+          ! else
+            ! waves come from eigenvectors and eigenvalues of
+            ! Jacobian([alphaq*q, alphan*n]^T) =
+            ! [alphaq,      0
+            !       0, alphan]
+            ! in x_k cell
+            s1(k) = alphaq(k)
+            s2(k) = alphan(k)
+            ! update fluxes: f(k-1) is flux at x_{k-1/2} edge, so finite volume
+            ! values at x_{k-1} and x_k are used to update f(k-1)
+            if (k > 1) then
+              dq = alphaq(k-1)/alphaq(k)*q(i,k-1) - q(i,k)
+              dn = alphan(k-1)/alphan(k)*n(i,k-1) - n(i,k)
+              ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
+              ! where
+              ! w1 = [1, 0]^T
+              ! w2 = [0, 1]^T
+              coeff(1) = dq
+              coeff(2) = dn
+              ! update fluxes to include the waves coeff1*w1 and coeff2*w2
+              fq(k-1,2) = s1(k)*coeff(1)
+              fn(k-1,2) = s2(k)*coeff(2)
+            else
+              ! consider q(i,0) and n(i,0) both zero at x_0,
+              fq(0,2) = -s1(1)*q(i,1)
+              fn(0,2) = -s2(1)*n(i,1)
+              ! store flux out for surface precipitation caluclation
+              fq(nlev,2) = alphaq(nlev)*q(i,nlev)
+            end if
+
+          ! end if
+        else if (k > 1 .and. qic(k-1) > qsmall) then
+          ! Address waves propagating from non-zero cell into zero cell
+          ! by considering eigenvectors and eigenvalues from x_{k-1} cell
+          s1(k) = alphaq(k-1)
+          s2(k) = alphan(k-1)
+          dq = q(i,k-1) - q(i,k)
+          dn = n(i,k-1) - n(i,k)
+          coeff(1) = dq
+          coeff(2) = dn
+          fq(k-1,2) = s1(k)*coeff(1)
+          fn(k-1,2) = s2(k)*coeff(2)
         end if
 
       else if (mg_type == MG_SNOW) then
@@ -146,6 +236,9 @@ contains
               min(an(i,k)*gamma_b_plus1/lam(k)**bs,1.2_r8*rhof(i,k))
            s1(k) = alphaq(k)
            s2(k) = alphan(k)
+           ! update fluxes
+           fq(k,:) = s1(k)*q(i,k)
+           fn(k,:) = s2(k)*n(i,k)
         end if
       end if
 
@@ -159,12 +252,6 @@ contains
       end if
     end do
 
-    ! compute fluxes
-    fq(0) = 0._r8
-    fq(1:nlev) = alphaq*qedge
-    fn(0) = 0._r8
-    fn(1:nlev) = alphan*nedge
-
   end subroutine sed_CalcFluxAndCFL
 
   subroutine sed_AdvanceOneStep(q,fq,n,fn,pdel,deltat,deltat_sed,nlev,i,mg_type,g, &
@@ -174,7 +261,7 @@ contains
     real(r8), intent(in)              :: deltat, deltat_sed, g
     integer, intent(in)               :: nlev, i, mg_type
     real(r8), intent(inout)           :: q(:,:), qtend(:,:), n(:,:), ntend(:,:)
-    real(r8), intent(inout)           :: fq(:), fn(:), prect(:)
+    real(r8), intent(inout)           :: fq(:,:), fn(:,:), prect(:)
     real(r8), intent(in), optional    :: cloud_frac(:,:), xxl
     real(r8), intent(inout), optional :: qvlat(:,:), tlat(:,:), preci(:)
     real(r8), intent(out), optional   :: qsevap(:,:)
@@ -197,17 +284,8 @@ contains
 
     do k = 1,nlev
       ratio(k)=min(ratio(k),1._r8)
-      deltafluxQ = (fq(k)-ratio(k)*fq(k-1))/pdel(i,k)
-      deltafluxN = (fn(k)-ratio(k)*fn(k-1))/pdel(i,k)
-      ! ! adjust fluxes if needed to maintain positivity
-      ! if (q(i,k) - deltat_sed*deltafluxQ < 0._r8) then
-      !   fq(k) = ratio(k)*fq(k-1) + pdel(i,k)/deltat_sed*q(i,k)
-      !   deltafluxQ = (fq(k)-ratio(k)*fq(k-1))/pdel(i,k)
-      ! end if
-      ! if (n(i,k) - deltat_sed*deltafluxN < 0._r8) then
-      !   fn(k) = ratio(k)*fn(k-1) + pdel(i,k)/deltat_sed*n(i,k)
-      !   deltafluxN = (fn(k)-ratio(k)*fn(k-1))/pdel(i,k)
-      ! end if
+      deltafluxQ = (fq(k,1)-ratio(k)*fq(k-1,2))/pdel(i,k)
+      deltafluxN = (fn(k,1)-ratio(k)*fn(k-1,2))/pdel(i,k)
       ! add fallout terms to eulerian tendencies
       qtend(i,k) = qtend(i,k) - deltafluxQ*deltat_sed/deltat
       ntend(i,k) = ntend(i,k) - deltafluxN*deltat_sed/deltat
@@ -215,7 +293,7 @@ contains
       qsedtend(i,k) = qsedtend(i,k) - deltafluxQ*deltat_sed/deltat
       if (mg_type == MG_ICE .or. mg_type == MG_LIQUID) then
         ! add terms to to evap/sub of cloud water
-        deltafluxQ_evap = (ratio(k)-1._r8)*fq(k-1)/pdel(i,k)
+        deltafluxQ_evap = (ratio(k)-1._r8)*fq(k-1,2)/pdel(i,k)
         qvlat(i,k) = qvlat(i,k) - deltafluxQ_evap*deltat_sed/deltat
         qsevap(i,k) = qsevap(i,k) - deltafluxQ_evap*deltat_sed/deltat
         tlat(i,k) = tlat(i,k) + deltafluxQ_evap*xxl*deltat_sed/deltat
@@ -228,6 +306,7 @@ contains
         print *, q(i,k)
         stop "q negative"
       else if (n(i,k) < -1.d-16) then
+        print *, n(i,k)
         stop "n negative"
       end if
     end do
@@ -236,9 +315,9 @@ contains
     ! sedimentation flux at surface is added to precip flux at surface
     ! to get total precip (cloud + precip water) rate
 
-    prect(i) = prect(i) + deltat_sed/deltat*fq(nlev)/g/1000._r8
+    prect(i) = prect(i) + deltat_sed/deltat*fq(nlev,2)/g/1000._r8
     if (mg_type == MG_ICE .or. mg_type == MG_SNOW) then
-      preci(i) = preci(i) + deltat_sed/deltat*fq(nlev)/g/1000._r8
+      preci(i) = preci(i) + deltat_sed/deltat*fq(nlev,2)/g/1000._r8
     end if
 
   end subroutine
