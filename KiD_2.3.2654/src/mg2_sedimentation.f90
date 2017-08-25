@@ -29,17 +29,28 @@ contains
     logical, intent(in), optional   :: ncons
     real(r8), intent(out)           :: cfl, fq(:,:), fn(:,:)
 
-    real(r8) :: qic(nlev), nic(nlev)
-    real(r8) :: alphaq(nlev), alphan(nlev), lambda_bounds(2)
+    real(r8) :: qic(nlev), nic(nlev), qtemp(0:nlev), ntemp(0:nlev)
+    real(r8) :: alphaq(0:nlev), alphan(0:nlev), lambda_bounds(2)
     real(r8) :: lam(nlev), pgam(nlev), cq, cn, clam, tr, sqrtdisc, lambr(nlev)
     real(r8) :: s1(nlev), s2(nlev), a, b, c, d, dq, dn, coeff(2)
-    integer :: k, nstep
+    real(r8) :: w1(2,nlev), w2(2,nlev)
+    integer :: k
     logical :: limited(nlev)
 
     ! initialize values to zero
     cfl = 0._r8
     fq = 0._r8
     fn = 0._r8
+    alphaq = 0._r8
+    alphan = 0._r8
+    s1 = 0._r8
+    s2 = 0._r8
+
+    ! initialize qtemp and ntemp with ghost cell
+    qtemp(0) = 0._r8
+    qtemp(1:nlev) = q(i,:)
+    ntemp(0) = 0._r8
+    ntemp(1:nlev) = n(i,:)
 
     ! use quantity in cloud
     qic = q(i,:)/cloud_frac(i,:)
@@ -95,10 +106,6 @@ contains
     ! Loop through levels to compute alphaq, alphan, and the CFL number
     do k=1,nlev
 
-      ! initialize fall rate (liquid,ice,snow) or eigenvalues (rain) to zero
-      s1 = 0._r8
-      s2 = 0._r8
-
       if(mg_type == MG_LIQUID) then
         if (qic(k) .ge. qsmall) then
           alphaq(k) = g*rho(i,k)*an(i,k)*gamma(4._r8+bc+pgam(k))/ &
@@ -129,103 +136,85 @@ contains
 
       else if (mg_type == MG_RAIN) then
 
+        ! use wave propagation algorithm to determine flux modifiers
         if (qic(k) > qsmall) then
-          ! define flux coefficients
+        ! scaled jump in x_{k-1} and x_k values will be added to flux at
+        ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,b))
+        ! in x_k cell
           cq = g*rho(i,k)*an(i,k)*gamma_b_plus4/6._r8
           cn = g*rho(i,k)*an(i,k)*gamma_b_plus1
           alphaq(k) = min(cq/lambr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
           alphan(k) = min(cn/lambr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
-          ! use wave propagation algorithm to determine flux modifiers
-          ! if (.not.limited(k)) then
-          !   ! waves come from eigenvectors and eigenvalues of
-          !   ! Jacobian([alphaq(q,n)*q, alphan(q,n)*n]^T) =
-          !   ! [alphaq + q*dalphaq/dq,          q*dalphaq/dn
-          !   !           n*dalphan/dq, alphan + n*dalphan/dn]
-          !   tr = cq*(1._r8 - br/mg_rain_props%eff_dim) + &
-          !        cn*(1._r8 + br/mg_rain_props%eff_dim)
-          !   sqrtdisc = sqrt( (1._r8 + br/mg_rain_props%eff_dim)**2 - &
-          !                    4._r8*br/mg_rain_props%eff_dim * cq/(cq-cn) )
-          !   s1(k) = 0.5_r8/lambr(k) * (tr - (cq-cn)*sqrtdisc)
-          !   s2(k) = 0.5_r8/lambr(k) * (tr + (cq-cn)*sqrtdisc)
-          !   ! update fluxes: f(k) is flux at x_{k+1/2} edge, so finite volume
-          !   ! values at x_k and x_{k-1} are used to update f(k-1) flux
-          !   if (k > 1) then
-          !     dq = q(i,k-1) - q(i,k)
-          !     dn = n(i,k-1) - n(i,k)
-          !     ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
-          !     ! where
-          !     ! w1 = [q/n, -0.5*d/b/cq*( cq*(1-b/d) - cn(1+b/d) + (cq-cn)*sqrtdisc )]^T
-          !     ! w2 = [q/n, -0.5*d/b/cq*( cq*(1-b/d) - cn(1+b/d) - (cq-cn)*sqrtdisc )]^T
-          !     a = qic(k)/nic(k)
-          !     b = qic(k)/nic(k)
-          !     c = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
-          !         ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
-          !           cn*(1._r8 + br/mg_rain_props%eff_dim) + (cq-cn)*sqrtdisc )
-          !     d = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
-          !         ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
-          !           cn*(1._r8 + br/mg_rain_props%eff_dim) - (cq-cn)*sqrtdisc )
-          !     if (abs(a*d - b*c) < 1.d-12) then
-          !       print *, lambr
-          !       print *, q(i,k), n(i,k)
-          !       print *, a, b, c, d
-          !       stop "matrix nearly singular"
-          !     end if
-          !     coeff(1) = (d*dq - b*dn)/(a*d - b*c)
-          !     coeff(2) = (a*dn - c*dq)/(a*d - b*c)
-          !     ! update fluxes to include the waves coeff1*w1 and coeff2*w2
-          !     fq(k-1,2) = s1(k)*coeff(1)*a + s2(k)*coeff(2)*b
-          !     fn(k-1,2) = s1(k)*coeff(1)*c + s2(k)*coeff(2)*d
-          !     ! DEBUG
-          !     !print *, s1(k), (cq*(1._r8 - br/mg_rain_props%eff_dim)*a + br/mg_rain_props%eff_dim*cq*a*c)/lambr/a
-          !     !print *, s1(k), (cn*(1._r8 + br/mg_rain_props%eff_dim)*c - br/mg_rain_props%eff_dim*cn/a*a)/lambr/c
-          !     !print *, s2(k), (cq*(1._r8 - br/mg_rain_props%eff_dim)*b + br/mg_rain_props%eff_dim*cq*a*d)/lambr/b
-          !     !print *, s2(k), (cn*(1._r8 + br/mg_rain_props%eff_dim)*d - br/mg_rain_props%eff_dim*cn/a*b)/lambr/d
-          !     !print *, dq, coeff(1)*a + coeff(2)*b
-          !     !print *, dn, coeff(1)*c + coeff(2)*d
-          !     !stop
-          !   end if
-          ! else
-            ! waves come from eigenvectors and eigenvalues of
-            ! Jacobian([alphaq*q, alphan*n]^T) =
-            ! [alphaq,      0
-            !       0, alphan]
-            ! in x_k cell
+          ! compute scaled jump
+          dq = alphaq(k-1)/alphaq(k)*qtemp(k-1) - qtemp(k)
+          dn = alphan(k-1)/alphan(k)*ntemp(k-1) - ntemp(k)
+          ! obtain eigenvectors and eigenvalues
+          if (limited(k)) then
+          ! Jacobian([alphaq*q, alphan*n]^T) =
+          ! [alphaq,      0
+          !       0, alphan]
             s1(k) = alphaq(k)
+            w1(1,k) = 1._r8
+            w1(2,k) = 0._r8
             s2(k) = alphan(k)
-            ! update fluxes: f(k-1) is flux at x_{k-1/2} edge, so finite volume
-            ! values at x_{k-1} and x_k are used to update f(k-1)
-            if (k > 1) then
-              dq = alphaq(k-1)/alphaq(k)*q(i,k-1) - q(i,k)
-              dn = alphan(k-1)/alphan(k)*n(i,k-1) - n(i,k)
-              ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
-              ! where
-              ! w1 = [1, 0]^T
-              ! w2 = [0, 1]^T
-              coeff(1) = dq
-              coeff(2) = dn
-              ! update fluxes to include the waves coeff1*w1 and coeff2*w2
-              fq(k-1,2) = s1(k)*coeff(1)
-              fn(k-1,2) = s2(k)*coeff(2)
-            else
-              ! consider q(i,0) and n(i,0) both zero at x_0,
-              fq(0,2) = -s1(1)*q(i,1)
-              fn(0,2) = -s2(1)*n(i,1)
-              ! store flux out for surface precipitation caluclation
-              fq(nlev,2) = alphaq(nlev)*q(i,nlev)
-            end if
+            w2(1,k) = 0._r8
+            w2(2,k) = 1._r8
+          else
+          ! Jacobian([alphaq(q,n)*q, alphan(q,n)*n]^T) =
+          ! [alphaq + q*dalphaq/dq,          q*dalphaq/dn
+          !           n*dalphan/dq, alphan + n*dalphan/dn]
+            tr = cq*(1._r8 - br/mg_rain_props%eff_dim) + &
+                 cn*(1._r8 + br/mg_rain_props%eff_dim)
+            sqrtdisc = sqrt( (1._r8 + br/mg_rain_props%eff_dim)**2 - &
+                             4._r8*br/mg_rain_props%eff_dim * cq/(cq-cn) )
+            s1(k) = 0.5_r8/lambr(k) * (tr - (cq-cn)*sqrtdisc)
+            w1(1,k) = qic(k)/nic(k)
+            w1(2,k) = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
+                      ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
+                      cn*(1._r8 + br/mg_rain_props%eff_dim) + (cq-cn)*sqrtdisc )
+            s2(k) = 0.5_r8/lambr(k) * (tr + (cq-cn)*sqrtdisc)
+            w2(1,k) = qic(k)/nic(k)
+            w2(2,k) = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
+                      ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
+                      cn*(1._r8 + br/mg_rain_props%eff_dim) - (cq-cn)*sqrtdisc )
+          end if
 
-          ! end if
         else if (k > 1 .and. qic(k-1) > qsmall) then
-          ! Address waves propagating from non-zero cell into zero cell
-          ! by considering eigenvectors and eigenvalues from x_{k-1} cell
-          s1(k) = alphaq(k-1)
-          s2(k) = alphan(k-1)
-          dq = q(i,k-1) - q(i,k)
-          dn = n(i,k-1) - n(i,k)
-          coeff(1) = dq
-          coeff(2) = dn
-          fq(k-1,2) = s1(k)*coeff(1)
-          fn(k-1,2) = s2(k)*coeff(2)
+        ! to handle waves going from a non-zero cell into a zero cell,
+        ! jump in x_{k-1} and x_k values will be added to flux at
+        ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,b))
+        ! in x_{k-1} cell
+          dq = qtemp(k-1) - qtemp(k)
+          dn = ntemp(k-1) - ntemp(k)
+          s1(k) = s1(k-1)
+          w1(:,k) = w1(:,k-1)
+          s2(k) = s2(k-1)
+          w2(:,k) = w2(:,k-1)
+        end if
+
+        if (s1(k) > 0._r8) then
+        ! Update fluxes at x_{k-1/2} to include the waves coeff1*w1 and coeff2*w2
+          ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
+          a = w1(1,k)
+          c = w1(2,k)
+          b = w2(1,k)
+          d = w2(2,k)
+          if (abs(a*d - b*c) < 1.d-12) then
+            print *, lambr
+            print *, q(i,k), n(i,k)
+            print *, a, b, c, d
+            stop "matrix nearly singular"
+          end if
+          coeff(1) = (d*dq - b*dn)/(a*d - b*c)
+          coeff(2) = (a*dn - c*dq)/(a*d - b*c)
+
+          fq(k-1,2) = s1(k)*coeff(1)*w1(1,k) + s2(k)*coeff(2)*w2(1,k)
+          fn(k-1,2) = s1(k)*coeff(1)*w1(2,k) + s2(k)*coeff(2)*w2(2,k)
+        end if
+
+        if (k == nlev) then
+          ! store flux out for surface precipitation calculation
+          fq(nlev,2) = alphaq(nlev)*q(i,nlev)
         end if
 
       else if (mg_type == MG_SNOW) then
@@ -245,11 +234,8 @@ contains
       ! Update CFL number
       cfl = max(cfl,s1(k)*deltat/pdel(i,k),s2(k)*deltat/pdel(i,k))
 
-      ! Detect if shock formation is possible
-      if ( k > 1 .and. (s1(k) < s1(k-1) .or. s2(k) < s2(k-1)) ) then
-        print *, "shock possible"
-        stop
-      end if
+      ! TODO: detect shock formation
+
     end do
 
   end subroutine sed_CalcFluxAndCFL
