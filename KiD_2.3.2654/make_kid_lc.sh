@@ -4,7 +4,7 @@
 #
 # D.J. Gardner @ LLNL
 # C.J. Vogl @ LLNL
-# Jul 2016
+# Sep 2017
 # ==============================================================================
 
 # Set up LC environnment
@@ -14,7 +14,7 @@ if [[ $HOSTNAME == "cab"* ]]; then
   source /usr/global/tools/dotkit/init.sh # Enable dotkit packages
   use icc-16.0.210                        # intel compiler
   use netcdf-intel-4.1.3                  # netcdf for output
-  use python                              # Load python for use in makefile 
+  use python                              # Load python for use in makefile
   COMPILER=ifort
   NCPATH=/usr/local/tools/netcdf-intel-4.1.3
 elif [[ $HOSTNAME == "tux"* ]]; then
@@ -23,6 +23,8 @@ elif [[ $HOSTNAME == "tux"* ]]; then
   source /usr/apps/intel/15.5.223/composer_xe_2015.5.223/bin/ifortvars.sh intel64
   COMPILER=ifort
   NCPATH=$HOME/local/netcdf-4.1.3_tux_intel_opt
+  GPTLPATH=$HOME/local/gptl-5.5_tux_intel_opt
+  MPIPATH=$HOME/local/mpich-3.2_tux_intel_opt
 elif [[ $HOSTNAME == "MOODYBLUES" ]]; then
   SYSTEM=moodyblues
   COMPILER=gfortran
@@ -32,13 +34,41 @@ else
   exit -1
 fi
 
+# set defines based on version number (v0 is default)
+if [[ $1 == "v1" ]]; then
+  export SED_UPDATECFL=True
+elif [[ $1 == "v2" ]]; then
+  export SED_UPDATECFL=True
+  export SED_COMBINELAMBDA=True
+elif [[ $1 = "v3" ]]; then
+  export SED_UPDATECFL=True
+  export SED_COMBINELAMBDA=True
+  export SED_NONLINEAR=True
+elif [[ $s == "v4" ]]; then
+  export SED_UPATECFL=True
+  export SED_COMBINELAMBDA=True
+  export SED_USEWPA=True
+elif [[ $s == "v5" ]]; then
+  export SED_UPATECFL=True
+  export SED_COMBINELAMBDA=True
+  export SED_NONLINEAR=True
+  export SED_USEWPA=True
+fi
+
+# set build directory
+BUILD=build_$SYSTEM
+if [[ $2 == "new" ]]; then
+  rm -rf $BUILD
+fi
+mkdir -p $BUILD
+
 # compile source code
 # --------------------------------------------------------------------
-BUILD=build_$SYSTEM
-
 make CASE=1D \
   COMPILER=$COMPILER \
   NCPATH=$NCPATH \
+  GPTLPATH=$GPTLPATH \
+  MPIPATH=$MPIPATH \
   EXECDIR=$BUILD/bin \
   OBJDIR=$BUILD/obj \
   all

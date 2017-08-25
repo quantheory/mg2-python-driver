@@ -45,7 +45,7 @@ OPTS=-g -O0 -check all -warn all,nodec,interfaces \
  -traceback -fpe0
 else
 #OPTS=-O3 -traceback -pg -g
-OPTS=-O3 -traceback -g
+OPTS=-O3 -traceback -g -openmp
 endif
 endif
 
@@ -54,7 +54,9 @@ LD=$(F90)   # Linker
 
 INCDF=-I$(NCPATH)/include
 LNCDF=-L$(NCPATH)/lib -lnetcdf -lnetcdff
-LDFLAGS=$(INCDF) $(LNCDF)
+IGPTL=-I$(GPTLPATH)/include
+LGPTL=-L$(GPTLPATH)/lib -lgptl -L$(MPIPATH)/lib -lmpi
+LDFLAGS=$(INCDF) $(LNCDF) $(IGPTL) $(LGPTL)
 
 EXECUTABLE=$(MODEL)_$(CASE).exe
 

@@ -13,16 +13,15 @@
 #     for dt = 4.0  -> warm1_mg2_dt4.nml
 #
 # D.J. Gardner @ LLNL
-# Dec 2016
-#
-# modified by C.J. Vogl @ LLNL
-# May 2017
+# C.J. Vogl @ LLNL
+# Sep 2017
 # ==============================================================================
 
 import subprocess  # launch subprocesses
 import numpy as np # math functions
 import os          # operating system functions
 import socket
+import sys
 
 hostname = socket.gethostname()
 if ("cab" in hostname):
@@ -55,6 +54,8 @@ mstepvals = [ 1, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200]
 # ------------------------------------------------------------------------------
 # make KiD
 command = "./make_kid_lc.sh"
+for arg in sys.argv[1:]:
+  command += ' ' + arg
 ierr = subprocess.call(command, shell=True)
 
 # ------------------------------------------------------------------------------

@@ -9,159 +9,175 @@ hostname = socket.gethostname()
 if ("tux" in hostname):
   wrkdir = os.getenv('HOME') + '/workspace/micro_physics/KiD_2.3.2654/output'
 
-runDirectory = wrkdir + '/warm1_v0'
-runDirectory_adaptive = wrkdir + '/warm1_v1'
-runDirectory_adaptive2 = wrkdir + '/warm1'
+# Dictionary for sedimentation methods (name: directory)
+methodDict = {'v0: original': wrkdir + '/warm1_v0',
+              'v1: time-varying speed': wrkdir + '/warm1_v1',
+              'v2: v1 with algebra mod': wrkdir + '/warm1_v2'}
 
+# Dictionary for quantities of interest (name: Quantity object)
 quantityDict = {'Rain Mass':Quantity('rain_mass'),
-                'Vapour':Quantity('vapour')}
+                'Vapour':Quantity('vapour'),
+                'Cloud Mass': Quantity('cloud_mass') }
 
-runDict = {'mstep1':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',1,quantityList=quantityDict.values()),
-           'mstep1_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',1,quantityList=quantityDict.values()),
-           'mstep1_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',1,quantityList=quantityDict.values()),
-           'mstep5':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep5.nc',5,quantityList=quantityDict.values()),
-           'mstep5_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep5.nc',5,quantityList=quantityDict.values()),
-           'mstep5_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep5.nc',5,quantityList=quantityDict.values()),
-           'mstep10':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep10.nc',10,quantityList=quantityDict.values()),
-           'mstep10_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep10.nc',10,quantityList=quantityDict.values()),
-           'mstep10_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep10.nc',10,quantityList=quantityDict.values()),
-           'mstep15':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep15.nc',15,quantityList=quantityDict.values()),
-           'mstep15_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep15.nc',15,quantityList=quantityDict.values()),
-           'mstep15_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep15.nc',15,quantityList=quantityDict.values()),
-           'mstep30':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep30.nc',30,quantityList=quantityDict.values()),
-           'mstep30_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep30.nc',30,quantityList=quantityDict.values()),
-           'mstep30_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep30.nc',30,quantityList=quantityDict.values()),
-           'mstep60':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep60.nc',60,quantityList=quantityDict.values()),
-           'mstep60_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep60.nc',60,quantityList=quantityDict.values()),
-           'mstep60_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep60.nc',60,quantityList=quantityDict.values()),
-           'mstep120':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep120.nc',120,quantityList=quantityDict.values()),
-           'mstep120_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep120.nc',120,quantityList=quantityDict.values()),
-           'mstep120_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep120.nc',120,quantityList=quantityDict.values()),
-           'mstep300':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep300.nc',300,quantityList=quantityDict.values()),
-           'mstep300_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep300.nc',300,quantityList=quantityDict.values()),
-           'mstep300_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep300.nc',300,quantityList=quantityDict.values()),
-           'mstep600':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep600.nc',600,quantityList=quantityDict.values()),
-           'mstep600_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep600.nc',600,quantityList=quantityDict.values()),
-           'mstep600_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep600.nc',600,quantityList=quantityDict.values()),
-           'mstep900':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep900.nc',900,quantityList=quantityDict.values()),
-           'mstep900_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep900.nc',900,quantityList=quantityDict.values()),
-           'mstep900_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep900.nc',900,quantityList=quantityDict.values()),
-           'mstep1200':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep1200.nc',1200,quantityList=quantityDict.values()),
-           'mstep1200_adaptive':Run(runDirectory_adaptive + '/warm1_mg2_acme_v1beta_dt1.0_mstep1200.nc',1200,quantityList=quantityDict.values()),
-           'mstep1200_adaptive2':Run(runDirectory_adaptive2 + '/warm1_mg2_acme_v1beta_dt1.0_mstep1200.nc',1200,quantityList=quantityDict.values())
-           }
+# Dictionary for runs (method name: individual run dictionary)
+runDict = {}
+for method in methodDict.keys():
+  runDirectory = methodDict[method]
+  # dictionary for runs (run name: run directory)
+  runs = {'mstep1':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep1.nc',1,quantityList=quantityDict.values()),
+             'mstep5':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep5.nc',5,quantityList=quantityDict.values()),
+             'mstep10':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep10.nc',10,quantityList=quantityDict.values()),
+             'mstep15':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep15.nc',15,quantityList=quantityDict.values()),
+             'mstep30':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep30.nc',30,quantityList=quantityDict.values()),
+             'mstep60':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep60.nc',60,quantityList=quantityDict.values()),
+             'mstep120':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep120.nc',120,quantityList=quantityDict.values()),
+             'mstep300':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep300.nc',300,quantityList=quantityDict.values()),
+             'mstep600':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep600.nc',600,quantityList=quantityDict.values()),
+             'mstep900':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep900.nc',900,quantityList=quantityDict.values()),
+             'mstep1200':Run(runDirectory + '/warm1_mg2_acme_v1beta_dt1.0_mstep1200.nc',1200,quantityList=quantityDict.values()),
+             }
+  runDict[method] = runs
 
-comparisonSizes = (30,300) #1,30,120,300)
+# Dictionary for timings (quantity name: list of timings)
+timingDict = {'rain': ['Sedimentation']}
+
+# List of resolutions for plotting solutions across methods
+comparisonSizes = (30,120,300) #1,30,120,300)
+
+# List of resolutions for convergence plot
 convergenceSizes = (5,10,15,30,60,120,300,600,900,1200)
 
+# Plot timing information
+if 1:
+  for l, quantity in enumerate(timingDict.keys()):
+    f, axarray = pyplot.subplots(2,2,figsize=(18,10),num=l)
+    timingList = timingDict[quantity]
+
+    for method in methodDict.keys():
+      runDirectory = methodDict[method]
+      currentRunDict = runDict[method]
+      callNumbers = np.zeros((len(convergenceSizes),len(timingList)))
+      wallClocks = np.zeros((len(convergenceSizes),len(timingList)))
+      ratios = np.zeros((len(convergenceSizes),len(timingList)))
+      dtlist = np.empty(len(convergenceSizes))
+
+      for j,size in enumerate(convergenceSizes):
+        dtlist[j] = currentRunDict['mstep'+str(size)].dt
+        timingFile = open(runDirectory+'/warm1_mg2_acme_v1beta_dt1.0_mstep'+str(size)+'_timing.txt')
+        lines = list(timingFile)
+
+        for line in lines:
+          for k,currentTiming in enumerate(timingList):
+            if (line.strip().startswith(currentTiming+' ('+quantity+')')):
+              words = line.split('('+quantity+')')
+              tmp = words[1].split()
+              callNumbers[j,k] = int(tmp[0])
+              wallClocks[j,k] = float(tmp[2])
+              ratios[j,k] = wallClocks[j,k]/callNumbers[j,k]
+      axarray[0,0].plot(dtlist,wallClocks[:,0],'-o',label=method)
+      axarray[0,1].plot(dtlist,callNumbers[:,0],'-o',label=method)
+      axarray[1,0].plot(dtlist,ratios[:,0],'-o',label=method)
+
+    axarray[0,0].set_ylabel('Wall Clock')
+    axarray[0,0].legend()
+    axarray[0,1].set_ylabel('Call #')
+    axarray[0,1].legend()
+    axarray[1,0].set_ylabel('Ratio')
+    axarray[1,0].legend()
+
+  pyplot.show()
+  exit()
 
 
-for l,size in enumerate(comparisonSizes):
-  f, axarray = pyplot.subplots(len(quantityDict.keys()),3,figsize=(18,10),num=l)
+# Only plot solutions across methods if there aren't many methods
+numMethods = len(methodDict.keys())
+if (numMethods <= 3):
 
-  for k,qname in enumerate(quantityDict.keys()):
-    qABS = np.amax(abs(quantityDict[qname].getQ(runDict['mstep1'])))
-    original = runDict['mstep'+str(size)]
-    adaptive = runDict['mstep'+str(size)+'_adaptive']
-    adaptive2 = runDict['mstep'+str(size)+'_adaptive2']
-    q = quantityDict[qname].getQ(original)
-    q_adaptive = quantityDict[qname].getQ(adaptive)
-    q_adaptive2 = quantityDict[qname].getQ(adaptive2)
-    [t,z] = np.meshgrid(np.arange(0,3600,original.dt),np.linspace(0,120,120))
-    cax = axarray[k,0].pcolor(t,z,q,cmap='bwr',vmin=-qABS,vmax=qABS)
-    f.colorbar(cax,ax=axarray[k,0])
-    cax = axarray[k,1].pcolor(t,z,q_adaptive,cmap='bwr',vmin=-qABS,vmax=qABS)
-    f.colorbar(cax,ax=axarray[k,1])
-    cax = axarray[k,2].pcolor(t,z,q_adaptive2,cmap='bwr',vmin=-qABS,vmax=qABS)
-    f.colorbar(cax,ax=axarray[k,2])
-    axarray[k,0].set_title(qname + ' (none)')
-    axarray[k,1].set_title(qname + ' (rain)')
-    axarray[k,2].set_title(qname + ' (rain+cloud)')
+  for l,size in enumerate(comparisonSizes):
+    f, axarray = pyplot.subplots(len(quantityDict.keys()),numMethods,figsize=(18,10),num=l)
+
+    for j,qname in enumerate(quantityDict.keys()):
+      currentRunDict = runDict[methodDict.keys()[0]]
+      qABS = np.amax(abs(quantityDict[qname].getQ(currentRunDict['mstep1'])))
+
+      for k,method in enumerate(methodDict.keys()):
+        currentRunDict = runDict[method]
+        currentRun = currentRunDict['mstep'+str(size)]
+        q = quantityDict[qname].getQ(currentRun)
+        [t,z] = np.meshgrid(np.arange(0,3600,currentRun.dt),np.linspace(0,120,120))
+        cax = axarray[j,k].pcolor(t,z,q,cmap='bwr',vmin=-qABS,vmax=qABS)
+        f.colorbar(cax,ax=axarray[j,k])
+        axarray[j,k].set_title(method)
 
     for i in range(len(quantityDict.keys())):
-      for j in range(3):
+      for j in range(numMethods):
         axarray[i,j].set_xlabel('time (s)')
         axarray[i,j].set_ylabel('height')
     pyplot.savefig('mstep'+str(size)+'.png')
 
-
+# Plot convergence of Final Time / All Time errors in L2 / LInf norms
 for k,qname in enumerate(quantityDict.keys()):
-  # Final Time Error Holders
-  l2ErrorFinalTime = np.zeros((3,len(convergenceSizes)))
-  lIErrorFinalTime = np.zeros((3,len(convergenceSizes)))
-  # All Time Error Holders
-  l2ErrorAllTime = np.zeros((3,len(convergenceSizes)))
-  lIErrorAllTime = np.zeros((3,len(convergenceSizes)))
-  dtlist = np.empty(len(convergenceSizes))
-  for j,size in enumerate(convergenceSizes):
-    original = runDict['mstep'+str(size)]
-    adaptive1 = runDict['mstep'+str(size)+'_adaptive']
-    adaptive2 = runDict['mstep'+str(size)+'_adaptive2']
-    q0 = quantityDict[qname].getQ(original)
-    q1 = quantityDict[qname].getQ(adaptive1)
-    q2 = quantityDict[qname].getQ(adaptive2)
-    qRef = quantityDict[qname].getQRef(original,runDict['mstep1'])
-    dtlist[j] = original.dt
-    # Final time errors
-    l2ErrorFinalTime[0,j] = np.sqrt(np.sum(np.square(q0[:,-1]-qRef[:,-1]))/120)
-    l2ErrorFinalTime[1,j] = np.sqrt(np.sum(np.square(q1[:,-1]-qRef[:,-1]))/120)
-    l2ErrorFinalTime[2,j] = np.sqrt(np.sum(np.square(q2[:,-1]-qRef[:,-1]))/120)
-    lIErrorFinalTime[0,j] = np.amax(abs(q0[:,-1]-qRef[:,-1]))
-    lIErrorFinalTime[1,j] = np.amax(abs(q1[:,-1]-qRef[:,-1]))
-    lIErrorFinalTime[2,j] = np.amax(abs(q2[:,-1]-qRef[:,-1]))
-    # All time errors
-    l2ErrorAllTime[0,j] = np.sqrt(np.sum(np.square(q0-qRef))/120*original.dt)
-    l2ErrorAllTime[1,j] = np.sqrt(np.sum(np.square(q1-qRef))/120*original.dt)
-    l2ErrorAllTime[2,j] = np.sqrt(np.sum(np.square(q2-qRef))/120*original.dt)
-    lIErrorAllTime[0,j] = np.amax(abs(q0-qRef))
-    lIErrorAllTime[1,j] = np.amax(abs(q1-qRef))
-    lIErrorAllTime[2,j] = np.amax(abs(q2-qRef))
 
   f,axarray = pyplot.subplots(2,2,figsize=(10,10),num=len(comparisonSizes)+k)
+  # Final Time Error Holders
+  l2ErrorFinalTime = np.zeros((len(methodDict.keys()),len(convergenceSizes)))
+  lIErrorFinalTime = np.zeros((len(methodDict.keys()),len(convergenceSizes)))
+  # All Time Error Holders
+  l2ErrorAllTime = np.zeros((len(methodDict.keys()),len(convergenceSizes)))
+  lIErrorAllTime = np.zeros((len(methodDict.keys()),len(convergenceSizes)))
+  dtlist = np.empty(len(convergenceSizes))
+
+  for i,method in enumerate(methodDict.keys()):
+    currentRunDict = runDict[method]
+    for j,size in enumerate(convergenceSizes):
+      currentRun = currentRunDict['mstep'+str(size)]
+      q = quantityDict[qname].getQ(currentRun)
+      qRef = quantityDict[qname].getQRef(currentRun,currentRunDict['mstep1'])
+      dtlist[j] = currentRun.dt
+      # Final time errors
+      l2ErrorFinalTime[i,j] = np.sqrt(np.sum(np.square(q[:,-1]-qRef[:,-1]))/120)
+      lIErrorFinalTime[i,j] = np.amax(abs(q[:,-1]-qRef[:,-1]))
+      # All time errors
+      l2ErrorAllTime[i,j] = np.sqrt(np.sum(np.square(q-qRef))/120*currentRun.dt)
+      lIErrorAllTime[i,j] = np.amax(abs(q-qRef))
+      # Plots
+    axarray[0,0].loglog(dtlist,l2ErrorFinalTime[i,:],'-o',label=method)
+    axarray[1,0].loglog(dtlist,l2ErrorAllTime[i,:],'-o',label=method)
+    axarray[0,1].loglog(dtlist,lIErrorFinalTime[i,:],'-o',label=method)
+    axarray[1,1].loglog(dtlist,lIErrorAllTime[i,:],'-o',label=method)
+
   coeff = l2ErrorFinalTime[0,0]/dtlist[0]
-  axarray[0,0].loglog(dtlist,l2ErrorFinalTime[0,:],'-o',label='no adaptive stepping')
-  axarray[0,0].loglog(dtlist,l2ErrorFinalTime[1,:],'-o',label='adaptive rain')
-  axarray[0,0].loglog(dtlist,l2ErrorFinalTime[2,:],'-o',label='adaptive rain & cloud')
-  axarray[0,0].loglog(dtlist,dtlist*coeff,'--',label='reference: first order')
+  #axarray[0,0].loglog(dtlist,dtlist*coeff,'--',label='reference: first order')
   axarray[0,0].axis('equal')
   axarray[0,0].set_xlabel('dt')
   axarray[0,0].set_title(qname + ' Error (L2, Final Time)')
   axarray[0,0].legend()
   coeff = l2ErrorAllTime[0,0]/dtlist[0]
-  axarray[1,0].loglog(dtlist,l2ErrorAllTime[0,:],'-o',label='no adaptive stepping')
-  axarray[1,0].loglog(dtlist,l2ErrorAllTime[1,:],'-o',label='adaptive rain')
-  axarray[1,0].loglog(dtlist,l2ErrorAllTime[2,:],'-o',label='adaptive rain & cloud')
-  axarray[1,0].loglog(dtlist,dtlist*coeff,'--',label='reference: first order')
+  #axarray[1,0].loglog(dtlist,dtlist*coeff,'--',label='reference: first order')
   axarray[1,0].axis('equal')
   axarray[1,0].set_xlabel('dt')
   axarray[1,0].set_title(qname + ' Error (L2, All Time)')
   axarray[1,0].legend()
   coeff = lIErrorFinalTime[0,0]/dtlist[0]
-  axarray[0,1].loglog(dtlist,lIErrorFinalTime[0,:],'-o',label='no adaptive stepping')
-  axarray[0,1].loglog(dtlist,lIErrorFinalTime[1,:],'-o',label='adaptive rain')
-  axarray[0,1].loglog(dtlist,lIErrorFinalTime[2,:],'-o',label='adaptive rain & cloud')
-  axarray[0,1].loglog(dtlist,dtlist*coeff,'--',label='reference: first order')
+  #axarray[0,1].loglog(dtlist,dtlist*coeff,'--',label='reference: first order')
   axarray[0,1].axis('equal')
   axarray[0,1].set_xlabel('dt')
   axarray[0,1].set_title(qname + ' Error (Linf, Final Time)')
   axarray[0,1].legend()
   coeff = lIErrorAllTime[0,0]/dtlist[0]
-  axarray[1,1].loglog(dtlist,lIErrorAllTime[0,:],'-o',label='no adaptive stepping')
-  axarray[1,1].loglog(dtlist,lIErrorAllTime[1,:],'-o',label='adaptive rain')
-  axarray[1,1].loglog(dtlist,lIErrorAllTime[2,:],'-o',label='adaptive rain & cloud')
-  axarray[1,1].loglog(dtlist,dtlist*coeff,'--',label='reference: first order')
+  #axarray[1,1].loglog(dtlist,dtlist*coeff,'--',label='reference: first order')
   axarray[1,1].axis('equal')
   axarray[1,1].set_xlabel('dt')
   axarray[1,1].set_title(qname + ' Error (Linf, All Time)')
   axarray[1,1].legend()
-  f.savefig(quantityDict[qname].name + '_convergence.png')
-  tmp = np.concatenate(([dtlist],l2ErrorFinalTime),axis=0)
-  np.savetxt(quantityDict[qname].name + '_l2ErrorFinalTime.txt', tmp.T)
-  tmp = np.concatenate(([dtlist],l2ErrorAllTime),axis=0)
-  np.savetxt(quantityDict[qname].name + '_l2ErrorAllTime.txt', tmp.T)
-  tmp = np.concatenate(([dtlist],lIErrorFinalTime),axis=0)
-  np.savetxt(quantityDict[qname].name + '_lIErrorFinalTime.txt', tmp.T)
-  tmp = np.concatenate(([dtlist],lIErrorAllTime),axis=0)
-  np.savetxt(quantityDict[qname].name + '_lIErrorAllTime.txt', tmp.T)
+  #f.savefig(quantityDict[qname].name + '_convergence.png')
+    # tmp = np.concatenate(([dtlist],l2ErrorFinalTime),axis=0)
+    # np.savetxt(quantityDict[qname].name + '_l2ErrorFinalTime.txt', tmp.T)
+    # tmp = np.concatenate(([dtlist],l2ErrorAllTime),axis=0)
+    # np.savetxt(quantityDict[qname].name + '_l2ErrorAllTime.txt', tmp.T)
+    # tmp = np.concatenate(([dtlist],lIErrorFinalTime),axis=0)
+    # np.savetxt(quantityDict[qname].name + '_lIErrorFinalTime.txt', tmp.T)
+    # tmp = np.concatenate(([dtlist],lIErrorAllTime),axis=0)
+    # np.savetxt(quantityDict[qname].name + '_lIErrorAllTime.txt', tmp.T)
 
 pyplot.show()

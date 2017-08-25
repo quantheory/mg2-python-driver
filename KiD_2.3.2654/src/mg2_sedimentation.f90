@@ -3,7 +3,7 @@ module Sedimentation
   implicit none
   private
   save
-  public :: sed_CalcFluxAndCFL, sed_AdvanceOneStep
+  public :: sed_CalcCFL, sed_CalcFlux, sed_AdvanceOneStep
   integer, parameter, public  :: MG_LIQUID = 1
   integer, parameter, public  :: MG_ICE = 2
   integer, parameter, public  :: MG_RAIN = 3
@@ -12,8 +12,10 @@ module Sedimentation
 
 contains
 
-  subroutine sed_CalcFluxAndCFL(q,qtend,n,ntend,cloud_frac,rho,pdel,nlev,i, &
-    mg_type,deltat,g,an,rhof,fq,fn,cfl,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
+  subroutine sed_CalcCFL(q,n,cloud_frac,rho,pdel,nlev,i, &
+    mg_type,deltat,g,an,rhof,alphaq,alphan,s1,s2,w1,w2,cfl,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
+    use gptl, only: gptlstart_handle, gptlstop_handle
+    use gptl_kid
     use micro_mg2_acme_v1beta_utils, only: size_dist_param_liq, &
                                            size_dist_param_basic, &
                                            mg_ice_props, mg_liq_props, &
@@ -21,25 +23,31 @@ contains
                                            qsmall, bi, bc, br, bs, &
                                            limiter_is_on
     implicit none
-    real(r8), intent(in)            :: q(:,:), qtend(:,:), n(:,:), ntend(:,:)
+    real(r8), intent(in)            :: q(:,:), n(:,:)
     real(r8), intent(in)            :: rho(:,:), pdel(:,:), an(:,:), rhof(:,:)
     real(r8), intent(in)            :: cloud_frac(:,:), deltat, g
     integer,  intent(in)            :: nlev, i, mg_type
     real(r8), intent(in), optional  :: nnst, gamma_b_plus1, gamma_b_plus4
     logical, intent(in), optional   :: ncons
-    real(r8), intent(out)           :: cfl, fq(:,:), fn(:,:)
+    real(r8), intent(out)           :: cfl, alphaq(:), alphan(:)
+    real(r8), intent(out)           :: s1(:), s2(:), w1(:,:), w2(:,:)
 
     real(r8) :: qic(nlev), nic(nlev)
-    real(r8) :: alphaq(nlev), alphan(nlev), lambda_bounds(2)
+    real(r8) :: lambda_bounds(2)
     real(r8) :: lam(nlev), pgam(nlev), cq, cn, clam, tr, sqrtdisc, lambr(nlev)
-    real(r8) :: s1(nlev), s2(nlev), a, b, c, d, dq, dn, coeff(2)
-    integer :: k, nstep
+    integer :: k
     logical :: limited(nlev)
 
-    ! initialize values to zero
-    cfl = 0._r8
-    fq = 0._r8
-    fn = 0._r8
+    ! compute lam and pgam
+    ! if (mg_type == MG_LIQUID) then
+    !   gptl_ret = gptlstart_handle('Lambda Calculation (cloud)',gptl_lambda_cloud)
+    ! else if (mg_type == MG_ICE) then
+    !   gptl_ret = gptlstart_handle('Lambda Calculation (ice)',gptl_lambda_ice)
+    ! else if (mg_type == MG_RAIN) then
+    !   gptl_ret = gptlstart_handle('Lambda Calculation (rain)',gptl_lambda_rain)
+    ! else if (mg_type == MG_SNOW) then
+    !   gptl_ret = gptlstart_handle('Lambda Calculation (snow)',gptl_lambda_snow)
+    ! end if
 
     ! use quantity in cloud
     qic = q(i,:)/cloud_frac(i,:)
@@ -50,7 +58,6 @@ contains
       nic = nnst/rho(i,:)
     end if
 
-    ! compute lam and pgam using elemental function call
     if (mg_type == MG_LIQUID) then
       call size_dist_param_liq(mg_liq_props, qic, nic, rho(i,:), &
                                pgam, lam)
@@ -59,6 +66,7 @@ contains
       call size_dist_param_basic(mg_ice_props, qic, nic, lam)
 
     else if (mg_type == MG_RAIN) then
+#ifdef SED_COMBINELAMBDA
       lambda_bounds(1) = mg_rain_props%lambda_bounds(1)**br
       lambda_bounds(2) = mg_rain_props%lambda_bounds(2)**br
       do k=1,nlev
@@ -84,20 +92,47 @@ contains
           end if
         end if
       end do
+#else
+      call size_dist_param_basic(mg_rain_props, qic, nic, lam)
+#endif
 
     else if (mg_type == MG_SNOW) then
-       call size_dist_param_basic(mg_snow_props, qic, nic, lam)
+      call size_dist_param_basic(mg_snow_props, qic, nic, lam)
     else
-       print *, "Invalid mg_type to mg2_sedimentation"
-       stop
+      print *, "Invalid mg_type to mg2_sedimentation"
+      stop
     end if
 
-    ! Loop through levels to compute alphaq, alphan, and the CFL number
-    do k=1,nlev
+    ! if (mg_type == MG_LIQUID) then
+    !   gptl_ret = gptlstop_handle('Lambda Calculation (cloud)',gptl_lambda_cloud)
+    ! else if (mg_type == MG_ICE) then
+    !   gptl_ret = gptlstop_handle('Lambda Calculation (ice)',gptl_lambda_ice)
+    ! else if (mg_type == MG_RAIN) then
+    !   gptl_ret = gptlstop_handle('Lambda Calculation (rain)',gptl_lambda_rain)
+    ! else if (mg_type == MG_SNOW) then
+    !   gptl_ret = gptlstop_handle('Lambda Calculation (snow)',gptl_lambda_snow)
+    ! end if
 
-      ! initialize fall rate (liquid,ice,snow) or eigenvalues (rain) to zero
-      s1 = 0._r8
-      s2 = 0._r8
+
+    ! Loop through levels to compute alphaq, alphan, and the CFL number
+    ! if (mg_type == MG_LIQUID) then
+    !   gptl_ret = gptlstart_handle('CFL Calculation (cloud)',gptl_cfl_cloud)
+    ! else if (mg_type == MG_ICE) then
+    !   gptl_ret = gptlstart_handle('CFL Calculation (ice)',gptl_cfl_ice)
+    ! else if (mg_type == MG_RAIN) then
+    !   gptl_ret = gptlstart_handle('CFL Calculation (rain)',gptl_cfl_rain)
+    ! else if (mg_type == MG_SNOW) then
+    !   gptl_ret = gptlstart_handle('CFL Calculation (snow)',gptl_cfl_snow)
+    ! end if
+
+    ! initialize values to zero
+    cfl = 0._r8
+    alphaq = 0._r8
+    alphan = 0._r8
+    s1 = 0._r8
+    s2 = 0._r8
+
+    do k=1,nlev
 
       if(mg_type == MG_LIQUID) then
         if (qic(k) .ge. qsmall) then
@@ -109,9 +144,6 @@ contains
                (lam(k)**bc*gamma(pgam(k)+1._r8))
           s1(k) = alphaq(k)
           s2(k) = alphan(k)
-          ! update fluxes
-          fq(k,:) = s1(k)*q(i,k)
-          fn(k,:) = s2(k)*n(i,k)
         end if
 
       else if (mg_type == MG_ICE) then
@@ -122,137 +154,190 @@ contains
                 min(an(i,k)*gamma_b_plus1/lam(k)**bi,1.2_r8*rhof(i,k))
           s1(k) = alphaq(k)
           s2(k) = alphan(k)
-          ! update fluxes
-          fq(k,:) = s1(k)*q(i,k)
-          fn(k,:) = s2(k)*n(i,k)
         end if
 
       else if (mg_type == MG_RAIN) then
-
         if (qic(k) > qsmall) then
-          ! define flux coefficients
           cq = g*rho(i,k)*an(i,k)*gamma_b_plus4/6._r8
           cn = g*rho(i,k)*an(i,k)*gamma_b_plus1
+#ifdef SED_COMBINELAMBDA
           alphaq(k) = min(cq/lambr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
           alphan(k) = min(cn/lambr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
-          ! use wave propagation algorithm to determine flux modifiers
-          ! if (.not.limited(k)) then
-          !   ! waves come from eigenvectors and eigenvalues of
-          !   ! Jacobian([alphaq(q,n)*q, alphan(q,n)*n]^T) =
-          !   ! [alphaq + q*dalphaq/dq,          q*dalphaq/dn
-          !   !           n*dalphan/dq, alphan + n*dalphan/dn]
-          !   tr = cq*(1._r8 - br/mg_rain_props%eff_dim) + &
-          !        cn*(1._r8 + br/mg_rain_props%eff_dim)
-          !   sqrtdisc = sqrt( (1._r8 + br/mg_rain_props%eff_dim)**2 - &
-          !                    4._r8*br/mg_rain_props%eff_dim * cq/(cq-cn) )
-          !   s1(k) = 0.5_r8/lambr(k) * (tr - (cq-cn)*sqrtdisc)
-          !   s2(k) = 0.5_r8/lambr(k) * (tr + (cq-cn)*sqrtdisc)
-          !   ! update fluxes: f(k) is flux at x_{k+1/2} edge, so finite volume
-          !   ! values at x_k and x_{k-1} are used to update f(k-1) flux
-          !   if (k > 1) then
-          !     dq = q(i,k-1) - q(i,k)
-          !     dn = n(i,k-1) - n(i,k)
-          !     ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
-          !     ! where
-          !     ! w1 = [q/n, -0.5*d/b/cq*( cq*(1-b/d) - cn(1+b/d) + (cq-cn)*sqrtdisc )]^T
-          !     ! w2 = [q/n, -0.5*d/b/cq*( cq*(1-b/d) - cn(1+b/d) - (cq-cn)*sqrtdisc )]^T
-          !     a = qic(k)/nic(k)
-          !     b = qic(k)/nic(k)
-          !     c = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
-          !         ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
-          !           cn*(1._r8 + br/mg_rain_props%eff_dim) + (cq-cn)*sqrtdisc )
-          !     d = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
-          !         ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
-          !           cn*(1._r8 + br/mg_rain_props%eff_dim) - (cq-cn)*sqrtdisc )
-          !     if (abs(a*d - b*c) < 1.d-12) then
-          !       print *, lambr
-          !       print *, q(i,k), n(i,k)
-          !       print *, a, b, c, d
-          !       stop "matrix nearly singular"
-          !     end if
-          !     coeff(1) = (d*dq - b*dn)/(a*d - b*c)
-          !     coeff(2) = (a*dn - c*dq)/(a*d - b*c)
-          !     ! update fluxes to include the waves coeff1*w1 and coeff2*w2
-          !     fq(k-1,2) = s1(k)*coeff(1)*a + s2(k)*coeff(2)*b
-          !     fn(k-1,2) = s1(k)*coeff(1)*c + s2(k)*coeff(2)*d
-          !     ! DEBUG
-          !     !print *, s1(k), (cq*(1._r8 - br/mg_rain_props%eff_dim)*a + br/mg_rain_props%eff_dim*cq*a*c)/lambr/a
-          !     !print *, s1(k), (cn*(1._r8 + br/mg_rain_props%eff_dim)*c - br/mg_rain_props%eff_dim*cn/a*a)/lambr/c
-          !     !print *, s2(k), (cq*(1._r8 - br/mg_rain_props%eff_dim)*b + br/mg_rain_props%eff_dim*cq*a*d)/lambr/b
-          !     !print *, s2(k), (cn*(1._r8 + br/mg_rain_props%eff_dim)*d - br/mg_rain_props%eff_dim*cn/a*b)/lambr/d
-          !     !print *, dq, coeff(1)*a + coeff(2)*b
-          !     !print *, dn, coeff(1)*c + coeff(2)*d
-          !     !stop
-          !   end if
-          ! else
-            ! waves come from eigenvectors and eigenvalues of
-            ! Jacobian([alphaq*q, alphan*n]^T) =
-            ! [alphaq,      0
-            !       0, alphan]
-            ! in x_k cell
+#else
+          alphaq(k) = min(cq/lam(k)**br, 9.1_r8*g*rho(i,k)*rhof(i,k))
+          alphan(k) = min(cn/lam(k)**br, 9.1_r8*g*rho(i,k)*rhof(i,k))
+#endif
+
+#ifdef SED_NONLINEAR
+          ! obtain eigenvalues
+          if (limited(k)) then
+          ! Jacobian([alphaq*q, alphan*n]^T) =
+          ! [alphaq,      0
+          !       0, alphan]
             s1(k) = alphaq(k)
             s2(k) = alphan(k)
-            ! update fluxes: f(k-1) is flux at x_{k-1/2} edge, so finite volume
-            ! values at x_{k-1} and x_k are used to update f(k-1)
-            if (k > 1) then
-              dq = alphaq(k-1)/alphaq(k)*q(i,k-1) - q(i,k)
-              dn = alphan(k-1)/alphan(k)*n(i,k-1) - n(i,k)
-              ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
-              ! where
-              ! w1 = [1, 0]^T
-              ! w2 = [0, 1]^T
-              coeff(1) = dq
-              coeff(2) = dn
-              ! update fluxes to include the waves coeff1*w1 and coeff2*w2
-              fq(k-1,2) = s1(k)*coeff(1)
-              fn(k-1,2) = s2(k)*coeff(2)
-            else
-              ! consider q(i,0) and n(i,0) both zero at x_0,
-              fq(0,2) = -s1(1)*q(i,1)
-              fn(0,2) = -s2(1)*n(i,1)
-              ! store flux out for surface precipitation caluclation
-              fq(nlev,2) = alphaq(nlev)*q(i,nlev)
-            end if
+          else
+          ! Jacobian([alphaq(q,n)*q, alphan(q,n)*n]^T) =
+          ! [alphaq + q*dalphaq/dq,          q*dalphaq/dn
+          !           n*dalphan/dq, alphan + n*dalphan/dn]
+            tr = cq*(1._r8 - br/mg_rain_props%eff_dim) + &
+                 cn*(1._r8 + br/mg_rain_props%eff_dim)
+            sqrtdisc = sqrt( (1._r8 + br/mg_rain_props%eff_dim)**2 - &
+                             4._r8*br/mg_rain_props%eff_dim * cq/(cq-cn) )
+            s1(k) = 0.5_r8/lambr(k) * (tr - (cq-cn)*sqrtdisc)
+            s2(k) = 0.5_r8/lambr(k) * (tr + (cq-cn)*sqrtdisc)
+          end if
+#else
+          ! obtain eigenvalues
+          s1(k) = alphaq(k)
+          s2(k) = alphan(k)
+#endif
 
-          ! end if
-        else if (k > 1 .and. qic(k-1) > qsmall) then
-          ! Address waves propagating from non-zero cell into zero cell
-          ! by considering eigenvectors and eigenvalues from x_{k-1} cell
-          s1(k) = alphaq(k-1)
-          s2(k) = alphan(k-1)
-          dq = q(i,k-1) - q(i,k)
-          dn = n(i,k-1) - n(i,k)
-          coeff(1) = dq
-          coeff(2) = dn
-          fq(k-1,2) = s1(k)*coeff(1)
-          fn(k-1,2) = s2(k)*coeff(2)
+#ifdef SED_USEWPA
+          ! obtain eigenvectors and eigenvalues
+          if (limited(k)) then
+            w1(1,k) = 1._r8
+            w1(2,k) = 0._r8
+            w2(1,k) = 0._r8
+            w2(2,k) = 1._r8
+          else
+            w1(1,k) = qic(k)/nic(k)
+            w1(2,k) = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
+                      ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
+                      cn*(1._r8 + br/mg_rain_props%eff_dim) + (cq-cn)*sqrtdisc )
+            w2(1,k) = qic(k)/nic(k)
+            w2(2,k) = -0.5_r8*mg_rain_props%eff_dim/br/cq * &
+                      ( cq*(1._r8 - br/mg_rain_props%eff_dim) - &
+                      cn*(1._r8 + br/mg_rain_props%eff_dim) - (cq-cn)*sqrtdisc )
+          end if
+#endif
         end if
 
       else if (mg_type == MG_SNOW) then
         if (lam(k) .ge. qsmall) then
-           alphaq(k) = g*rho(i,k)* &
-              min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bs),1.2_r8*rhof(i,k))
-           alphan(k) = g*rho(i,k)* &
-              min(an(i,k)*gamma_b_plus1/lam(k)**bs,1.2_r8*rhof(i,k))
-           s1(k) = alphaq(k)
-           s2(k) = alphan(k)
-           ! update fluxes
-           fq(k,:) = s1(k)*q(i,k)
-           fn(k,:) = s2(k)*n(i,k)
+          alphaq(k) = g*rho(i,k)* &
+            min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bs),1.2_r8*rhof(i,k))
+          alphan(k) = g*rho(i,k)* &
+            min(an(i,k)*gamma_b_plus1/lam(k)**bs,1.2_r8*rhof(i,k))
+          s1(k) = alphaq(k)
+          s2(k) = alphan(k)
         end if
       end if
 
       ! Update CFL number
       cfl = max(cfl,s1(k)*deltat/pdel(i,k),s2(k)*deltat/pdel(i,k))
 
-      ! Detect if shock formation is possible
-      if ( k > 1 .and. (s1(k) < s1(k-1) .or. s2(k) < s2(k-1)) ) then
-        print *, "shock possible"
-        stop
-      end if
+      ! TODO: detect shock formation
+
     end do
 
-  end subroutine sed_CalcFluxAndCFL
+    ! if (mg_type == MG_LIQUID) then
+    !   gptl_ret = gptlstop_handle('CFL Calculation (cloud)',gptl_cfl_cloud)
+    ! else if (mg_type == MG_ICE) then
+    !   gptl_ret = gptlstop_handle('CFL Calculation (ice)',gptl_cfl_ice)
+    ! else if (mg_type == MG_RAIN) then
+    !   gptl_ret = gptlstop_handle('CFL Calculation (rain)',gptl_cfl_rain)
+    ! else if (mg_type == MG_SNOW) then
+    !   gptl_ret = gptlstop_handle('CFL Calculation (snow)',gptl_cfl_snow)
+    ! end if
+
+  end subroutine sed_CalcCFL
+
+  subroutine sed_CalcFlux(q,n,alphaq,alphan,s1,s2,w1,w2,nlev,i,mg_type,fq,fn)
+    implicit none
+    real(r8), intent(in)            :: q(:,:), n(:,:), alphaq(:), alphan(:)
+    real(r8), intent(in)            :: s1(:), s2(:), w1(:,:), w2(:,:)
+    integer,  intent(in)            :: nlev, i, mg_type
+    real(r8), intent(out)           :: fq(:,:), fn(:,:)
+
+    real(r8) :: qtemp(0:nlev), ntemp(0:nlev)
+    real(r8) :: a, b, c, d, dq, dn, coeff(2)
+    integer :: k
+
+    ! initialize values to zero
+    fq = 0._r8
+    fn = 0._r8
+
+
+
+    ! initialize qtemp and ntemp with ghost cell
+    qtemp(0) = 0._r8
+    qtemp(1:nlev) = q(i,:)
+    ntemp(0) = 0._r8
+    ntemp(1:nlev) = n(i,:)
+
+    ! Loop through levels to compute flux
+    do k=1,nlev
+
+      if(mg_type == MG_LIQUID) then
+        fq(k,:) = alphaq(k)*qtemp(k)
+        fn(k,:) = alphan(k)*ntemp(k)
+
+      else if (mg_type == MG_ICE) then
+        fq(k,:) = alphaq(k)*qtemp(k)
+        fn(k,:) = alphan(k)*ntemp(k)
+
+      else if (mg_type == MG_RAIN) then
+#ifdef SED_USEWPA
+        if (q(i,k) > qsmall) then
+          ! scaled jump in x_{k-1} and x_k values will be added to flux at
+          ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,b))
+          ! in x_k cell
+
+          ! compute scaled jump
+          dq = alphaq(k-1)/alphaq(k)*qtemp(k-1) - qtemp(k)
+          dn = alphan(k-1)/alphan(k)*ntemp(k-1) - ntemp(k)
+
+        else if (k > 1 .and. qic(k-1) > qsmall) then
+        ! to handle waves going from a non-zero cell into a zero cell,
+        ! jump in x_{k-1} and x_k values will be added to flux at
+        ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,b))
+        ! in x_{k-1} cell
+          dq = qtemp(k-1) - qtemp(k)
+          dn = ntemp(k-1) - ntemp(k)
+          s1(k) = s1(k-1)
+          w1(:,k) = w1(:,k-1)
+          s2(k) = s2(k-1)
+          w2(:,k) = w2(:,k-1)
+        end if
+
+        if (s1(k) > 0._r8) then
+        ! Update fluxes at x_{k-1/2} to include the waves coeff1*w1 and coeff2*w2
+          ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
+          a = w1(1,k)
+          c = w1(2,k)
+          b = w2(1,k)
+          d = w2(2,k)
+          if (abs(a*d - b*c) < 1.d-12) then
+            print *, a, b, c, d
+            stop "matrix nearly singular"
+          end if
+          coeff(1) = (d*dq - b*dn)/(a*d - b*c)
+          coeff(2) = (a*dn - c*dq)/(a*d - b*c)
+
+          fq(k-1,2) = s1(k)*coeff(1)*w1(1,k) + s2(k)*coeff(2)*w2(1,k)
+          fn(k-1,2) = s1(k)*coeff(1)*w1(2,k) + s2(k)*coeff(2)*w2(2,k)
+        end if
+
+        if (k == nlev) then
+          ! store flux out for surface precipitation calculation
+          fq(nlev,2) = alphaq(nlev)*qtemp(nlev)
+        end if
+
+#else
+        fq(k,:) = alphaq(k)*qtemp(k)
+        fn(k,:) = alphan(k)*ntemp(k)
+#endif
+
+      else if (mg_type == MG_SNOW) then
+        fq(k,:) = alphaq(k)*qtemp(k)
+        fn(k,:) = alphan(k)*ntemp(k)
+      end if
+
+    end do
+
+  end subroutine sed_CalcFlux
+
 
   subroutine sed_AdvanceOneStep(q,fq,n,fn,pdel,deltat,deltat_sed,nlev,i,mg_type,g, &
     qtend,ntend,prect,qsedtend,cloud_frac,qvlat,tlat,xxl,preci,qsevap)

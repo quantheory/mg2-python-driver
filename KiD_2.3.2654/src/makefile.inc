@@ -42,17 +42,17 @@ defs:
 
 $(OBJSF90_UM): $(OBJDIR)/%.o: %.f90 
 	[ -d $(OBJDIR)/UM_source ] || mkdir -p "$(OBJDIR)/UM_source"; \
-	$(F90D) -c $< -o $@ $(INCDF)
+	$(F90D) -c $< -o $@ $(INCDF) $(IGPTL)
 
 $(OBJSF90_4A): $(OBJDIR)/%.o: %.f90 
 	[ -d $(OBJDIR)/4A_code ] || mkdir -p "$(OBJDIR)/4A_code"; \
-	$(F90D) -c $< -o $@ $(INCDF)
+	$(F90D) -c $< -o $@ $(INCDF) $(IGPTL)
 
 $(OBJSF90): $(OBJDIR)/%.o: %.f90 
-	$(F90D) -c $< -o $@ $(INCDF)
+	$(F90D) -c $< -o $@ $(INCDF) $(IGPTL)
 
 $(OBJSF): $(OBJDIR)/%.o: %.f 
-	$(F90D)  -c $< -o $@ $(INCDF)
+	$(F90D)  -c $< -o $@ $(INCDF) $(IGPTL)
 
 $(EXECUTABLE): $(OBJS) $(OBJSF90_UM) $(OBJSF90_4A)
 	$(LD) -o $(EXECDIR)/$(EXECUTABLE) $(OBJDIR)/*.o $(OBJSF90_4A) $(OBJSF90_UM) $(LDFLAGS)

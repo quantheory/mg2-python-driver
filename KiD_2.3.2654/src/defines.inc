@@ -1,5 +1,5 @@
 # set the appropriate resolutions for building each test case.
-# 
+#
 # The resolutions chosen here are as specified for any intercomparison
 
 #
@@ -77,4 +77,19 @@ ALLOCATABLE_TYPE=0
 # Defines to pass to compiler
 DEFS=-D$(D1) -D$(D2) -DDEF_CASE=\'$(CASE)\' -DCOMMANDLINE=$(COMMANDLINE) -DMODEL_KiD=1 -DMODEL_LEM=2 -DMODEL_UM=3 -DDEF_MODEL=MODEL_KiD -DALLOCATABLE_TYPE=$(ALLOCATABLE_TYPE) -DSHIPWAY_MICRO=$(SHIPWAY_MICRO) -DUM_MICRO=$(UM_MICRO)
 
+# add defs to determine sedimentation approach
+ifeq ($(SED_UPDATECFL), True)
+DEFS+=-DSED_UPDATECFL
+endif
 
+ifeq ($(SED_COMBINELAMBDA), True)
+DEFS+=-DSED_COMBINELAMBDA
+endif
+
+ifeq ($(SED_NONLINEAR), True)
+DEFS+=-DSED_NONLINEAR
+endif
+
+ifeq ($(SED_USEWPA), True)
+DEFS+=-DSED_USEWPA
+endif

@@ -459,13 +459,17 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        bergeron_process_snow
 
   use Sedimentation, only: &
-       sed_CalcFluxAndCFL, &
+       sed_CalcCFL, &
+       sed_CalcFlux, &
        sed_AdvanceOneStep, &
        MG_LIQUID, &
        MG_ICE, &
        MG_RAIN,&
        MG_SNOW, &
        CFL
+
+   use gptl, only: gptlstart_handle, gptlstop_handle
+   use gptl_kid
 
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
@@ -904,15 +908,12 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 !!== KZ_DCS
 
   ! parameters for cloud water and cloud ice sedimentation calculations
-  real(r8) :: fc(0:nlev,2)
-  real(r8) :: fnc(0:nlev,2)
-  real(r8) :: fi(0:nlev,2)
-  real(r8) :: fni(0:nlev,2)
-
-  real(r8) :: fr(0:nlev,2)
-  real(r8) :: fnr(0:nlev,2)
-  real(r8) :: fs(0:nlev,2)
-  real(r8) :: fns(0:nlev,2)
+  real(r8) :: fc(0:nlev,2), fnc(0:nlev,2)
+  real(r8) :: fi(0:nlev,2), fni(0:nlev,2)
+  real(r8) :: fr(0:nlev,2), fnr(0:nlev,2)
+  real(r8) :: fs(0:nlev,2), fns(0:nlev,2)
+  real(r8) :: alphaq(0:nlev), alphan(0:nlev)
+  real(r8) :: s1(nlev),s2(nlev), w1(2,nlev), w2(2,nlev)
 
   ! sum of source/sink terms for diagnostic precip
   real(r8) :: qstend(mgncol,nlev)     ! snow mixing ratio
@@ -2452,19 +2453,36 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      ! subcycle
      do while (time_sed > qsmall)
-       ! obtain fall speeds
-       call sed_CalcFluxAndCFL(dumi,qitend,dumni,nitend,icldm,rho,pdel,nlev,i,&
-         MG_ICE,time_sed,g,ain,rhof,fi,fni,dum,&
+       gptl_ret = gptlstart_handle('Sedimentation (ice)',gptl_sed_ice)
+       ! obtain CFL number
+#ifndef SED_UPDATECFL
+       if (nstep == 0) then
+#endif
+!       gptl_ret = gptlstart_handle('CalcCFL total (ice)',gptl_calccfl_total_ice)
+       call sed_CalcCFL(dumi,dumni,icldm,rho,pdel,nlev,i,&
+         MG_ICE,deltat_sed,g,ain,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
          ncons=nicons,nnst=ninst,&
          gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
+!       gptl_ret = gptlstop_handle('CalcCFL total (ice)',gptl_calccfl_total_ice)
+#ifndef SED_UPDATECFL
+      else
+        dum = CFL
+      end if
+#endif
        ! update deltat_sed for target CFL number
-       deltat_sed = min(time_sed*CFL/dum,time_sed)
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
        ! advance cloud ice sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep+1
+!       gptl_ret = gptlstart_handle('Flux Calculation (ice)',gptl_flux_ice)
+       call sed_CalcFlux(dumi,dumni,alphaq,alphan,s1,s2,w1,w2,nlev,i,MG_ICE,fi,fni)
+!       gptl_ret = gptlstop_handle('Flux Calculation (ice)',gptl_flux_ice)
+!       gptl_ret = gptlstart_handle('Advance Solution (ice)',gptl_advance_sol_ice)
        call sed_AdvanceOneStep(dumi,fi,dumni,fni,pdel,deltat,deltat_sed,nlev,i,MG_ICE,g, &
          qitend,nitend,preci,qisedten,&
          cloud_frac=icldm,qvlat=qvlat,tlat=tlat,xxl=xxls,preci=preci,qsevap=qisevap)
+!       gptl_ret = gptlstop_handle('Advance Solution (ice)',gptl_advance_sol_ice)
+       gptl_ret = gptlstop_handle('Sedimentation (ice)',gptl_sed_ice)
      end do
 
      write(fid_nstep,'(I12,4X,I12,4X)',advance="no") mphys_calls, nstep
@@ -2477,22 +2495,38 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      ! subcycle
      do while (time_sed > qsmall)
+       gptl_ret = gptlstart_handle('Sedimentation (cloud)',gptl_sed_cloud)
        ! obtain fall speeds
-       call sed_CalcFluxAndCFL(dumc,qctend,dumnc,nctend,lcldm,rho,pdel,nlev,i,&
-         MG_LIQUID,time_sed,g,acn,rhof,fc,fnc,dum,&
+#ifndef SED_UPDATECFL
+       if (nstep == 0) then
+#endif
+!       gptl_ret = gptlstart_handle('CalcCFL total (cloud)',gptl_calccfl_total_cloud)
+       call sed_CalcCFL(dumc,dumnc,lcldm,rho,pdel,nlev,i,&
+         MG_LIQUID,deltat_sed,g,acn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
          ncons=nccons,nnst=ncnst)
+!       gptl_ret = gptlstop_handle('CalcCFL total (cloud)',gptl_calccfl_total_cloud)
+#ifndef SED_UPDATECFL
+       else
+         dum = CFL
+       end if
+#endif
        ! update deltat_sed for target CFL number
-       deltat_sed = min(time_sed*CFL/dum,time_sed)
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
        ! advance cloud liquid sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1
+!       gptl_ret = gptlstart_handle('Flux Calculation (cloud)',gptl_flux_cloud)
+       call sed_CalcFlux(dumc,dumnc,alphaq,alphan,s1,s2,w1,w2,nlev,i,MG_LIQUID,fc,fnc)
+!       gptl_ret = gptlstop_handle('Flux Calculation (cloud)',gptl_flux_cloud)
+!       gptl_ret = gptlstart_handle('Advance Solution (cloud)',gptl_advance_sol_cloud)
        call sed_AdvanceOneStep(dumc,fc,dumnc,fnc,pdel,deltat,deltat_sed,nlev,i,MG_LIQUID,g, &
          qctend,nctend,prect,qcsedten,&
          cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
+!       gptl_ret = gptlstop_handle('Advance Solution (cloud)',gptl_advance_sol_cloud)
+        gptl_ret = gptlstop_handle('Sedimentation (cloud)',gptl_sed_cloud)
      end do
 
      write(fid_nstep,'(I12,4X)',advance="no") nstep
-
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      deltat_sed = deltat
@@ -2501,17 +2535,34 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      ! subcycle
      do while (time_sed > qsmall)
+       gptl_ret = gptlstart_handle('Sedimentation (rain)',gptl_sed_rain)
        ! obtain fall speeds
-       call sed_CalcFluxAndCFL(dumr,qrtend,dumnr,nrtend,precip_frac,rho,pdel,nlev,i,&
-         MG_RAIN,time_sed,g,arn,rhof,fr,fnr,dum,&
+#ifndef SED_UPDATECFL
+       if (nstep == 0) then
+#endif
+!       gptl_ret = gptlstart_handle('CalcCFL total (rain)',gptl_calccfl_total_rain)
+       call sed_CalcCFL(dumr,dumnr,precip_frac,rho,pdel,nlev,i,&
+         MG_RAIN,deltat_sed,g,arn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
          gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
+!       gptl_ret = gptlstop_handle('CalcCFL total (rain)',gptl_calccfl_total_rain)
+#ifndef SED_UPDATECFL
+       else
+         dum = CFL
+       end if
+#endif
        ! update deltat_sed for target CFL number
-       deltat_sed = min(time_sed*CFL/dum,time_sed)
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
        ! advance rain sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1
+!       gptl_ret = gptlstart_handle('Flux Calculation (rain)',gptl_flux_rain)
+       call sed_CalcFlux(dumr,dumnr,alphaq,alphan,s1,s2,w1,w2,nlev,i,MG_RAIN,fr,fnr)
+!       gptl_ret = gptlstop_handle('Flux Calculation (rain)',gptl_flux_rain)
+!       gptl_ret = gptlstart_handle('Advance Solution (rain)',gptl_advance_sol_rain)
        call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
          qrtend,nrtend,prect,qrsedten)
+!       gptl_ret = gptlstop_handle('Advance Solution (rain)',gptl_advance_sol_rain)
+        gptl_ret = gptlstop_handle('Sedimentation (rain)',gptl_sed_rain)
      end do
 
      write(fid_nstep,'(I12,4X)',advance="no") nstep
@@ -2524,17 +2575,34 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      ! subcycle
      do while (time_sed > qsmall)
+       gptl_ret = gptlstart_handle('Sedimentation (snow)',gptl_sed_snow)
        ! obtain fall speeds
-       call sed_CalcFluxAndCFL(dums,qstend,dumns,nstend,precip_frac,rho,pdel,nlev,i,&
-         MG_SNOW,time_sed,g,asn,rhof,fs,fns,dum,&
+#ifndef SED_UPDATECFL
+      if (nstep == 0) then
+#endif
+!      gptl_ret = gptlstart_handle('CalcCFL total (snow)',gptl_calccfl_total_snow)
+      call sed_CalcCFL(dums,dumns,precip_frac,rho,pdel,nlev,i,&
+         MG_SNOW,deltat_sed,g,asn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
          gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
+!      gptl_ret = gptlstop_handle('CalcCFL total (snow)',gptl_calccfl_total_snow)
+#ifndef SED_UPDATECFL
+      else
+        dum = CFL
+      end if
+#endif
        ! update deltat_sed for target CFL number
-       deltat_sed = min(time_sed*CFL/dum,time_sed)
+       deltat_sed = min(deltat_sed*CFL/dum,time_sed)
        ! advance snow sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1
+!       gptl_ret = gptlstart_handle('Flux Calculation (snow)',gptl_flux_snow)
+       call sed_CalcFlux(dums,dumns,alphaq,alphan,s1,s2,w1,w2,nlev,i,MG_SNOW,fs,fns)
+!       gptl_ret = gptlstop_handle('Flux Calculation (snow)',gptl_flux_snow)
+!       gptl_ret = gptlstart_handle('Advance Solution (snow)',gptl_advance_sol_snow)
        call sed_AdvanceOneStep(dums,fs,dumns,fns,pdel,deltat,deltat_sed,nlev,i,MG_SNOW,g, &
          qstend,nstend,prect,qssedten,preci=preci)
+!       gptl_ret = gptlstop_handle('Advance Solution (snow)',gptl_advance_sol_snow)
+       gptl_ret = gptlstop_handle('Sedimentation (snow)',gptl_sed_snow)
      end do
 
      write(fid_nstep,'(I12,4X)') nstep

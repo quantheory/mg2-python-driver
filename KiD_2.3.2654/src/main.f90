@@ -4,7 +4,7 @@
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
 !
-! Driver for 1D Kinematic Driver (KiD) model 
+! Driver for 1D Kinematic Driver (KiD) model
 !
 ! Author: Ben Shipway
 !
@@ -12,7 +12,7 @@
 !
 
 Module main
- 
+
   Use typeKind
   Use parameters, only : dt, dg_dt, nx
   Use namelists, only : read_namelist
@@ -35,25 +35,36 @@ Module main
 contains
 
   subroutine main_loop
-    
-    integer :: itime      ! loop counter for time
+    use gptl, only: gptlinitialize, gptlfinalize, gptlpr_file
+    use namelists, only: fileName
+
+    integer :: itime       ! loop counter for time
+    integer :: gptlret     ! for GPTL functions
 
     real(wp) :: dtm        ! microphysics time step size
     real(wp) :: dt_orig    ! temporary var for time step
     integer  :: mcount     ! PMC in namelist now: ,mstep
     logical  :: call_micro ! flag to track if microphysics was computed this dynamics step
-    
+    character(200) :: gptlfilename
+
+
     !
     ! Start by reading in namelists
     !
 
     if (l_namelists) call read_namelist
 
+    ! Initialize GPTL and get filename
+    gptlret = gptlinitialize()
+    gptlfilename = trim(fileName)
+    gptlret = len_trim(fileName)
+    gptlfilename = gptlfilename(:(gptlret-4)) // '_timing.txt'
+
     !+++PMC: put macro stepping where dt is actually known.
     ! now in namelist:    mstep = 2  ! call micro every mstep (an integer) dynamics calls
     mcount = 0        ! just need to initialize the counter which is incremented below
     dtm    = dt*mstep ! micro timestep if only call every mstep dynamics steps
-    
+
     write(*,*) 'mstep, dtm = ', mstep, dtm
     !---PMC
 
@@ -81,9 +92,9 @@ contains
     ! Do we want to do diagnostics on this timestep?
     call query_dgstep
 
-    if ( nx == 1 ) then 
+    if ( nx == 1 ) then
        call save_diagnostics_1d
-    else 
+    else
        call save_diagnostics_2d
     endif
 
@@ -91,7 +102,7 @@ contains
 
        time=time+dt
        time_step=time_step+1
-  
+
        ! Do we want to do diagnostics on this timestep?
        call query_dgstep
 
@@ -140,7 +151,7 @@ contains
        call step_column(.true., dt)
 
        if (time > end_time) exit
-       
+
        if ( nx == 1 ) then
           call save_diagnostics_1d
        else
@@ -150,8 +161,11 @@ contains
     end do
 
     if (l_write_dgs) call write_diagnostics
-    
+
     call finalize_stats()
+
+    gptlret = gptlpr_file(trim(gptlfilename))
+    gptlret = gptlfinalize()
 
   end subroutine main_loop
 
