@@ -397,7 +397,8 @@ subroutine micro_mg_tend ( &
      errstring, & ! Below arguments are "optional" (pass null pointers to omit).
      tnd_qsnow,          tnd_nsnow,          re_ice,             &
      prer_evap,                                                      &
-     frzimm,             frzcnt,             frzdep)
+     frzimm,             frzcnt,             frzdep, &
+     do_sed, do_inst)
 
   ! Constituent properties.
   use micro_mg_utils, only: &
@@ -585,6 +586,9 @@ subroutine micro_mg_tend ( &
   real(r8), intent(in), optional :: frzimm(mgncol,nlev) ! Number tendency due to immersion freezing (1/cm3)
   real(r8), intent(in), optional :: frzcnt(mgncol,nlev) ! Number tendency due to contact freezing (1/cm3)
   real(r8), intent(in), optional :: frzdep(mgncol,nlev) ! Number tendency due to deposition nucleation (1/cm3)
+
+  logical, intent(in), optional :: do_sed ! Do sedimentation? (default .true.)
+  logical, intent(in), optional :: do_inst ! Do instantaneous processes? (default .true.)
 
   ! local workspace
   ! all units mks unless otherwise stated
@@ -809,6 +813,9 @@ subroutine micro_mg_tend ( &
   ! of sedimentation to MG2 timestep, respectively.
   real(r8) :: sed_deltat, sed_time, sed_step_ratio
 
+  ! Processes that can be disabled.
+  logical :: do_sed_loc, do_inst_loc
+
   ! loop array variables
   ! "i" and "k" are column/level iterators for internal (MG) variables
   ! "n" is used for other looping (currently just sedimentation)
@@ -832,6 +839,15 @@ subroutine micro_mg_tend ( &
        (present(frzimm) .and. present(frzcnt) .and. present(frzdep)))) then
      errstring = "External heterogeneous freezing is enabled, but the &
           &required tendencies were not all passed in."
+  end if
+
+  do_sed_loc = .true.
+  if (present(do_sed)) then
+     do_sed_loc = do_sed
+  end if
+  do_inst_loc = .true.
+  if (present(do_inst)) then
+     do_inst_loc = do_inst
   end if
 
   ! Process inputs
@@ -1095,7 +1111,7 @@ subroutine micro_mg_tend ( &
   ! ice nucleation if activated nuclei exist at t<-5C AND rhmini + 5%
   !-------------------------------------------------------
 
-  if (do_cldice) then
+  if (do_inst_loc .and. do_cldice) then
      where (naai > 0._r8 .and. t < icenuct .and. &
           relhum*esl/esi > rhmini+0.05_r8)
 
@@ -1127,7 +1143,7 @@ subroutine micro_mg_tend ( &
         ! calculate instantaneous precip processes (melting and homogeneous freezing)
 
         ! melting of snow at +2 C
-
+        pre_inst_if: if (do_inst_loc) then
         if (t(i,k) > snowmelt) then
            if (qs(i,k) > 0._r8) then
 
@@ -1188,7 +1204,7 @@ subroutine micro_mg_tend ( &
 
            end if
         end if
-
+        end if pre_inst_if
         ! obtain in-cloud values of cloud water/ice mixing ratios and number concentrations
         !-------------------------------------------------------
         ! for microphysical process calculations
@@ -2140,6 +2156,7 @@ subroutine micro_mg_tend ( &
 
      end do       !!! vertical loop
 
+     sed_if: if (do_sed_loc) then
      ! initialize nstep for sedimentation sub-steps
 
      ! calculate number of split time steps to ensure courant stability criteria
@@ -2389,6 +2406,7 @@ subroutine micro_mg_tend ( &
         preci(i) = preci(i)+falouts(nlev)/g/real(nstep)/1000._r8
 
      end do   !! nstep loop
+     end if sed_if
 
      ! end sedimentation
      !ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -2425,7 +2443,7 @@ subroutine micro_mg_tend ( &
 
         ! calculate instantaneous processes (melting, homogeneous freezing)
         !====================================================================
-
+        inst_if: if (do_inst_loc) then
         ! melting of snow at +2 C
 
         if (t(i,k)+tlat(i,k)/cpp*deltat > snowmelt) then
@@ -2600,6 +2618,7 @@ subroutine micro_mg_tend ( &
               tlat(i,k)=tlat(i,k)+dum*(1._r8-dum1)*xxlv+dum*dum1*xxls
            end if
         end if
+        end if inst_if
 
         ! calculate effective radius for pass to radiation code
         !=========================================================
