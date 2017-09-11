@@ -394,6 +394,14 @@ subroutine micro_mg_tend ( &
      drout2,                       dsout2,                       &
      freqs,                        freqr,                        &
      nfice,                        qcrat,                        &
+     precip_frac,                  nadjtot,                      &
+     ncmeitot,           mnudeptot,          nnudeptot,          &
+     npsacwstot,         nnuccctot,          nnuccttot,          &
+     nsacwitot,          nnuccrtot,          mnuccritot,         &
+     nnuccritot,         npracstot,          npratot,            &
+     nprctot,            nprc1tot,           npraitot,           &
+     nprcitot,           nsubrtot,           nraggtot,           &
+     nsaggtot,                                                   &
      errstring, & ! Below arguments are "optional" (pass null pointers to omit).
      tnd_qsnow,          tnd_nsnow,          re_ice,             &
      prer_evap,                                                      &
@@ -568,7 +576,27 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: freqr(mgncol,nlev)        ! fractional occurrence of rain
   real(r8), intent(out) :: nfice(mgncol,nlev)        ! fractional occurrence of ice
   real(r8), intent(out) :: qcrat(mgncol,nlev)        ! limiter for qc process rates (1=no limit --> 0. no qc)
-
+  real(r8), intent(out) :: precip_frac(mgncol,nlev)  ! precip fraction assuming maximum overlap
+  real(r8), intent(out) :: nsubrtot(mgncol,nlev)        ! rain number evaporation
+  real(r8), intent(out) :: ncmeitot(mgncol,nlev)     ! number tendency from nucleation-sublimation (1/kg/s)
+  real(r8), intent(out) :: mnudeptot(mgncol,nlev)    ! mass tendency of deposition nucleation (from external scheme)
+  real(r8), intent(out) :: nnudeptot(mgncol,nlev)    ! number tendency of deposition nucleation (from external scheme)
+  real(r8), intent(out) :: npsacwstot(mgncol,nlev)   ! number collection of cloud water by snow
+  real(r8), intent(out) :: nnuccctot(mgncol,nlev)    ! number tend due to immersion freezing
+  real(r8), intent(out) :: nnuccttot(mgncol,nlev)    ! number tend due to contact freezing
+  real(r8), intent(out) :: nsacwitot(mgncol,nlev)    ! number tend due to H-M splintering
+  real(r8), intent(out) :: nnuccrtot(mgncol,nlev)    ! number tendency due to heterogeneous freezing of rain to snow (1/s)
+  real(r8), intent(out) :: mnuccritot(mgncol,nlev)   ! mixing ratio tendency due to heterogeneous freezing of rain to cloud ice (1/s)
+  real(r8), intent(out) :: nnuccritot(mgncol,nlev)   ! number tendency due to heterogeneous freezing of rain to cloud ice (1/s)
+  real(r8), intent(out) :: npracstot(mgncol,nlev)    ! number tendency due to accretion of rain by snow (1/s)
+  real(r8), intent(out) :: npratot(mgncol,nlev)      ! number accretion of cloud by rain
+  real(r8), intent(out) :: nprctot(mgncol,nlev)      ! number autoconversion of cloud to rain (rain)
+  real(r8), intent(out) :: nprc1tot(mgncol,nlev)     ! number autoconversion of cloud to rain (droplets)
+  real(r8), intent(out) :: npraitot(mgncol,nlev)     ! number accretion of cloud ice by snow
+  real(r8), intent(out) :: nprcitot(mgncol,nlev)     ! number autoconversion of cloud ice to snow
+  real(r8), intent(out) :: nraggtot(mgncol,nlev)     ! number tendency from rain aggregation
+  real(r8), intent(out) :: nsaggtot(mgncol,nlev)     ! number tendency from snow aggregation
+  real(r8), intent(out) :: nadjtot(mgncol,nlev,4)    ! size adjustment for each hydrometeor
   real(r8), intent(out) :: prer_evap(mgncol,nlev)
 
   character(128),   intent(out) :: errstring  ! output status (non-blank for error return)
@@ -615,7 +643,6 @@ subroutine micro_mg_tend ( &
   real(r8) :: rhof(mgncol,nlev)   ! density correction factor for fallspeed
 
   ! cloud fractions
-  real(r8) :: precip_frac(mgncol,nlev) ! precip fraction assuming maximum overlap
   real(r8) :: cldm(mgncol,nlev)   ! cloud fraction
   real(r8) :: icldm(mgncol,nlev)  ! ice cloud fraction
   real(r8) :: lcldm(mgncol,nlev)  ! liq cloud fraction
@@ -951,6 +978,7 @@ subroutine micro_mg_tend ( &
   qisevap=0._r8
   qvres  =0._r8
   cmeitot =0._r8
+  ncmeitot =0._r8
   vtrmc =0._r8
   vtrmi =0._r8
   qcsedten =0._r8
@@ -977,6 +1005,8 @@ subroutine micro_mg_tend ( &
   meltsdttot=0._r8
   frzrdttot=0._r8
   mnuccdtot=0._r8
+
+  nadjtot = 0._r8
 
   rflx=0._r8
   sflx=0._r8
@@ -1132,6 +1162,9 @@ subroutine micro_mg_tend ( &
         mnuccd = 0._r8
      end where
 
+  else
+     nnuccd = 0._r8
+     mnuccd = 0._r8
   end if
 
 
@@ -1532,7 +1565,11 @@ subroutine micro_mg_tend ( &
 
         berg(:,k)=berg(:,k)*micro_mg_berg_eff_factor
 
-        nsubi(:,k) = ice_sublim(:,k) / qi(:,k) * ni(:,k) / icldm(:,k)
+        where (qi(:,k) >= qsmall)
+           nsubi(:,k) = ice_sublim(:,k) / qi(:,k) * ni(:,k) / icldm(:,k)
+        elsewhere
+           nsubi(:,k) = 0._r8
+        end where
 
         ! bergeron process should not reduce nc unless
         ! all ql is removed (which is handled elsewhere)
@@ -1898,6 +1935,8 @@ subroutine micro_mg_tend ( &
         nevapr(i,k) = -pre(i,k)*precip_frac(i,k)
         prer_evap(i,k) = -pre(i,k)*precip_frac(i,k)
 
+        mnudeptot(i,k) = mnudep(i,k) * lcldm(i,k)
+
         ! change to make sure prain is positive: do not remove snow from
         ! prain used for wet deposition
         prain(i,k) = (pra(i,k)+prc(i,k))*lcldm(i,k)+(-pracs(i,k)- &
@@ -1932,6 +1971,7 @@ subroutine micro_mg_tend ( &
 
         pracstot(i,k) = pracs(i,k)*precip_frac(i,k)
         mnuccrtot(i,k) = mnuccr(i,k)*precip_frac(i,k)
+        mnuccritot(i,k) = mnuccri(i,k)*precip_frac(i,k)
 
 
         nctend(i,k) = nctend(i,k)+&
@@ -1956,12 +1996,30 @@ subroutine micro_mg_tend ( &
              nprc(i,k)*lcldm(i,k)+(nsubr(i,k)-npracs(i,k)-nnuccr(i,k) &
              -nnuccri(i,k)+nragg(i,k))*precip_frac(i,k)
 
+        ncmeitot(i,k) = nnuccd(i,k) + nsubi(i,k)*icldm(i,k)
+        nnudeptot(i,k) = nnudep(i,k) * lcldm(i,k)
+        npsacwstot(i,k) = npsacws(i,k) * lcldm(i,k)
+        nnuccctot(i,k) = nnuccc(i,k)*lcldm(i,k)
+        nnuccttot(i,k) = nnucct(i,k)*lcldm(i,k)
+        nsacwitot(i,k) = nsacwi(i,k)*lcldm(i,k)
+        nnuccrtot(i,k) = nnuccr(i,k)*precip_frac(i,k)
+        nnuccritot(i,k) = nnuccri(i,k)*precip_frac(i,k)
+        npracstot(i,k) = npracs(i,k)*precip_frac(i,k)
+        npratot(i,k) = npra(i,k)*lcldm(i,k)
+        nprctot(i,k) = nprc(i,k)*lcldm(i,k)
+        nprc1tot(i,k) = nprc1(i,k)*lcldm(i,k)
+        nprcitot(i,k) = nprci(i,k)*icldm(i,k)
+        npraitot(i,k) = nprai(i,k)*icldm(i,k)
+        nsubrtot(i,k) = nsubr(i,k)*precip_frac(i,k)
+        nraggtot(i,k) = nragg(i,k)*precip_frac(i,k)
+        nsaggtot(i,k) = nsagg(i,k)*precip_frac(i,k)
+
         ! make sure that ni at advanced time step does not exceed
         ! maximum (existing N + source terms*dt), which is possible if mtime < deltat
         ! note that currently mtime = deltat
         !================================================================
 
-        if (do_cldice .and. nitend(i,k).gt.0._r8.and.ni(i,k)+nitend(i,k)*deltat.gt.nimax(i,k)) then
+        if (do_inst_loc .and. do_cldice .and. nitend(i,k).gt.0._r8.and.ni(i,k)+nitend(i,k)*deltat.gt.nimax(i,k)) then
            nitend(i,k)=max(0._r8,(nimax(i,k)-ni(i,k))/deltat)
         end if
 
@@ -2663,7 +2721,9 @@ subroutine micro_mg_tend ( &
 
               if (dumni(i,k) /=dum_2D(i,k)) then
                  ! adjust number conc if needed to keep mean size in reasonable range
+                 nadjtot(i,k,2) = -nitend(i,k)
                  nitend(i,k)=(dumni(i,k)*icldm(i,k)-ni(i,k))/deltat
+                 nadjtot(i,k,2) = nadjtot(i,k,2) + nitend(i,k)
               end if
 
               effi(i,k) = 1.5_r8/lami(i,k)*1.e6_r8
@@ -2704,7 +2764,9 @@ subroutine micro_mg_tend ( &
 
            if (dum /= dumnc(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
+              nadjtot(i,k,1) = -nctend(i,k)
               nctend(i,k)=(dumnc(i,k)*lcldm(i,k)-nc(i,k))/deltat
+              nadjtot(i,k,1) = nadjtot(i,k,1) + nctend(i,k)
            end if
 
            effc(i,k) = (pgam(i,k)+3._r8)/lamc(i,k)/2._r8*1.e6_r8
@@ -2746,7 +2808,9 @@ subroutine micro_mg_tend ( &
 
            if (dum /= dumnr(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
+              nadjtot(i,k,3) = -nrtend(i,k)
               nrtend(i,k)=(dumnr(i,k)*precip_frac(i,k)-nr(i,k))/deltat
+              nadjtot(i,k,3) = nadjtot(i,k,3) + nrtend(i,k)
            end if
 
         end if
@@ -2763,7 +2827,9 @@ subroutine micro_mg_tend ( &
 
            if (dum /= dumns(i,k)) then
               ! adjust number conc if needed to keep mean size in reasonable range
+              nadjtot(i,k,4) = -nstend(i,k)
               nstend(i,k)=(dumns(i,k)*precip_frac(i,k)-ns(i,k))/deltat
+              nadjtot(i,k,4) = nadjtot(i,k,4) + nstend(i,k)
            end if
 
         end if
@@ -2774,10 +2840,26 @@ subroutine micro_mg_tend ( &
      do k=1,nlev
         ! if updated q (after microphysics) is zero, then ensure updated n is also zero
         !=================================================================================
-        if (qc(i,k)+qctend(i,k)*deltat.lt.qsmall) nctend(i,k)=-nc(i,k)/deltat
-        if (do_cldice .and. qi(i,k)+qitend(i,k)*deltat.lt.qsmall) nitend(i,k)=-ni(i,k)/deltat
-        if (qr(i,k)+qrtend(i,k)*deltat.lt.qsmall) nrtend(i,k)=-nr(i,k)/deltat
-        if (qs(i,k)+qstend(i,k)*deltat.lt.qsmall) nstend(i,k)=-ns(i,k)/deltat
+        if (qc(i,k)+qctend(i,k)*deltat.lt.qsmall) then
+           nadjtot(i,k,1) = nadjtot(i,k,1) - nctend(i,k)
+           nctend(i,k)=-nc(i,k)/deltat
+           nadjtot(i,k,1) = nadjtot(i,k,1) + nctend(i,k)
+        end if
+        if (do_cldice .and. qi(i,k)+qitend(i,k)*deltat.lt.qsmall) then
+           nadjtot(i,k,2) = nadjtot(i,k,2) - nitend(i,k)
+           nitend(i,k)=-ni(i,k)/deltat
+           nadjtot(i,k,2) = nadjtot(i,k,2) + nitend(i,k)
+        end if
+        if (qr(i,k)+qrtend(i,k)*deltat.lt.qsmall) then
+           nadjtot(i,k,3) = nadjtot(i,k,3) - nrtend(i,k)
+           nrtend(i,k)=-nr(i,k)/deltat
+           nadjtot(i,k,3) = nadjtot(i,k,3) + nrtend(i,k)
+        end if
+        if (qs(i,k)+qstend(i,k)*deltat.lt.qsmall) then
+           nadjtot(i,k,4) = nadjtot(i,k,4) - nstend(i,k)
+           nstend(i,k)=-ns(i,k)/deltat
+           nadjtot(i,k,4) = nadjtot(i,k,4) + nstend(i,k)
+        end if
 
      end do
 
