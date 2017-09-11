@@ -160,7 +160,7 @@ contains
 #endif
 
 #ifdef SED_USEWPA
-          ! obtain eigenvectors and eigenvalues
+          ! obtain eigenvectors
           if (limited(k)) then
             w1(1,k) = 1._r8
             w1(2,k) = 0._r8
