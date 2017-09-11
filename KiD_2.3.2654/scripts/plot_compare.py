@@ -5,9 +5,7 @@ import socket
 import os
 from analysis_tools import *
 
-hostname = socket.gethostname()
-if ("tux" in hostname):
-  wrkdir = os.getenv('HOME') + '/workspace/micro_physics/KiD_2.3.2654/output'
+wrkdir = os.getenv('PWD')
 
 # Dictionary for sedimentation methods (name: directory)
 methodDict = {'v0: original': wrkdir + '/warm1_v0',
@@ -39,7 +37,8 @@ for method in methodDict.keys():
   runDict[method] = runs
 
 # Dictionary for timings (quantity name: list of timings)
-timingDict = {'rain': ['Sedimentation']}
+timingDict = {'rain': ['CFL Calculation', 'Flux Calculation', 'Advance Solution']}
+gptlLoopNumbers = [10000, 10000, 1]
 
 # List of resolutions for plotting solutions across methods
 comparisonSizes = (30,120,300) #1,30,120,300)
@@ -50,15 +49,15 @@ convergenceSizes = (5,10,15,30,60,120,300,600,900,1200)
 # Plot timing information
 if 1:
   for l, quantity in enumerate(timingDict.keys()):
-    f, axarray = pyplot.subplots(2,2,figsize=(18,10),num=l)
     timingList = timingDict[quantity]
+    f, axarray = pyplot.subplots(3,len(timingList),figsize=(18,10),num=l)
 
     for method in methodDict.keys():
       runDirectory = methodDict[method]
       currentRunDict = runDict[method]
       callNumbers = np.zeros((len(convergenceSizes),len(timingList)))
       wallClocks = np.zeros((len(convergenceSizes),len(timingList)))
-      ratios = np.zeros((len(convergenceSizes),len(timingList)))
+      totalClock = np.zeros(len(convergenceSizes))
       dtlist = np.empty(len(convergenceSizes))
 
       for j,size in enumerate(convergenceSizes):
@@ -72,18 +71,33 @@ if 1:
               words = line.split('('+quantity+')')
               tmp = words[1].split()
               callNumbers[j,k] = int(tmp[0])
-              wallClocks[j,k] = float(tmp[2])
-              ratios[j,k] = wallClocks[j,k]/callNumbers[j,k]
-      axarray[0,0].plot(dtlist,wallClocks[:,0],'-o',label=method)
-      axarray[0,1].plot(dtlist,callNumbers[:,0],'-o',label=method)
-      axarray[1,0].plot(dtlist,ratios[:,0],'-o',label=method)
+              wallClocks[j,k] = float(tmp[2])/gptlLoopNumbers[k]
 
-    axarray[0,0].set_ylabel('Wall Clock')
-    axarray[0,0].legend()
-    axarray[0,1].set_ylabel('Call #')
-    axarray[0,1].legend()
-    axarray[1,0].set_ylabel('Ratio')
+      for k in range(len(timingList)):
+        axarray[0,k].plot(dtlist,wallClocks[:,k],'-o',label=method)
+        totalClock += wallClocks[:,k]
+      axarray[1,0].plot(dtlist,callNumbers[:,0],'-o',label=method)
+      axarray[1,1].plot(dtlist,callNumbers[:,1],'-o',label=method)
+      axarray[1,2].plot(dtlist,totalClock,'-o',label=method)
+      axarray[2,0].plot(dtlist,wallClocks[:,0]/callNumbers[:,0],'-o',label=method)
+      axarray[2,1].plot(dtlist,wallClocks[:,1]/callNumbers[:,1],'-o',label=method)
+      axarray[2,2].plot(dtlist,totalClock/callNumbers[:,1],'-o',label=method)
+
+    for k, timing in enumerate(timingList):
+      axarray[0,k].set_title(timing + ' (Wall Clock)')
+      axarray[0,k].legend()
+    axarray[1,0].set_title('Number of CFL updates')
     axarray[1,0].legend()
+    axarray[1,1].set_title('Sed. Subcycle Steps')
+    axarray[1,1].legend()
+    axarray[1,2].set_title('Total Sed. Wall Clock')
+    axarray[1,2].legend()
+    axarray[2,0].set_title('CFL Wall Clock Per Update')
+    axarray[2,0].legend()
+    axarray[2,1].set_title('Flux Wall Clock Per Subcycle Step')
+    axarray[2,1].legend()
+    axarray[2,2].set_title('Total Wall Clock Per Subcycle Step')
+    axarray[2,2].legend()
 
   pyplot.show()
   exit()

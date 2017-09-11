@@ -14,8 +14,6 @@ contains
 
   subroutine sed_CalcCFL(q,n,cloud_frac,rho,pdel,nlev,i, &
     mg_type,deltat,g,an,rhof,alphaq,alphan,s1,s2,w1,w2,cfl,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
-    use gptl, only: gptlstart_handle, gptlstop_handle
-    use gptl_kid
     use micro_mg2_acme_v1beta_utils, only: size_dist_param_liq, &
                                            size_dist_param_basic, &
                                            mg_ice_props, mg_liq_props, &
@@ -37,17 +35,6 @@ contains
     real(r8) :: lam(nlev), pgam(nlev), cq, cn, clam, tr, sqrtdisc, lambr(nlev)
     integer :: k
     logical :: limited(nlev)
-
-    ! compute lam and pgam
-    ! if (mg_type == MG_LIQUID) then
-    !   gptl_ret = gptlstart_handle('Lambda Calculation (cloud)',gptl_lambda_cloud)
-    ! else if (mg_type == MG_ICE) then
-    !   gptl_ret = gptlstart_handle('Lambda Calculation (ice)',gptl_lambda_ice)
-    ! else if (mg_type == MG_RAIN) then
-    !   gptl_ret = gptlstart_handle('Lambda Calculation (rain)',gptl_lambda_rain)
-    ! else if (mg_type == MG_SNOW) then
-    !   gptl_ret = gptlstart_handle('Lambda Calculation (snow)',gptl_lambda_snow)
-    ! end if
 
     ! use quantity in cloud
     qic = q(i,:)/cloud_frac(i,:)
@@ -103,28 +90,7 @@ contains
       stop
     end if
 
-    ! if (mg_type == MG_LIQUID) then
-    !   gptl_ret = gptlstop_handle('Lambda Calculation (cloud)',gptl_lambda_cloud)
-    ! else if (mg_type == MG_ICE) then
-    !   gptl_ret = gptlstop_handle('Lambda Calculation (ice)',gptl_lambda_ice)
-    ! else if (mg_type == MG_RAIN) then
-    !   gptl_ret = gptlstop_handle('Lambda Calculation (rain)',gptl_lambda_rain)
-    ! else if (mg_type == MG_SNOW) then
-    !   gptl_ret = gptlstop_handle('Lambda Calculation (snow)',gptl_lambda_snow)
-    ! end if
-
-
     ! Loop through levels to compute alphaq, alphan, and the CFL number
-    ! if (mg_type == MG_LIQUID) then
-    !   gptl_ret = gptlstart_handle('CFL Calculation (cloud)',gptl_cfl_cloud)
-    ! else if (mg_type == MG_ICE) then
-    !   gptl_ret = gptlstart_handle('CFL Calculation (ice)',gptl_cfl_ice)
-    ! else if (mg_type == MG_RAIN) then
-    !   gptl_ret = gptlstart_handle('CFL Calculation (rain)',gptl_cfl_rain)
-    ! else if (mg_type == MG_SNOW) then
-    !   gptl_ret = gptlstart_handle('CFL Calculation (snow)',gptl_cfl_snow)
-    ! end if
-
     ! initialize values to zero
     cfl = 0._r8
     alphaq = 0._r8
@@ -230,16 +196,6 @@ contains
       ! TODO: detect shock formation
 
     end do
-
-    ! if (mg_type == MG_LIQUID) then
-    !   gptl_ret = gptlstop_handle('CFL Calculation (cloud)',gptl_cfl_cloud)
-    ! else if (mg_type == MG_ICE) then
-    !   gptl_ret = gptlstop_handle('CFL Calculation (ice)',gptl_cfl_ice)
-    ! else if (mg_type == MG_RAIN) then
-    !   gptl_ret = gptlstop_handle('CFL Calculation (rain)',gptl_cfl_rain)
-    ! else if (mg_type == MG_SNOW) then
-    !   gptl_ret = gptlstop_handle('CFL Calculation (snow)',gptl_cfl_snow)
-    ! end if
 
   end subroutine sed_CalcCFL
 
@@ -347,10 +303,10 @@ contains
     integer, intent(in)               :: nlev, i, mg_type
     real(r8), intent(inout)           :: q(:,:), qtend(:,:), n(:,:), ntend(:,:)
     real(r8), intent(inout)           :: fq(:,:), fn(:,:), prect(:)
+    real(r8), intent(inout)           :: qsedtend(:,:)
     real(r8), intent(in), optional    :: cloud_frac(:,:), xxl
     real(r8), intent(inout), optional :: qvlat(:,:), tlat(:,:), preci(:)
-    real(r8), intent(out), optional   :: qsevap(:,:)
-    real(r8), intent(out)             :: qsedtend(:,:)
+    real(r8), intent(inout), optional :: qsevap(:,:)
 
     real(r8) :: ratio(nlev), deltaFluxQ, deltaFluxN, deltafluxQ_evap
     integer :: k
