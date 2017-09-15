@@ -44,11 +44,11 @@ elif [[ $1 = "v3" ]]; then
   export SED_UPDATECFL=True
   export SED_COMBINELAMBDA=True
   export SED_NONLINEAR=True
-elif [[ $s == "v4" ]]; then
+elif [[ $1 == "v4" ]]; then
   export SED_UPATECFL=True
   export SED_COMBINELAMBDA=True
   export SED_USEWPA=True
-elif [[ $s == "v5" ]]; then
+elif [[ $1 == "v5" ]]; then
   export SED_UPATECFL=True
   export SED_COMBINELAMBDA=True
   export SED_NONLINEAR=True

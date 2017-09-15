@@ -2434,11 +2434,14 @@ subroutine micro_mg2_acme_v1beta_tend ( &
 
      ! initialize nstep for sedimentation sub-steps
      fid_nstep = 102
-     fname = trim(fileNameOut)//'.nstep.txt'
+     fname = trim(fileNameOut)//'_sedinfo.txt'
      if (mphys_calls == 0) then
         open(unit = fid_nstep, file = fname, status="new", action="write")
-        write(fid_nstep,'(A12,4X,A12,4X,A12,4X,A12,4X,A12)') "mphys_call", &
-             "nstep_qi", "nstep_qc", "nstep_qr","nstep_qs"
+        write(fid_nstep, &
+          '(A12,4X,A12,4X,A12,4X,A12,4X,A12,4X,A12,4X,A12,4X,A12,4X,A12)') &
+             "mphys_call", &
+             "nstep_qi", "max_qi", "nstep_qc", "max_qc", "nstep_qr", "max_rq", &
+             "nstep_qs", "max_qs"
      else
         open(unit = fid_nstep, file = fname, status="old", &
              position="append", action="write")
@@ -2452,23 +2455,19 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      else
        time_sed = 0._r8
      end if
-     nstep = 0
+     nstep = 0 ! used to track number of sedimentation steps
+     dum1 = 0._r8 ! used to track maximum fall speed
 
      ! subcycle
      do while (time_sed > qsmall)
-!       gptl_ret = gptlstart_handle('Sedimentation (ice)',gptl_sed_ice)
-       ! obtain CFL number
+     ! obtain CFL number
 #ifndef SED_UPDATECFL
        if (nstep == 0) then
 #endif
-       gptl_ret = gptlstart_handle('CFL Calculation (ice)',gptl_cfl_ice)
-       do n=1,gptl_loop
-         call sed_CalcCFL(dumi,dumni,icldm,rho,pdel,nlev,i,&
-           MG_ICE,deltat_sed,g,ain,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
-           ncons=nicons,nnst=ninst,&
-           gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
-       end do
-       gptl_ret = gptlstop_handle('CFL Calculation (ice)',gptl_cfl_ice)
+       call sed_CalcCFL(dumi,dumni,icldm,rho,pdel,nlev,i,&
+         MG_ICE,deltat_sed,g,ain,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
+         ncons=nicons,nnst=ninst,&
+         gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
 #ifndef SED_UPDATECFL
       else
         dum = CFL
@@ -2489,32 +2488,29 @@ subroutine micro_mg2_acme_v1beta_tend ( &
          qitend,nitend,preci,qisedten,&
          cloud_frac=icldm,qvlat=qvlat,tlat=tlat,xxl=xxls,preci=preci,qsevap=qisevap)
        gptl_ret = gptlstop_handle('Advance Solution (ice)',gptl_advance_sol_ice)
-
-!       gptl_ret = gptlstop_handle('Sedimentation (ice)',gptl_sed_ice)
+       ! update maximum fall speed
+       dum1 = max(dum1,maxval(s1(:)),maxval(s2(:)))
      end do
 
-     write(fid_nstep,'(I12,4X,I12,4X)',advance="no") mphys_calls, nstep
+     write(fid_nstep,'(I12,4X,I12,4X,F12.6,4X)',advance="no") &
+      mphys_calls, nstep, dum1
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      deltat_sed = deltat
      time_sed = deltat
-     nstep = 0
+     nstep = 0 ! used to track number of sedimentation steps
+     dum1 = 0._r8 ! used to track maximum fall speed
 
      ! subcycle
      do while (time_sed > qsmall)
-!       gptl_ret = gptlstart_handle('Sedimentation (cloud)',gptl_sed_cloud)
        ! obtain fall speeds
 #ifndef SED_UPDATECFL
        if (nstep == 0) then
 #endif
-       gptl_ret = gptlstart_handle('CFL Calculation (cloud)',gptl_cfl_cloud)
-       do n=1,gptl_loop
-         call sed_CalcCFL(dumc,dumnc,lcldm,rho,pdel,nlev,i,&
-           MG_LIQUID,deltat_sed,g,acn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
-           ncons=nccons,nnst=ncnst)
-       end do
-       gptl_ret = gptlstop_handle('CFL Calculation (cloud)',gptl_cfl_cloud)
+       call sed_CalcCFL(dumc,dumnc,lcldm,rho,pdel,nlev,i,&
+         MG_LIQUID,deltat_sed,g,acn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
+         ncons=nccons,nnst=ncnst)
 #ifndef SED_UPDATECFL
        else
          dum = CFL
@@ -2535,30 +2531,28 @@ subroutine micro_mg2_acme_v1beta_tend ( &
          qctend,nctend,prect,qcsedten,&
          cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
        gptl_ret = gptlstop_handle('Advance Solution (cloud)',gptl_advance_sol_cloud)
-!       gptl_ret = gptlstop_handle('Sedimentation (cloud)',gptl_sed_cloud)
+       ! update maximum fall speed
+       dum1 = max(maxval(s1(:)),maxval(s2(:)))
      end do
 
-     write(fid_nstep,'(I12,4X)',advance="no") nstep
+     write(fid_nstep,'(I12,4X,F12.6,4X)',advance="no") nstep, dum1
+
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      deltat_sed = deltat
      time_sed = deltat
-     nstep = 0
+     nstep = 0 ! used to track number of sedimentation steps
+     dum1 = 0._r8 ! used to track maximum fall speed
 
      ! subcycle
      do while (time_sed > qsmall)
-!       gptl_ret = gptlstart_handle('Sedimentation (rain)',gptl_sed_rain)
        ! obtain fall speeds
 #ifndef SED_UPDATECFL
        if (nstep == 0) then
 #endif
-       gptl_ret = gptlstart_handle('CFL Calculation (rain)',gptl_cfl_rain)
-       do n=1,gptl_loop
-         call sed_CalcCFL(dumr,dumnr,precip_frac,rho,pdel,nlev,i,&
-           MG_RAIN,deltat_sed,g,arn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
-           gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
-       end do
-       gptl_ret = gptlstop_handle('CFL Calculation (rain)',gptl_cfl_rain)
+       call sed_CalcCFL(dumr,dumnr,precip_frac,rho,pdel,nlev,i,&
+         MG_RAIN,deltat_sed,g,arn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
+         gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
 #ifndef SED_UPDATECFL
        else
          dum = CFL
@@ -2578,31 +2572,28 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        call sed_AdvanceOneStep(dumr,fr,dumnr,fnr,pdel,deltat,deltat_sed,nlev,i,MG_RAIN,g, &
          qrtend,nrtend,prect,qrsedten)
        gptl_ret = gptlstop_handle('Advance Solution (rain)',gptl_advance_sol_rain)
-!       gptl_ret = gptlstop_handle('Sedimentation (rain)',gptl_sed_rain)
+       ! update maximum fall speed
+       dum1 = max(maxval(s1(:)),maxval(s2(:)))
      end do
 
-     write(fid_nstep,'(I12,4X)',advance="no") nstep
+     write(fid_nstep,'(I12,4X,F12.6,4X)',advance="no") nstep, dum1
 
      ! loop over sedimentation sub-time step to ensure stability
      !==============================================================
      deltat_sed = deltat
      time_sed = deltat
-     nstep = 0
+     nstep = 0 ! used to track number of sedimentation steps
+     dum1 = 0._r8 ! used to track maximum fall speed
 
      ! subcycle
      do while (time_sed > qsmall)
-!       gptl_ret = gptlstart_handle('Sedimentation (snow)',gptl_sed_snow)
        ! obtain fall speeds
 #ifndef SED_UPDATECFL
       if (nstep == 0) then
 #endif
-      gptl_ret = gptlstart_handle('CFL Calculation (snow)',gptl_cfl_snow)
-      do n=1,gptl_loop
-        call sed_CalcCFL(dums,dumns,precip_frac,rho,pdel,nlev,i,&
-           MG_SNOW,deltat_sed,g,asn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
-           gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
-      end do
-      gptl_ret = gptlstop_handle('CFL Calculation (snow)',gptl_cfl_snow)
+      call sed_CalcCFL(dums,dumns,precip_frac,rho,pdel,nlev,i,&
+         MG_SNOW,deltat_sed,g,asn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
+         gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
 #ifndef SED_UPDATECFL
       else
         dum = CFL
@@ -2622,10 +2613,10 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        call sed_AdvanceOneStep(dums,fs,dumns,fns,pdel,deltat,deltat_sed,nlev,i,MG_SNOW,g, &
          qstend,nstend,prect,qssedten,preci=preci)
        gptl_ret = gptlstop_handle('Advance Solution (snow)',gptl_advance_sol_snow)
-!       gptl_ret = gptlstop_handle('Sedimentation (snow)',gptl_sed_snow)
+       dum1 = max(maxval(s1(:)),maxval(s2(:)))
      end do
 
-     write(fid_nstep,'(I12,4X)') nstep
+     write(fid_nstep,'(I12,4X,F12.6,4X)') nstep, dum1
 
      ! close sedimentation step file
      close(fid_nstep)
