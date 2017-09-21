@@ -40,15 +40,27 @@ if [[ $1 == "v1" ]]; then
 elif [[ $1 == "v2" ]]; then
   export SED_UPDATECFL=True
   export SED_COMBINELAMBDA=True
-elif [[ $1 = "v3" ]]; then
+elif [[ $1 == "v3" ]]; then
   export SED_UPDATECFL=True
   export SED_COMBINELAMBDA=True
   export SED_NONLINEAR=True
 elif [[ $1 == "v4" ]]; then
-  export SED_UPATECFL=True
+  export SED_UPDATECFL=True
+  export SED_COMPFLAG=True
+elif [[ $1 == "v5" ]]; then
+  export SED_UPDATECFL=True
+  export SED_COMBINELAMBDA=True
+  export SED_COMPFLAG=True
+elif [[ $1 == "v6" ]]; then
+  export SED_UPDATECFL=True
+  export SED_COMBINELAMBDA=True
+  export SED_COMPFLAG=True
+  export SED_NONLINEAR=True
+elif [[ $1 == "v7" ]]; then
+  export SED_UPDATECFL=True
   export SED_COMBINELAMBDA=True
   export SED_USEWPA=True
-elif [[ $1 == "v5" ]]; then
+elif [[ $1 == "v8" ]]; then
   export SED_UPATECFL=True
   export SED_COMBINELAMBDA=True
   export SED_NONLINEAR=True

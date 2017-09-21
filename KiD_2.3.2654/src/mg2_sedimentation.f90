@@ -13,7 +13,7 @@ module Sedimentation
 contains
 
   subroutine sed_CalcCFL(q,n,cloud_frac,rho,pdel,nlev,i, &
-    mg_type,deltat,g,an,rhof,alphaq,alphan,s1,s2,w1,w2,cfl,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
+    mg_type,deltat,g,an,rhof,computed,alphaq,alphan,s1,s2,w1,w2,cfl,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
     use gptl,                        only: gptlstart_handle, gptlstop_handle
     use gptl_kid
     use micro_mg2_acme_v1beta_utils, only: size_dist_param_liq, &
@@ -26,11 +26,13 @@ contains
     real(r8), intent(in)            :: q(:,:), n(:,:)
     real(r8), intent(in)            :: rho(:,:), pdel(:,:), an(:,:), rhof(:,:)
     real(r8), intent(in)            :: cloud_frac(:,:), deltat, g
-    integer,  intent(in)            :: nlev, i, mg_type
+    integer, intent(in)             :: nlev, i, mg_type
+    logical, intent(inout)          :: computed(:)
     real(r8), intent(in), optional  :: nnst, gamma_b_plus1, gamma_b_plus4
     logical, intent(in), optional   :: ncons
-    real(r8), intent(out)           :: cfl, alphaq(:), alphan(:)
-    real(r8), intent(out)           :: s1(:), s2(:), w1(:,:), w2(:,:)
+    real(r8), intent(inout)         :: alphaq(:), alphan(:)
+    real(r8), intent(inout)         :: s1(:), s2(:), w1(:,:), w2(:,:)
+    real(r8), intent(out)           :: cfl
 
     real(r8) :: qic(nlev), nic(nlev), lam(nlev), pgam(nlev), lambr_bounds(2)
     real(r8) :: cq, cn, clam, tr, det, sqrtdisc, lambr(nlev)
@@ -51,14 +53,18 @@ contains
       case (MG_ICE)
         gptl_ret = gptlstart_handle('Lambda Calculation (ice)', gptl_lambda_ice)
         do ngptl=1,gptl_loop
-          call size_dist_param_basic(mg_ice_props, qic, nic, lam)
+          do k=1,nlev
+            if (.not.computed(k)) call size_dist_param_basic(mg_ice_props, qic(k), nic(k), lam(k))
+          end do
         end do
         gptl_ret = gptlstop_handle('Lambda Calculation (ice)', gptl_lambda_ice)
 
       case (MG_LIQUID)
         gptl_ret = gptlstart_handle('Lambda Calculation (cloud)', gptl_lambda_cloud)
         do ngptl=1,gptl_loop
-          call size_dist_param_liq(mg_liq_props, qic, nic, rho(i,:), pgam, lam)
+          do k=1,nlev
+            if (.not.computed(k)) call size_dist_param_liq(mg_liq_props, qic(k), nic(k), rho(i,k), pgam(k), lam(k))
+          end do
         end do
         gptl_ret = gptlstop_handle('Lambda Calculation (cloud)', gptl_lambda_cloud)
 
@@ -69,7 +75,7 @@ contains
           lambr_bounds(1) = mg_rain_props%lambda_bounds(1)**br
           lambr_bounds(2) = mg_rain_props%lambda_bounds(2)**br
           do k=1,nlev
-            if (qic(k) > qsmall) then
+            if (qic(k) > qsmall .and. (.not.computed(k))) then
               ! add upper limit to in-cloud number concentration to prevent
               ! numerical error
               if (limiter_is_on(mg_rain_props%min_mean_mass)) then
@@ -89,7 +95,9 @@ contains
             end if
           end do
 #else
-          call size_dist_param_basic(mg_rain_props, qic, nic, lam)
+        do k=1,nlev
+          if (.not.computed(k)) call size_dist_param_basic(mg_rain_props, qic(k), nic(k), lam(k))
+        end do
 #endif
         end do
         gptl_ret = gptlstop_handle('Lambda Calculation (rain)', gptl_lambda_rain)
@@ -97,7 +105,9 @@ contains
       case (MG_SNOW)
         gptl_ret = gptlstart_handle('Lambda Calculation (snow)', gptl_lambda_snow)
         do ngptl=1,gptl_loop
-          call size_dist_param_basic(mg_snow_props, qic, nic, lam)
+          do k=1,nlev
+            if (.not.computed(k)) call size_dist_param_basic(mg_snow_props, qic(k), nic(k), lam(k))
+          end do
         end do
         gptl_ret = gptlstop_handle('Lambda Calculation (snow)', gptl_lambda_snow)
 
@@ -108,11 +118,6 @@ contains
     end select
 
     ! Loop through levels to compute alphaq, alphan, and possibly eigenspaces
-    alphaq = 0._r8
-    alphan = 0._r8
-    s1 = 0._r8
-    s2 = 0._r8
-
     select case (mg_type)
 
       case (MG_ICE)
@@ -153,7 +158,7 @@ contains
         gptl_ret = gptlstart_handle('Fall Speed Calculation (rain)', gptl_fall_rain)
         do ngptl=1,gptl_loop
           do k=1,nlev
-            if (qic(k) > qsmall) then
+            if (qic(k) > qsmall .and. (.not.computed(k))) then
               cq = g*rho(i,k)*an(i,k)*gamma_b_plus4/6._r8
               cn = g*rho(i,k)*an(i,k)*gamma_b_plus1
 #ifdef SED_COMBINELAMBDA
@@ -204,6 +209,9 @@ contains
               w2(2,k) = 1._r8
 #endif
 #endif
+#ifdef SED_COMPFLAG
+              computed(k) = .true.
+#endif
             end if
           end do
         end do
@@ -250,8 +258,6 @@ contains
     ! initialize values to zero
     fq = 0._r8
     fn = 0._r8
-
-
 
     ! initialize qtemp and ntemp with ghost cell
     qtemp(0) = 0._r8
@@ -334,6 +340,7 @@ contains
 
   subroutine sed_AdvanceOneStep(q,fq,n,fn,pdel,deltat,deltat_sed,nlev,i,mg_type,g, &
     qtend,ntend,prect,qsedtend,cloud_frac,qvlat,tlat,xxl,preci,qsevap)
+    use micro_mg2_acme_v1beta_utils, only: qsmall
     implicit none
     real(r8), intent(in)           :: pdel(:,:)
     real(r8), intent(in)              :: deltat, deltat_sed, g

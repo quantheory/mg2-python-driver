@@ -914,6 +914,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
   real(r8) :: fs(0:nlev,2), fns(0:nlev,2)
   real(r8) :: alphaq(0:nlev), alphan(0:nlev)
   real(r8) :: s1(nlev),s2(nlev), w1(2,nlev), w2(2,nlev)
+  logical :: computed(nlev)
 
   ! sum of source/sink terms for diagnostic precip
   real(r8) :: qstend(mgncol,nlev)     ! snow mixing ratio
@@ -2457,6 +2458,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      end if
      nstep = 0 ! used to track number of sedimentation steps
      dum1 = 0._r8 ! used to track maximum fall speed
+     alphaq(:) = 0._r8
+     alphan(:) = 0._r8
+     s1(:) = 0._r8
+     s2(:) = 0._r8
+     computed(:) = .false.
 
      ! subcycle
      do while (time_sed > qsmall)
@@ -2465,7 +2471,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        if (nstep == 0) then
 #endif
        call sed_CalcCFL(dumi,dumni,icldm,rho,pdel,nlev,i,&
-         MG_ICE,deltat_sed,g,ain,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
+         MG_ICE,deltat_sed,g,ain,rhof,computed,alphaq,alphan,s1,s2,w1,w2,dum,&
          ncons=nicons,nnst=ninst,&
          gamma_b_plus1=gamma_bi_plus1,gamma_b_plus4=gamma_bi_plus4)
 #ifndef SED_UPDATECFL
@@ -2501,6 +2507,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      time_sed = deltat
      nstep = 0 ! used to track number of sedimentation steps
      dum1 = 0._r8 ! used to track maximum fall speed
+     alphaq(:) = 0._r8
+     alphan(:) = 0._r8
+     s1(:) = 0._r8
+     s2(:) = 0._r8
+     computed(:) = .false.
 
      ! subcycle
      do while (time_sed > qsmall)
@@ -2509,7 +2520,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        if (nstep == 0) then
 #endif
        call sed_CalcCFL(dumc,dumnc,lcldm,rho,pdel,nlev,i,&
-         MG_LIQUID,deltat_sed,g,acn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
+         MG_LIQUID,deltat_sed,g,acn,rhof,computed,alphaq,alphan,s1,s2,w1,w2,dum,&
          ncons=nccons,nnst=ncnst)
 #ifndef SED_UPDATECFL
        else
@@ -2543,6 +2554,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      time_sed = deltat
      nstep = 0 ! used to track number of sedimentation steps
      dum1 = 0._r8 ! used to track maximum fall speed
+     alphaq(:) = 0._r8
+     alphan(:) = 0._r8
+     s1(:) = 0._r8
+     s2(:) = 0._r8
+     computed(:) = .false.
 
      ! subcycle
      do while (time_sed > qsmall)
@@ -2551,7 +2567,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        if (nstep == 0) then
 #endif
        call sed_CalcCFL(dumr,dumnr,precip_frac,rho,pdel,nlev,i,&
-         MG_RAIN,deltat_sed,g,arn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
+         MG_RAIN,deltat_sed,g,arn,rhof,computed,alphaq,alphan,s1,s2,w1,w2,dum,&
          gamma_b_plus1=gamma_br_plus1,gamma_b_plus4=gamma_br_plus4)
 #ifndef SED_UPDATECFL
        else
@@ -2584,6 +2600,11 @@ subroutine micro_mg2_acme_v1beta_tend ( &
      time_sed = deltat
      nstep = 0 ! used to track number of sedimentation steps
      dum1 = 0._r8 ! used to track maximum fall speed
+     alphaq(:) = 0._r8
+     alphan(:) = 0._r8
+     s1(:) = 0._r8
+     s2(:) = 0._r8
+     computed(:) = .false.
 
      ! subcycle
      do while (time_sed > qsmall)
@@ -2592,7 +2613,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
       if (nstep == 0) then
 #endif
       call sed_CalcCFL(dums,dumns,precip_frac,rho,pdel,nlev,i,&
-         MG_SNOW,deltat_sed,g,asn,rhof,alphaq,alphan,s1,s2,w1,w2,dum,&
+         MG_SNOW,deltat_sed,g,asn,rhof,computed,alphaq,alphan,s1,s2,w1,w2,dum,&
          gamma_b_plus1=gamma_bs_plus1,gamma_b_plus4=gamma_bs_plus4)
 #ifndef SED_UPDATECFL
       else

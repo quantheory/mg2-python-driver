@@ -93,3 +93,7 @@ endif
 ifeq ($(SED_USEWPA), True)
 DEFS+=-DSED_USEWPA
 endif
+
+ifeq ($(SED_COMPFLAG), True)
+DEFS+=-DSED_COMPFLAG
+endif
