@@ -38,7 +38,7 @@ else:
   exit()
 
 # test case: warm1, warm2, warm3, warm7, mixed1, mixed3
-casenames = ('warm1',)
+casenames = ('warm1','warm2','warm3')
 # casename = 'mixed1'
 
 #mphys='thompson09'
@@ -48,7 +48,7 @@ mphys='mg2_acme_v1beta'
 dtvals = [ 1.0 ]
 
 # dtm = dt * mstep, physics time step sizes
-mstepvals = [ 1, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1200]
+mstepvals = [ 1, 5, 10, 15, 30, 60, 120, 300, 400, 600, 900, 1200]
 # mstepvals = [ 30 ]
 
 # ------------------------------------------------------------------------------
