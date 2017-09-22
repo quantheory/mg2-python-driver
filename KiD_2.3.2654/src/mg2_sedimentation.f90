@@ -117,6 +117,14 @@ contains
 
     end select
 
+
+#ifndef SED_COMPFLAG
+    alphaq(:) = 0._r8
+    alphan(:) = 0._r8
+    s1(:) = 0._r8
+    s2(:) = 0._r8
+#endif
+
     ! Loop through levels to compute alphaq, alphan, and possibly eigenspaces
     select case (mg_type)
 
@@ -131,6 +139,9 @@ contains
                     min(an(i,k)*gamma_b_plus1/lam(k)**bi,1.2_r8*rhof(i,k))
               s1(k) = alphaq(k)
               s2(k) = alphan(k)
+#ifdef SED_COMPFLAG
+              computed(k) = .true.
+#endif
             end if
           end do
         end do
@@ -149,6 +160,9 @@ contains
                           (lam(k)**bc*gamma(pgam(k)+1._r8))
               s1(k) = alphaq(k)
               s2(k) = alphan(k)
+#ifdef SED_COMPFLAG
+              computed(k) = .true.
+#endif
             end if
           end do
         end do
@@ -188,7 +202,9 @@ contains
               s1(k) = alphaq(k)
               s2(k) = alphan(k)
 #endif
-
+#ifdef SED_COMPFLAG
+              computed(k) = .true.
+#endif
 #ifdef SED_USEWPA
               ! obtain eigenvectors
 #ifdef SED_NONLINEAR
@@ -209,9 +225,6 @@ contains
               w2(2,k) = 1._r8
 #endif
 #endif
-#ifdef SED_COMPFLAG
-              computed(k) = .true.
-#endif
             end if
           end do
         end do
@@ -228,6 +241,9 @@ contains
                 min(an(i,k)*gamma_b_plus1/lam(k)**bs,1.2_r8*rhof(i,k))
               s1(k) = alphaq(k)
               s2(k) = alphan(k)
+#ifdef SED_COMPFLAG
+              computed(k) = .true.
+#endif
             end if
           end do
         end do
@@ -245,6 +261,7 @@ contains
   end subroutine sed_CalcCFL
 
   subroutine sed_CalcFlux(q,n,alphaq,alphan,s1,s2,w1,w2,nlev,i,mg_type,fq,fn)
+    use micro_mg2_acme_v1beta_utils, only: qsmall
     implicit none
     real(r8), intent(in)            :: q(:,:), n(:,:), alphaq(:), alphan(:)
     integer,  intent(in)            :: nlev, i, mg_type
@@ -278,7 +295,7 @@ contains
 
       else if (mg_type == MG_RAIN) then
 #ifdef SED_USEWPA
-        if (s1(k) > 0._r8) then
+        if (s1(k) > qsmall) then
           ! scaled jump in x_{k-1} and x_k values will be added to flux at
           ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,b))
           ! in x_k cell
@@ -287,10 +304,10 @@ contains
           dq = alphaq(k-1)/alphaq(k)*qtemp(k-1) - qtemp(k)
           dn = alphan(k-1)/alphan(k)*ntemp(k-1) - ntemp(k)
 
-        else if (k > 1 .and. s1(k-1) > 0._r8) then
+        else if (k > 1 .and. s1(k-1) > qsmall) then
         ! to handle waves going from a non-zero cell into a zero cell,
         ! jump in x_{k-1} and x_k values will be added to flux at
-        ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,b))
+        ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,n))
         ! in x_{k-1} cell
           dq = qtemp(k-1) - qtemp(k)
           dn = ntemp(k-1) - ntemp(k)
@@ -300,7 +317,7 @@ contains
           w2(:,k) = w2(:,k-1)
         end if
 
-        if (s1(k) > 0._r8) then
+        if (s1(k) > qsmall) then
         ! Update fluxes at x_{k-1/2} to include the waves coeff1*w1 and coeff2*w2
           ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
           a = w1(1,k)
