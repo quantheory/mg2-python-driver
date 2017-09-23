@@ -142,6 +142,13 @@ contains
 #ifdef SED_COMPFLAG
               computed(k) = .true.
 #endif
+#ifdef SED_USEWPA
+              ! obtain eigenvectors
+              w1(1,k) = 1._r8
+              w1(2,k) = 0._r8
+              w2(1,k) = 0._r8
+              w2(2,k) = 1._r8
+#endif
             end if
           end do
         end do
@@ -162,6 +169,13 @@ contains
               s2(k) = alphan(k)
 #ifdef SED_COMPFLAG
               computed(k) = .true.
+#endif
+#ifdef SED_USEWPA
+              ! obtain eigenvectors
+              w1(1,k) = 1._r8
+              w1(2,k) = 0._r8
+              w2(1,k) = 0._r8
+              w2(2,k) = 1._r8
 #endif
             end if
           end do
@@ -244,6 +258,13 @@ contains
 #ifdef SED_COMPFLAG
               computed(k) = .true.
 #endif
+#ifdef SED_USEWPA
+              ! obtain eigenvectors
+              w1(1,k) = 1._r8
+              w1(2,k) = 0._r8
+              w2(1,k) = 0._r8
+              w2(2,k) = 1._r8
+#endif
             end if
           end do
         end do
@@ -260,16 +281,21 @@ contains
 
   end subroutine sed_CalcCFL
 
-  subroutine sed_CalcFlux(q,n,alphaq,alphan,s1,s2,w1,w2,nlev,i,mg_type,fq,fn)
+  subroutine sed_CalcFlux(q,n,alphaq,alphan,pdel,deltat,s1,s2,w1,w2, &
+                          nlev,i,mg_type,fq,fn)
     use micro_mg2_acme_v1beta_utils, only: qsmall
     implicit none
-    real(r8), intent(in)            :: q(:,:), n(:,:), alphaq(:), alphan(:)
+    real(r8), intent(in)            :: q(:,:), n(:,:)
+    real(r8), intent(in)            :: pdel(:,:), deltat
     integer,  intent(in)            :: nlev, i, mg_type
     real(r8), intent(out)           :: fq(:,:), fn(:,:)
     real(r8), intent(inout)         :: s1(:), s2(:), w1(:,:), w2(:,:)
-
+    real(r8), intent(inout)         :: alphaq(:), alphan(:)
+    ! note that "inout" variables here are really just "in" variables that are
+    ! modified
     real(r8) :: qtemp(0:nlev), ntemp(0:nlev)
-    real(r8) :: a, b, c, d, dq, dn, coeff(2)
+    real(r8) :: a, b, c, d, dq, dn, coeff1(nlev), coeff2(nlev), sig1(2), sig2(2)
+    real(r8) :: mult1, mult2, phi1, phi2, theta
     integer :: k
 
     ! initialize values to zero
@@ -282,75 +308,76 @@ contains
     ntemp(0) = 0._r8
     ntemp(1:nlev) = n(i,:)
 
-    ! Loop through levels to compute flux
-    do k=1,nlev
-
-      if(mg_type == MG_LIQUID) then
-        fq(k,:) = alphaq(k)*qtemp(k)
-        fn(k,:) = alphan(k)*ntemp(k)
-
-      else if (mg_type == MG_ICE) then
-        fq(k,:) = alphaq(k)*qtemp(k)
-        fn(k,:) = alphan(k)*ntemp(k)
-
-      else if (mg_type == MG_RAIN) then
+    ! Compute flux
 #ifdef SED_USEWPA
-        if (s1(k) > qsmall) then
-          ! scaled jump in x_{k-1} and x_k values will be added to flux at
-          ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,b))
-          ! in x_k cell
-
-          ! compute scaled jump
-          dq = alphaq(k-1)/alphaq(k)*qtemp(k-1) - qtemp(k)
-          dn = alphan(k-1)/alphan(k)*ntemp(k-1) - ntemp(k)
-
-        else if (k > 1 .and. s1(k-1) > qsmall) then
-        ! to handle waves going from a non-zero cell into a zero cell,
-        ! jump in x_{k-1} and x_k values will be added to flux at
-        ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,n))
-        ! in x_{k-1} cell
-          dq = qtemp(k-1) - qtemp(k)
-          dn = ntemp(k-1) - ntemp(k)
-          s1(k) = s1(k-1)
-          w1(:,k) = w1(:,k-1)
-          s2(k) = s2(k-1)
-          w2(:,k) = w2(:,k-1)
-        end if
-
-        if (s1(k) > qsmall) then
-        ! Update fluxes at x_{k-1/2} to include the waves coeff1*w1 and coeff2*w2
-          ! solve for coeff1, coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
-          a = w1(1,k)
-          c = w1(2,k)
-          b = w2(1,k)
-          d = w2(2,k)
-          if (abs(a*d - b*c) < 1.d-12) then
-            print *, a, b, c, d
-            stop "matrix nearly singular"
-          end if
-          coeff(1) = (d*dq - b*dn)/(a*d - b*c)
-          coeff(2) = (a*dn - c*dq)/(a*d - b*c)
-
-          fq(k-1,2) = s1(k)*coeff(1)*w1(1,k) + s2(k)*coeff(2)*w2(1,k)
-          fn(k-1,2) = s1(k)*coeff(1)*w1(2,k) + s2(k)*coeff(2)*w2(2,k)
-        end if
-
-        if (k == nlev) then
-          ! store flux out for surface precipitation calculation
-          fq(nlev,2) = alphaq(nlev)*qtemp(nlev)
-        end if
-
-#else
-        fq(k,:) = alphaq(k)*qtemp(k)
-        fn(k,:) = alphan(k)*ntemp(k)
-#endif
-
-      else if (mg_type == MG_SNOW) then
-        fq(k,:) = alphaq(k)*qtemp(k)
-        fn(k,:) = alphan(k)*ntemp(k)
+    do k=1,nlev
+      if (s1(k) < qsmall .and. k > 1 .and. s1(k-1) > qsmall) then
+        ! to handle waves going from a wet cell into a dry cell,
+        ! copy eigenvectors and eigenvalues of Jacobian(F(q,n))
+        ! from wet x_{k-1} cell into dry x_k cell
+        s1(k) = s1(k-1)
+        w1(:,k) = w1(:,k-1)
+        s2(k) = s2(k-1)
+        w2(:,k) = w2(:,k-1)
+        alphaq(k) = alphaq(k-1)
+        alphan(k) = alphan(k-1)
       end if
 
+      if (s1(k) > qsmall) then
+      ! scaled jump in x_{k-1} and x_k values will be added to flux at
+      ! x_{k-1/2} using eigenvectors and eigenvalues of Jacobian(F(q,b))
+      ! in x_k cell
+        dq = alphaq(k-1)/alphaq(k)*qtemp(k-1) - qtemp(k)
+        dn = alphan(k-1)/alphan(k)*ntemp(k-1) - ntemp(k)
+        ! solve for coeff1 and coeff2 in [dq, dn]^T = coeff1*w1 + coeff2*w2
+        a = w1(1,k)
+        c = w1(2,k)
+        b = w2(1,k)
+        d = w2(2,k)
+        if (abs(a*d - b*c) < 1.d-12) then
+          print *, a, b, c, d
+          stop "matrix nearly singular"
+        end if
+        coeff1(k) = (d*dq - b*dn)/(a*d - b*c)
+        coeff2(k) = (a*dn - c*dq)/(a*d - b*c)
+        ! Add first order terms to flux
+        fq(k-1,2) = s1(k)*coeff1(k)*w1(1,k) + s2(k)*coeff2(k)*w2(1,k)
+        fn(k-1,2) = s1(k)*coeff1(k)*w1(2,k) + s2(k)*coeff2(k)*w2(2,k)
+        ! Need flux limiter value for second order term
+        phi1 = 1._r8 ! phi ~ 1 for smooth data
+        phi2 = 1._r8
+        if (k > 1) then
+          theta = coeff1(k-1)/coeff1(k)
+          if (abs(theta) < 1._r8) phi1 = theta ! minmod
+          !phi1 = max(0.r_8,min(1._r8,2._r8*theta),min(2._r8,theta)) ! superbee
+          !phi1 = max(0._r8,min(0.5_r8*(1._r8+theta),2._r8,2._r8*theta)) ! MC
+          !phi1 = (theta + abs(theta))/(1._r8 + abs(theta)) ! van Leer
+          theta = coeff2(k-1)/coeff2(k)
+          if (abs(theta) < 1._r8) phi2 = theta ! minmod
+          !phi2 = max(0.r_8,min(1._r8,2._r8*theta),min(2._r8,theta)) ! superbee
+          !phi2 = max(0._r8,min(0.5_r8*(1._r8+theta),2._r8,2._r8*theta)) ! MC
+          !phi2 = (theta + abs(theta))/(1._r8 + abs(theta)) ! van Leer
+        end if
+        ! Add second order terms to flux
+        mult1 = 0.5_r8*s1(k)*(1._r8-s1(k)*deltat/pdel(i,k-1))
+        mult2 = 0.5_r8*s2(k)*(1._r8-s2(k)*deltat/pdel(i,k-1))
+        fq(k-1,:) = fq(k-1,:) + mult1*phi1*coeff1(k)*w1(1,k) &
+                              + mult2*phi2*coeff2(k)*w2(1,k)
+        fn(k-1,:) = fn(k-1,:) + mult1*phi1*coeff1(k)*w1(2,k) &
+                              + mult2*phi2*coeff2(k)*w2(2,k)
+      end if
+
+      if (k == nlev) then
+        ! store flux out for surface precipitation calculation
+        fq(nlev,2) = alphaq(nlev)*qtemp(nlev)
+      end if
     end do
+#else
+    fq(:,1) = alphaq(:)*qtemp(:)
+    fq(:,2) = fq(:,1)
+    fn(:,1) = alphan(:)*ntemp(:)
+    fn(:,2) = fn(:,1)
+#endif
 
   end subroutine sed_CalcFlux
 

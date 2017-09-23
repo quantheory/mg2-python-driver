@@ -2486,7 +2486,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        nstep = nstep+1
        gptl_ret = gptlstart_handle('Flux Calculation (ice)',gptl_flux_ice)
        do n=1,gptl_loop
-         call sed_CalcFlux(dumi,dumni,alphaq,alphan,s1,s2,w1,w2,nlev,i,MG_ICE,fi,fni)
+         call sed_CalcFlux(dumi,dumni,alphaq,alphan,pdel,deltat_sed,s1,s2,w1,w2,nlev,i,MG_ICE,fi,fni)
        end do
        gptl_ret = gptlstop_handle('Flux Calculation (ice)',gptl_flux_ice)
        gptl_ret = gptlstart_handle('Advance Solution (ice)',gptl_advance_sol_ice)
@@ -2534,7 +2534,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        nstep = nstep + 1
        gptl_ret = gptlstart_handle('Flux Calculation (cloud)',gptl_flux_cloud)
        do n=1,gptl_loop
-         call sed_CalcFlux(dumc,dumnc,alphaq,alphan,s1,s2,w1,w2,nlev,i,MG_LIQUID,fc,fnc)
+         call sed_CalcFlux(dumc,dumnc,alphaq,alphan,pdel,deltat_sed,s1,s2,w1,w2,nlev,i,MG_LIQUID,fc,fnc)
        end do
        gptl_ret = gptlstop_handle('Flux Calculation (cloud)',gptl_flux_cloud)
        gptl_ret = gptlstart_handle('Advance Solution (cloud)',gptl_advance_sol_cloud)
@@ -2581,7 +2581,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        nstep = nstep + 1
        gptl_ret = gptlstart_handle('Flux Calculation (rain)',gptl_flux_rain)
        do n=1,gptl_loop
-         call sed_CalcFlux(dumr,dumnr,alphaq,alphan,s1,s2,w1,w2,nlev,i,MG_RAIN,fr,fnr)
+         call sed_CalcFlux(dumr,dumnr,alphaq,alphan,pdel,deltat_sed,s1,s2,w1,w2,nlev,i,MG_RAIN,fr,fnr)
        end do
        gptl_ret = gptlstop_handle('Flux Calculation (rain)',gptl_flux_rain)
        gptl_ret = gptlstart_handle('Advance Solution (rain)',gptl_advance_sol_rain)
@@ -2627,7 +2627,7 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        nstep = nstep + 1
        gptl_ret = gptlstart_handle('Flux Calculation (snow)',gptl_flux_snow)
        do n=1,gptl_loop
-         call sed_CalcFlux(dums,dumns,alphaq,alphan,s1,s2,w1,w2,nlev,i,MG_SNOW,fs,fns)
+         call sed_CalcFlux(dums,dumns,alphaq,alphan,pdel,deltat_sed,s1,s2,w1,w2,nlev,i,MG_SNOW,fs,fns)
        end do
        gptl_ret = gptlstop_handle('Flux Calculation (snow)',gptl_flux_snow)
        gptl_ret = gptlstart_handle('Advance Solution (snow)',gptl_advance_sol_snow)

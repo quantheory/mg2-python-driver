@@ -14,20 +14,21 @@ else:
 
 
 # Flags for what to plot
-PLOT_PROPAGATION_SPEED = True
+PLOT_PROPAGATION_SPEED = False
 PLOT_TIMING_INFO = False
 PLOT_SOLUTIONS = True
 PLOT_CONVERGENCE = True
 # Dictionary for sedimentation methods (name: directory)
-methodDict = {'v0: original': wrkdir + '/' + case + '_v0',
-             'v1: time-varying speed': wrkdir + '/' + case + '_v1',
+methodDict = {#'v0: original': wrkdir + '/' + case + '_v0',
+#             'v1: time-varying speed': wrkdir + '/' + case + '_v1',
              'v2: v1 with algebra mod': wrkdir + '/' + case + '_v2',
-             'v3: v2 with nonlin rain': wrkdir + '/' + case + '_v3',
-             'v4: v1 with comp flag': wrkdir + '/' + case +'_v4',
-             'v5: v4 with algebra mod': wrkdir + '/' + case + '_v5',
-             'v6: v5 with nonlin rain': wrkdir + '/' + case + '_v6',
-             'v7: v2 with WPA': wrkdir + '/' + case + '_v7'}
-#             'v8: v7 with nonlin rain': wrkdir + '/' + case + '_v8'}
+#             'v3: v2 with nonlin rain': wrkdir + '/' + case + '_v3',
+#             'v4: v1 with comp flag': wrkdir + '/' + case +'_v4',
+#             'v5: v4 with algebra mod': wrkdir + '/' + case + '_v5',
+#             'v6: v5 with nonlin rain': wrkdir + '/' + case + '_v6'}
+             'v7: v2 with WPA': wrkdir + '/' + case + '_v7',
+             'v?': wrkdir + '/' + case}
+             #'v8: v7 with nonlin rain': wrkdir + '/' + case + '_v8'}
 
 # Dictionary for quantities of interest (name: Quantity object)
 quantityDict = {'Rain Mass':Quantity('rain_mass'),
