@@ -39,8 +39,7 @@ contains
     real(r8), intent(out)           :: alphaq(:), alphan(:)
     real(r8), intent(out)           :: cfl
 
-    real(r8) :: qic(nlev), nic(nlev), lam(nlev), pgam(nlev)
-    real(r8) :: cq, cn, clam, tr, det, sqrtdisc, lamPbr(nlev)
+    real(r8) :: qic(nlev), nic(nlev), lam(nlev), pgam(nlev), cq, cn, lamPbr(nlev)
     integer :: k, ngptl
 
     ! compute module lambda quantities for rain if not already computed
@@ -67,18 +66,14 @@ contains
       case (MG_ICE)
         gptl_ret = gptlstart_handle('Lambda Calculation (ice)', gptl_lambda_ice)
         do ngptl=1,gptl_loop
-          do k=1,nlev
-            call size_dist_param_basic(mg_ice_props, qic(k), nic(k), lam(k))
-          end do
+          call size_dist_param_basic(mg_ice_props, qic(:), nic(:), lam(:))
         end do
         gptl_ret = gptlstop_handle('Lambda Calculation (ice)', gptl_lambda_ice)
 
       case (MG_LIQUID)
         gptl_ret = gptlstart_handle('Lambda Calculation (cloud)', gptl_lambda_cloud)
         do ngptl=1,gptl_loop
-          do k=1,nlev
-            call size_dist_param_liq(mg_liq_props, qic(k), nic(k), rho(i,k), pgam(k), lam(k))
-          end do
+          call size_dist_param_liq(mg_liq_props, qic(:), nic(:), rho(i,:), pgam(:), lam(:))
         end do
         gptl_ret = gptlstop_handle('Lambda Calculation (cloud)', gptl_lambda_cloud)
 
@@ -111,9 +106,7 @@ contains
       case (MG_SNOW)
         gptl_ret = gptlstart_handle('Lambda Calculation (snow)', gptl_lambda_snow)
         do ngptl=1,gptl_loop
-          do k=1,nlev
-            call size_dist_param_basic(mg_snow_props, qic(k), nic(k), lam(k))
-          end do
+          call size_dist_param_basic(mg_snow_props, qic(:), nic(:), lam(:))
         end do
         gptl_ret = gptlstop_handle('Lambda Calculation (snow)', gptl_lambda_snow)
 
