@@ -38,7 +38,7 @@ else:
   exit()
 
 # test case: warm1, warm2, warm3, warm7, mixed1, mixed3
-casenames = ('warm1','warm2','warm3')
+casenames = ('warm1',)
 # casename = 'mixed1'
 
 #mphys='thompson09'

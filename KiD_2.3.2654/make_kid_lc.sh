@@ -34,39 +34,6 @@ else
   exit -1
 fi
 
-# set defines based on version number (v0 is default)
-if [[ $1 == "v1" ]]; then
-  export SED_UPDATECFL=True
-elif [[ $1 == "v2" ]]; then
-  export SED_UPDATECFL=True
-  export SED_COMBINELAMBDA=True
-elif [[ $1 == "v3" ]]; then
-  export SED_UPDATECFL=True
-  export SED_COMBINELAMBDA=True
-  export SED_NONLINEAR=True
-elif [[ $1 == "v4" ]]; then
-  export SED_UPDATECFL=True
-  export SED_COMPFLAG=True
-elif [[ $1 == "v5" ]]; then
-  export SED_UPDATECFL=True
-  export SED_COMBINELAMBDA=True
-  export SED_COMPFLAG=True
-elif [[ $1 == "v6" ]]; then
-  export SED_UPDATECFL=True
-  export SED_COMBINELAMBDA=True
-  export SED_COMPFLAG=True
-  export SED_NONLINEAR=True
-elif [[ $1 == "v7" ]]; then
-  export SED_UPDATECFL=True
-  export SED_COMBINELAMBDA=True
-  export SED_USEWPA=True
-elif [[ $1 == "v8" ]]; then
-  export SED_UPATECFL=True
-  export SED_COMBINELAMBDA=True
-  export SED_NONLINEAR=True
-  export SED_USEWPA=True
-fi
-
 # set build directory
 BUILD=build_$SYSTEM
 if [[ $2 == "new" ]]; then
