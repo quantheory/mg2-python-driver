@@ -21,8 +21,6 @@ contains
 
   subroutine sed_CalcFallRate(q,n,cloud_frac,rho,pdel,nlev,i, &
     mg_type,deltat,g,an,rhof,alphaq,alphan,cfl,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
-    use gptl,                        only: gptlstart_handle, gptlstop_handle
-    use gptl_kid
     use micro_mg2_acme_v1beta_utils, only: size_dist_param_liq, &
                                            size_dist_param_basic, &
                                            mg_ice_props, mg_liq_props, &
@@ -64,51 +62,35 @@ contains
     select case (mg_type)
 
       case (MG_ICE)
-        gptl_ret = gptlstart_handle('Lambda Calculation (ice)', gptl_lambda_ice)
-        do ngptl=1,gptl_loop
-          call size_dist_param_basic(mg_ice_props, qic(:), nic(:), lam(:))
-        end do
-        gptl_ret = gptlstop_handle('Lambda Calculation (ice)', gptl_lambda_ice)
+        call size_dist_param_basic(mg_ice_props, qic(:), nic(:), lam(:))
 
       case (MG_LIQUID)
-        gptl_ret = gptlstart_handle('Lambda Calculation (cloud)', gptl_lambda_cloud)
-        do ngptl=1,gptl_loop
-          call size_dist_param_liq(mg_liq_props, qic(:), nic(:), rho(i,:), pgam(:), lam(:))
-        end do
-        gptl_ret = gptlstop_handle('Lambda Calculation (cloud)', gptl_lambda_cloud)
+        call size_dist_param_liq(mg_liq_props, qic(:), nic(:), rho(i,:), pgam(:), lam(:))
 
       case (MG_RAIN)
-        gptl_ret = gptlstart_handle('Lambda Calculation (rain)', gptl_lambda_rain)
-        do ngptl=1,gptl_loop
-          do k=1,nlev
-            if (qic(k) > qsmall) then
-              ! add upper limit to in-cloud number concentration to prevent
-              ! numerical error
-              if (limiter_is_on(mg_rain_props%min_mean_mass)) then
-                nic(k) = min(nic(k), qic(k) / mg_rain_props%min_mean_mass)
-              end if
-              ! lambda^b = (c nic/qic)^(b/d)
-              lamPbr(k) = (mg_rain_props%shape_coef * nic(k)/qic(k))**brDeff_dim
-              ! check for slope
-              ! adjust vars
-              if (lamPbr(k) < lamPbr_bounds(1)) then
-                lamPbr(k) = lamPbr_bounds(1)
-                nic(k) = lamPbr(k)**eff_dimDbr * qic(k)*oneDshape_coeff
-              else if (lamPbr(k) > lamPbr_bounds(2)) then
-                lamPbr(k) = lamPbr_bounds(2)
-                nic(k) = lamPbr(k)**eff_dimDbr * qic(k)*oneDshape_coeff
-              end if
+        do k=1,nlev
+          if (qic(k) > qsmall) then
+            ! add upper limit to in-cloud number concentration to prevent
+            ! numerical error
+            if (limiter_is_on(mg_rain_props%min_mean_mass)) then
+              nic(k) = min(nic(k), qic(k) / mg_rain_props%min_mean_mass)
             end if
-          end do
+            ! lambda^b = (c nic/qic)^(b/d)
+            lamPbr(k) = (mg_rain_props%shape_coef * nic(k)/qic(k))**brDeff_dim
+            ! check for slope
+            ! adjust vars
+            if (lamPbr(k) < lamPbr_bounds(1)) then
+              lamPbr(k) = lamPbr_bounds(1)
+              nic(k) = lamPbr(k)**eff_dimDbr * qic(k)*oneDshape_coeff
+            else if (lamPbr(k) > lamPbr_bounds(2)) then
+              lamPbr(k) = lamPbr_bounds(2)
+              nic(k) = lamPbr(k)**eff_dimDbr * qic(k)*oneDshape_coeff
+            end if
+          end if
         end do
-        gptl_ret = gptlstop_handle('Lambda Calculation (rain)', gptl_lambda_rain)
 
       case (MG_SNOW)
-        gptl_ret = gptlstart_handle('Lambda Calculation (snow)', gptl_lambda_snow)
-        do ngptl=1,gptl_loop
-          call size_dist_param_basic(mg_snow_props, qic(:), nic(:), lam(:))
-        end do
-        gptl_ret = gptlstop_handle('Lambda Calculation (snow)', gptl_lambda_snow)
+        call size_dist_param_basic(mg_snow_props, qic(:), nic(:), lam(:))
 
       case default
         print *, "Invalid mg_type to mg2_sedimentation"
@@ -120,62 +102,46 @@ contains
     select case (mg_type)
 
       case (MG_ICE)
-        gptl_ret = gptlstart_handle('Fall Speed Calculation (ice)', gptl_fall_ice)
-        do ngptl=1,gptl_loop
-          do k=1,nlev
-            if (qic(k) .ge. qsmall) then
-              alphaq(k) = g*rho(i,k)*min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bi), &
-                    1.2_r8*rhof(i,k))
-              alphan(k) = g*rho(i,k)* &
-                    min(an(i,k)*gamma_b_plus1/lam(k)**bi,1.2_r8*rhof(i,k))
-            end if
-          end do
+        do k=1,nlev
+          if (qic(k) .ge. qsmall) then
+            alphaq(k) = g*rho(i,k)*min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bi), &
+                  1.2_r8*rhof(i,k))
+            alphan(k) = g*rho(i,k)* &
+                  min(an(i,k)*gamma_b_plus1/lam(k)**bi,1.2_r8*rhof(i,k))
+          end if
         end do
-        gptl_ret = gptlstop_handle('Fall Speed Calculation (ice)', gptl_fall_ice)
 
       case (MG_LIQUID)
-        gptl_ret = gptlstart_handle('Fall Speed Calculation (cloud)', gptl_fall_cloud)
-        do ngptl=1,gptl_loop
-          do k=1,nlev
-            if (qic(k) .ge. qsmall) then
-              alphaq(k) = g*rho(i,k)*an(i,k)*gamma(4._r8+bc+pgam(k))/ &
-                          (lam(k)**bc*gamma(pgam(k)+4._r8))
+        do k=1,nlev
+          if (qic(k) .ge. qsmall) then
+            alphaq(k) = g*rho(i,k)*an(i,k)*gamma(4._r8+bc+pgam(k))/ &
+                        (lam(k)**bc*gamma(pgam(k)+4._r8))
 
-              alphan(k) = g*rho(i,k)* &
-                          an(i,k)*gamma(1._r8+bc+pgam(k))/ &
-                          (lam(k)**bc*gamma(pgam(k)+1._r8))
-            end if
-          end do
+            alphan(k) = g*rho(i,k)* &
+                        an(i,k)*gamma(1._r8+bc+pgam(k))/ &
+                        (lam(k)**bc*gamma(pgam(k)+1._r8))
+          end if
         end do
-        gptl_ret = gptlstop_handle('Fall Speed Calculation (cloud)', gptl_fall_cloud)
 
       case (MG_RAIN)
-        gptl_ret = gptlstart_handle('Fall Speed Calculation (rain)', gptl_fall_rain)
-        do ngptl=1,gptl_loop
-          do k=1,nlev
-            if (qic(k) > qsmall) then
-              cq = g*rho(i,k)*an(i,k)*gamma_b_plus4/6._r8
-              cn = g*rho(i,k)*an(i,k)*gamma_b_plus1
-              alphaq(k) = min(cq/lamPbr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
-              alphan(k) = min(cn/lamPbr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
-            end if
-          end do
+        do k=1,nlev
+          if (qic(k) > qsmall) then
+            cq = g*rho(i,k)*an(i,k)*gamma_b_plus4/6._r8
+            cn = g*rho(i,k)*an(i,k)*gamma_b_plus1
+            alphaq(k) = min(cq/lamPbr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
+            alphan(k) = min(cn/lamPbr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
+          end if
         end do
-        gptl_ret = gptlstop_handle('Fall Speed Calculation (rain)', gptl_fall_rain)
 
       case (MG_SNOW)
-        gptl_ret = gptlstart_handle('Fall Speed Calculation (snow)', gptl_fall_snow)
-        do ngptl=1,gptl_loop
-          do k=1,nlev
-            if (lam(k) .ge. qsmall) then
-              alphaq(k) = g*rho(i,k)* &
-                min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bs),1.2_r8*rhof(i,k))
-              alphan(k) = g*rho(i,k)* &
-                min(an(i,k)*gamma_b_plus1/lam(k)**bs,1.2_r8*rhof(i,k))
-            end if
-          end do
+        do k=1,nlev
+          if (lam(k) .ge. qsmall) then
+            alphaq(k) = g*rho(i,k)* &
+              min(an(i,k)*gamma_b_plus4/(6._r8*lam(k)**bs),1.2_r8*rhof(i,k))
+            alphan(k) = g*rho(i,k)* &
+              min(an(i,k)*gamma_b_plus1/lam(k)**bs,1.2_r8*rhof(i,k))
+          end if
         end do
-        gptl_ret = gptlstop_handle('Fall Speed Calculation (snow)', gptl_fall_snow)
 
       case default
         print *, "Invalid mg_type to mg2_sedimentation"

@@ -54,9 +54,7 @@ LD=$(F90)   # Linker
 
 INCDF=-I$(NCPATH)/include
 LNCDF=-L$(NCPATH)/lib -lnetcdf -lnetcdff
-IGPTL=-I$(GPTLPATH)/include
-LGPTL=-L$(GPTLPATH)/lib -lgptl -L$(MPIPATH)/lib -lmpi
-LDFLAGS=$(INCDF) $(LNCDF) $(IGPTL) $(LGPTL)
+LDFLAGS=$(INCDF) $(LNCDF)
 
 EXECUTABLE=$(MODEL)_$(CASE).exe
 

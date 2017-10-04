@@ -467,9 +467,6 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        MG_SNOW, &
        CFL
 
-   use gptl, only: gptlstart_handle, gptlstop_handle
-   use gptl_kid
-
   !Authors: Hugh Morrison, Andrew Gettelman, NCAR, Peter Caldwell, LLNL
   ! e-mail: morrison@ucar.edu, andrew@ucar.edu
 
@@ -2464,11 +2461,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        ! advance cloud ice sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep+1
-       gptl_ret = gptlstart_handle('Advance Solution (ice)',gptl_advance_sol_ice)
        call sed_AdvanceOneStep(dumi,dumni,alphaq,alphan,pdel,deltat,deltat_sed, &
          nlev,i,MG_ICE,g,qitend,nitend,preci,qisedten,&
          cloud_frac=icldm,qvlat=qvlat,tlat=tlat,xxl=xxls,preci=preci,qsevap=qisevap)
-       gptl_ret = gptlstop_handle('Advance Solution (ice)',gptl_advance_sol_ice)
        ! update maximum fall speed
        dum1 = max(dum1,maxval(alphaq(:)),maxval(alphan(:)))
      end do
@@ -2494,11 +2489,9 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        ! advance cloud liquid sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1
-       gptl_ret = gptlstart_handle('Advance Solution (cloud)',gptl_advance_sol_cloud)
        call sed_AdvanceOneStep(dumc,dumnc,alphaq,alphan,pdel,deltat,deltat_sed, &
          nlev,i,MG_LIQUID,g,qctend,nctend,prect,qcsedten,&
          cloud_frac=lcldm,qvlat=qvlat,tlat=tlat,xxl=xxlv,qsevap=qcsevap)
-       gptl_ret = gptlstop_handle('Advance Solution (cloud)',gptl_advance_sol_cloud)
        ! update maximum fall speed
        dum1 = max(maxval(alphaq(:)),maxval(alphan(:)))
      end do
@@ -2523,10 +2516,8 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        ! advance rain sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1
-       gptl_ret = gptlstart_handle('Advance Solution (rain)',gptl_advance_sol_rain)
        call sed_AdvanceOneStep(dumr,dumnr,alphaq,alphan,pdel,deltat,deltat_sed, &
          nlev,i,MG_RAIN,g,qrtend,nrtend,prect,qrsedten)
-       gptl_ret = gptlstop_handle('Advance Solution (rain)',gptl_advance_sol_rain)
        ! update maximum fall speed
        dum1 = max(maxval(alphaq(:)),maxval(alphan(:)))
      end do
@@ -2551,10 +2542,8 @@ subroutine micro_mg2_acme_v1beta_tend ( &
        ! advance snow sedimentation
        time_sed = time_sed - deltat_sed
        nstep = nstep + 1
-       gptl_ret = gptlstart_handle('Advance Solution (snow)',gptl_advance_sol_snow)
        call sed_AdvanceOneStep(dums,dumns,alphaq,alphan,pdel,deltat,deltat_sed, &
          nlev,i,MG_SNOW,g,qstend,nstend,prect,qssedten,preci=preci)
-       gptl_ret = gptlstop_handle('Advance Solution (snow)',gptl_advance_sol_snow)
        dum1 = max(maxval(alphaq(:)),maxval(alphan(:)))
      end do
 

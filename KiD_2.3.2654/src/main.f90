@@ -35,30 +35,20 @@ Module main
 contains
 
   subroutine main_loop
-    use gptl, only: gptlinitialize, gptlfinalize, gptlpr_file
     use namelists, only: fileName
 
     integer :: itime       ! loop counter for time
-    integer :: gptlret     ! for GPTL functions
 
     real(wp) :: dtm        ! microphysics time step size
     real(wp) :: dt_orig    ! temporary var for time step
     integer  :: mcount     ! PMC in namelist now: ,mstep
     logical  :: call_micro ! flag to track if microphysics was computed this dynamics step
-    character(200) :: gptlfilename
-
 
     !
     ! Start by reading in namelists
     !
 
     if (l_namelists) call read_namelist
-
-    ! Initialize GPTL and get filename
-    gptlret = gptlinitialize()
-    gptlfilename = trim(fileName)
-    gptlret = len_trim(fileName)
-    gptlfilename = gptlfilename(:(gptlret-4)) // '_timing.txt'
 
     !+++PMC: put macro stepping where dt is actually known.
     ! now in namelist:    mstep = 2  ! call micro every mstep (an integer) dynamics calls
@@ -163,9 +153,6 @@ contains
     if (l_write_dgs) call write_diagnostics
 
     call finalize_stats()
-
-    gptlret = gptlpr_file(trim(gptlfilename))
-    gptlret = gptlfinalize()
 
   end subroutine main_loop
 

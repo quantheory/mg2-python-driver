@@ -23,8 +23,6 @@ elif [[ $HOSTNAME == "tux"* ]]; then
   source /usr/apps/intel/15.5.223/composer_xe_2015.5.223/bin/ifortvars.sh intel64
   COMPILER=ifort
   NCPATH=$HOME/local/netcdf-4.1.3_tux_intel_opt
-  GPTLPATH=$HOME/local/gptl-5.5_tux_intel_opt
-  MPIPATH=$HOME/local/mpich-3.2_tux_intel_opt
 elif [[ $HOSTNAME == "MOODYBLUES" ]]; then
   SYSTEM=moodyblues
   COMPILER=gfortran
@@ -46,8 +44,6 @@ mkdir -p $BUILD
 make CASE=1D \
   COMPILER=$COMPILER \
   NCPATH=$NCPATH \
-  GPTLPATH=$GPTLPATH \
-  MPIPATH=$MPIPATH \
   EXECDIR=$BUILD/bin \
   OBJDIR=$BUILD/obj \
   all
