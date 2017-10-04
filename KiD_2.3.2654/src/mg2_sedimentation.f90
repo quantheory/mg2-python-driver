@@ -11,13 +11,89 @@ module Sedimentation
   integer, parameter, public  :: MG_SNOW = 4
   real(r8), parameter, public :: CFL = 0.9_r8
 
-  real(r8) :: brDeff_dim = -1._r8
-  real(r8) :: eff_dimDbr = -1._r8
-  real(r8) :: oneDshape_coeff = -1._r8
-  real(r8) :: lamPbr_bounds(2) = (/ -1._r8, -1._r8 /)
-
+  integer, parameter :: SPLINE_RESOLUTION = 100
+  logical :: spline_generated = .false.
+  real(r8) :: spline_svals(SPLINE_RESOLUTION)
+  real(r8) :: spline_fvals(SPLINE_RESOLUTION)
 
 contains
+
+  subroutine generateLamPmbrSpline()
+  ! Generates a spline for f(s) = (c_lambda * s)^{-br/eff_dim}, where s = n/q.
+  ! Spacing for s is chosen so that f(s_{j+1}) - f(s_j) is constant:
+  !   s_j = [a + (j-1)*delta]^{-eff_dim/br}
+  ! The coefficients a, delta are chosen so that s_1 and s_{SPLINE_RESOLUTION}
+  ! equal the lambda bounds.
+    use micro_mg2_acme_v1beta_utils, only: mg_rain_props, br
+    implicit none
+    real(r8) :: a, delta, lamPmbr_bounds(2), tmp
+    integer :: res, j
+
+    ! obtain a and delta from lambda bounds
+    res = SPLINE_RESOLUTION
+    tmp = mg_rain_props%shape_coef**(br/mg_rain_props%eff_dim)
+    a =  tmp / mg_rain_props%lambda_bounds(1)**br
+    delta = (tmp / mg_rain_props%lambda_bounds(2)**br - a)/(res-1)
+
+    ! generate spline
+    do j = 1,res
+      spline_svals(j) = (a + (j-1)*delta)**(-mg_rain_props%eff_dim/br)
+      spline_fvals(j) = (mg_rain_props%shape_coef*spline_svals(j))** &
+                                (-br/mg_rain_props%eff_dim)
+    end do
+    spline_generated = .true.
+
+  end subroutine generateLamPmbrSpline
+
+  function evaluateLamPmbrSpline(q,n) result(lamPmbr)
+    implicit none
+    real(r8), intent(in) :: q, n
+
+    integer :: low_ind, mid_ind, high_ind
+    real(r8) :: lamPmbr, s, low, mid, high
+    logical :: found
+
+    s = n/q
+
+    ! if s is outside splined region, set function value that corresponds to
+    ! lambda bounds
+    if (s < spline_svals(1)) then
+      lamPmbr = spline_fvals(1)
+      return
+    else if (s > spline_svals(SPLINE_RESOLUTION)) then
+      lamPmbr = spline_fvals(SPLINE_RESOLUTION)
+      return
+    end if
+
+    ! if s is inside region, use bisection-like search to find which spline
+    ! indices to use (s \in [s_j, s_{j+1}])
+    low_ind = 1
+    low = spline_svals(low_ind)
+    high_ind = SPLINE_RESOLUTION
+    high = spline_svals(SPLINE_RESOLUTION)
+    found = .false.
+    do while (.not.found)
+      mid_ind = (low_ind + high_ind)/2
+      mid = spline_svals(mid_ind)
+      if (s < mid) then
+        high_ind = mid_ind
+        high = mid
+      else
+        low_ind = mid_ind
+        low = mid
+      end if
+
+      if (high_ind - low_ind == 1) then
+        found = .true.
+      end if
+    end do
+
+    ! compute splined value
+    lamPmbr = ( &
+          (s-low)*spline_fvals(high_ind) + (high-s)*spline_fvals(low_ind) ) / &
+          (high-low)
+    return
+  end function evaluateLamPmbrSpline
 
   subroutine sed_CalcFallRate(q,n,cloud_frac,rho,pdel,nlev,i, &
     mg_type,deltat,g,an,rhof,alphaq,alphan,cfl,ncons,nnst,gamma_b_plus1,gamma_b_plus4)
@@ -37,17 +113,8 @@ contains
     real(r8), intent(out)           :: alphaq(:), alphan(:)
     real(r8), intent(out)           :: cfl
 
-    real(r8) :: qic(nlev), nic(nlev), lam(nlev), pgam(nlev), cq, cn, lamPbr(nlev)
-    integer :: k, ngptl
-
-    ! compute module lambda quantities for rain if not already computed
-    if (brDeff_dim .eq. -1._r8) then
-      brDeff_dim = br/mg_rain_props%eff_dim
-      eff_dimDbr = mg_rain_props%eff_dim/br
-      oneDshape_coeff = 1._r8/mg_rain_props%shape_coef
-      lamPbr_bounds(1) = mg_rain_props%lambda_bounds(1)**br
-      lamPbr_bounds(2) = mg_rain_props%lambda_bounds(2)**br
-    end if
+    real(r8) :: qic(nlev), nic(nlev), lam(nlev), pgam(nlev), cq, cn, lamPmbr(nlev)
+    integer :: k
 
     ! use quantity in cloud
     qic = q(i,:)/cloud_frac(i,:)
@@ -68,6 +135,10 @@ contains
         call size_dist_param_liq(mg_liq_props, qic(:), nic(:), rho(i,:), pgam(:), lam(:))
 
       case (MG_RAIN)
+        ! generate spline if needed
+        if (.not.spline_generated) then
+          call generateLamPmbrSpline()
+        end if
         do k=1,nlev
           if (qic(k) > qsmall) then
             ! add upper limit to in-cloud number concentration to prevent
@@ -76,16 +147,7 @@ contains
               nic(k) = min(nic(k), qic(k) / mg_rain_props%min_mean_mass)
             end if
             ! lambda^b = (c nic/qic)^(b/d)
-            lamPbr(k) = (mg_rain_props%shape_coef * nic(k)/qic(k))**brDeff_dim
-            ! check for slope
-            ! adjust vars
-            if (lamPbr(k) < lamPbr_bounds(1)) then
-              lamPbr(k) = lamPbr_bounds(1)
-              nic(k) = lamPbr(k)**eff_dimDbr * qic(k)*oneDshape_coeff
-            else if (lamPbr(k) > lamPbr_bounds(2)) then
-              lamPbr(k) = lamPbr_bounds(2)
-              nic(k) = lamPbr(k)**eff_dimDbr * qic(k)*oneDshape_coeff
-            end if
+            lamPmbr(k) = evaluateLamPmbrSpline(qic(k),nic(k))
           end if
         end do
 
@@ -128,8 +190,8 @@ contains
           if (qic(k) > qsmall) then
             cq = g*rho(i,k)*an(i,k)*gamma_b_plus4/6._r8
             cn = g*rho(i,k)*an(i,k)*gamma_b_plus1
-            alphaq(k) = min(cq/lamPbr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
-            alphan(k) = min(cn/lamPbr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
+            alphaq(k) = min(cq*lamPmbr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
+            alphan(k) = min(cn*lamPmbr(k), 9.1_r8*g*rho(i,k)*rhof(i,k))
           end if
         end do
 
