@@ -46,7 +46,10 @@ set FILES="${DIR}/wv_sat_methods.F90 ${DIR}/micro_mg_utils.F90 ${DIR}/micro_mg2_
 #are separated by spaces - the code still compiles if commas are used instead,
 #but it crashes when you try to load it into python. 
 
-set PUB_FNS='wv_sat_methods_init wv_sat_svp_water wv_sat_svp_ice wv_sat_svp_to_qsat wv_sat_qsat_water wv_sat_qsat_ice micro_mg_init micro_mg_tend micro_mg_utils_init ice_deposition_sublimation kk2000_liq_autoconversion ice_autoconversion immersion_freezing contact_freezing snow_self_aggregation accrete_cloud_water_snow secondary_ice_production accrete_rain_snow heterogeneous_rain_freezing accrete_cloud_water_rain self_collection_rain accrete_cloud_ice_snow evaporate_sublimate_precip bergeron_process_snow sedimentation avg_diameter rain_fall_speeds'
+# Note that micro_mg_utils_init is included purely in order to make sure that
+# f2py actually tries to include micro_mg_utils (as opposed to assuming that it
+# has nothing we need and not properly integrating it into the library).
+set PUB_FNS='wv_sat_methods_init micro_mg_utils_init micro_mg_init micro_mg_tend'
 
 #CREATE .pyf FILE WITH INTERFACES TO PYTHON:
 #=================
