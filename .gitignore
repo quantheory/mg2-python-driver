@@ -1,3 +1,4 @@
 *.pyf
 *.pyfe
 *.so
+.ipynb_checkpoints/
