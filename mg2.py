@@ -8,6 +8,9 @@ import numpy             as np
 import numpy.linalg      as la
 import matplotlib.pyplot as plt
 import netCDF4           as nc4
+import os
+import pycurl
+
 from   mg2_constants import *
 
 ################################################################################
@@ -15,6 +18,24 @@ from   mg2_constants import *
 wsm      = _mg2.wv_sat_methods
 mg       = _mg2.micro_mg2_0
 mg_utils = _mg2.micro_mg_utils
+
+################################################################################
+
+def obtain_datafile(filename, url):
+    """
+    Check to see if filename exists. If not, download the file from the given
+    URL. If it does exist, assume the file has already been downloaded and skip
+    the download.
+    """
+    if not os.path.isfile(filename):
+        with open(filename, 'wb') as f:
+            c = pycurl.Curl()
+            c.setopt(c.URL, url)
+            c.setopt(c.WRITEDATA, f)
+            print('Downloading', filename, '...', end='')
+            c.perform()
+            c.close()
+            print('Done')
 
 ################################################################################
 
@@ -237,7 +258,7 @@ class convergence_test(object):
 
     def initialize(self, total_columns, timesteps):
         self.total_columns = total_columns
-        self.timesteps     = timesteps
+        self.timesteps     = np.array(timesteps)
         self.final_time    = self.timesteps[-1]
         self.norms = {}
         self.finals = {}
