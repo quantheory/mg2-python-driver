@@ -348,16 +348,18 @@ class convergence_test(object):
         percentiles     - Percentiles of error to plot (e.g. 50. is the median).
         estimate_slopes - Print out an estimated slope for each percentile.
         """
+        fig = plt.figure(figsize=(10,7.5))
+        ax  = fig.add_subplot(1, 1, 1)
         for p in percentiles:
             norms_p = np.percentile(self.norms[name], p, axis=0)
-            plt.loglog(self.timesteps[1:], norms_p, label='Percentile={:.1f}'.format(p))
+            ax.loglog(self.timesteps[1:], norms_p, label='Percentile={:.1f}'.format(p))
             if estimate_slopes:
                 coefs = np.polyfit(np.log(self.timesteps[1:]), np.log(norms_p), 1)
                 print("Estimated slope for percentile {:.1f} is {}.".format(p, coefs[0]))
-        plt.xlabel('Timestep (sec)')
-        plt.ylabel('Norm of difference in {} from $\Delta$t={}'.format(name, self.timesteps[0]))
-        plt.legend(loc='best')
-        plt.axis('tight')
+        ax.set_xlabel('Timestep (sec)', fontsize='x-large')
+        ax.set_ylabel('Norm of difference in {} from $\Delta$t={}'.format(name, self.timesteps[0]),
+                      fontsize='x-large')
+        ax.legend(loc='best', fontsize='x-large')
 
     ############################################################################
 
@@ -372,14 +374,16 @@ class convergence_test(object):
                           the "timesteps" list).
         estimate_slopes - Print out an estimated slope for each column.
         """
+        fig = plt.figure(figsize=(10,7.5))
+        ax  = fig.add_subplot(1, 1, 1)
         indices = np.argsort(self.norms[name][:,list(self.timesteps).index(timestep)-1])
         for p in percentiles:
             norms_p = self.norms[name][indices[round(p/100.*(self.total_columns-1))]]
-            plt.loglog(self.timesteps[1:], norms_p, label='Percentile={:.1f}'.format(p))
+            ax.loglog(self.timesteps[1:], norms_p, label='Percentile={:.1f}'.format(p))
             if estimate_slopes:
                 coefs = np.polyfit(np.log(self.timesteps[1:]), np.log(norms_p), 1)
                 print("Estimated slope for percentile {:.1f} is {}.".format(p, coefs[0]))
-        plt.xlabel('Seconds/timestep')
-        plt.ylabel('Norm of difference in {} from $\Delta$t={}'.format(name, self.timesteps[0]))
-        plt.legend(loc='best')
-        plt.axis('tight')
+        ax.set_xlabel('Timestep (sec)', fontsize='x-large')
+        ax.set_ylabel('Norm of difference in {} from $\Delta$t={}'.format(name, self.timesteps[0]),
+                      fontsize='x-large')
+        ax.legend(loc='best', fontsize='x-large')
