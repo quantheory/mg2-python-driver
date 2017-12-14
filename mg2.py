@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import netCDF4           as nc4
 import os
 import pycurl
+import sys
 
 from   mg2_constants import *
 
@@ -281,7 +282,8 @@ class convergence_test(object):
 
     def run_tests(self):
         for it in range(self.timesteps.size):
-            print("Starting timestep =", self.timesteps[it])
+            print("Running test with timestep =", self.timesteps[it], '... ', end='')
+            sys.stdout.flush()
             nsteps = int(round(self.final_time / self.timesteps[it]))
             deltat = float(self.timesteps[it])
 
@@ -357,6 +359,7 @@ class convergence_test(object):
                         self.norms[name][offset*self.mgncol:(offset+1)*self.mgncol,it-1] \
                             = la.norm(self.finals[name][offset*self.mgncol:(offset+1)*self.mgncol,:] - self.loc_arrays[name],
                                       axis=1)
+            print("done")
 
     ############################################################################
 
