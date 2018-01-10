@@ -1,0 +1,178 @@
+python module mg2
+
+    module wv_sat_methods:
+        subroutine wv_sat_methods_init( 6 in, 1 out )
+            in:
+                integer      kind                            # 
+                real(kind=8) tmelt_in                        # 
+                real(kind=8) h2otrip_in                      # 
+                real(kind=8) tboil_in                        # 
+                real(kind=8) ttrice_in                       # 
+                real(kind=8) epsilo_in                       # 
+            out:
+                character*(*) errstring                      # Error string
+
+    module micro_mg_utils
+        subroutine micro_mg_utils_init( 8 in, 1 out )
+            in:
+                integer      kind                            # 
+                real(kind=8) rh2o                            # 
+                real(kind=8) cpair                           # 
+                real(kind=8) tmelt_in                        # 
+                real(kind=8) latvap                          # 
+                real(kind=8) latice                          # 
+                real(kind=8) dcs                             # 
+                real(kind=8) ice_sed_ai                      # 
+            out:
+                character*128 errstring                      # Error string
+
+    module micro_mg2_0
+        subroutine micro_mg_init( 24 in, 1 out )
+            in:
+                integer      kind                            # 
+                real(kind=8) gravit                          # 
+                real(kind=8) rair                            # 
+                real(kind=8) rh2o                            # 
+                real(kind=8) cpair                           # 
+                real(kind=8) tmelt_in                        # 
+                real(kind=8) latvap                          # 
+                real(kind=8) latice                          # 
+                real(kind=8) rhmini_in                       # 
+                real(kind=8) micro_mg_dcs                    # 
+                logical      micro_mg_dcs_tdep               # 
+                logical      microp_uniform_in               # 
+                logical      do_cldice_in                    # 
+                logical      use_hetfrz_classnuc_in          # 
+                character*16 micro_mg_precip_frac_method_in  # 
+                real(kind=8) micro_mg_berg_eff_factor_in     # 
+                logical      allow_sed_supersat_in           # 
+                real(kind=8) ice_sed_ai                      # 
+                real(kind=8) prc_coef1_in                    # 
+                real(kind=8) prc_exp_in                      # 
+                real(kind=8) prc_exp1_in                     # 
+                real(kind=8) cld_sed_in                      # 
+                logical      mg_prc_coeff_fix_in             # 
+                real(kind=8) alpha_grad_in                   # 
+                real(kind=8) beta_grad_in                    # 
+            out:
+                character*128 errstring                      # Error string
+
+        subroutine micro_mg_tend( 30 in, 86 out )
+            in:
+                integer      mgncol=shape(t,0)               # 
+                integer      nlev=shape(t,1)                 # 
+                real(kind=8) deltatin                        # 
+                real(kind=8) t                               # 
+                real(kind=8) q                               # 
+                real(kind=8) qcn                             # 
+                real(kind=8) qin                             # 
+                real(kind=8) ncn                             # 
+                real(kind=8) nin                             # 
+                real(kind=8) qrn                             # 
+                real(kind=8) qsn                             # 
+                real(kind=8) nrn                             # 
+                real(kind=8) nsn                             # 
+                real(kind=8) relvar                          # 
+                real(kind=8) accre_enhan                     # 
+                real(kind=8) p                               # 
+                real(kind=8) pdel                            # 
+                real(kind=8) cldn                            # 
+                real(kind=8) liqcldf                         # 
+                real(kind=8) icecldf                         # 
+                real(kind=8) naai                            # 
+                real(kind=8) npccn                           # 
+                real(kind=8) rndst                           # 
+                real(kind=8) nacon                           # 
+                real(kind=8) tnd_qsnow                       # 
+                real(kind=8) tnd_nsnow                       # 
+                real(kind=8) re_ice                          # 
+                real(kind=8) frzimm                          # 
+                real(kind=8) frzcnt                          # 
+                real(kind=8) frzdep                          # 
+            out:
+                real(kind=8)  qcsinksum_rate1ord             # 
+                real(kind=8)  tlat                           # 
+                real(kind=8)  qvlat                          # 
+                real(kind=8)  qctend                         # 
+                real(kind=8)  qitend                         # 
+                real(kind=8)  nctend                         # 
+                real(kind=8)  nitend                         # 
+                real(kind=8)  qrtend                         # 
+                real(kind=8)  qstend                         # 
+                real(kind=8)  nrtend                         # 
+                real(kind=8)  nstend                         # 
+                real(kind=8)  effc                           # 
+                real(kind=8)  effc_fn                        # 
+                real(kind=8)  effi                           # 
+                real(kind=8)  prect                          # 
+                real(kind=8)  preci                          # 
+                real(kind=8)  nevapr                         # 
+                real(kind=8)  evapsnow                       # 
+                real(kind=8)  prain                          # 
+                real(kind=8)  prodsnow                       # 
+                real(kind=8)  cmeout                         # 
+                real(kind=8)  deffi                          # 
+                real(kind=8)  pgamrad                        # 
+                real(kind=8)  lamcrad                        # 
+                real(kind=8)  qsout                          # 
+                real(kind=8)  dsout                          # 
+                real(kind=8)  rflx                           # 
+                real(kind=8)  sflx                           # 
+                real(kind=8)  qrout                          # 
+                real(kind=8)  reff_rain                      # 
+                real(kind=8)  reff_snow                      # 
+                real(kind=8)  qcsevap                        # 
+                real(kind=8)  qisevap                        # 
+                real(kind=8)  qvres                          # 
+                real(kind=8)  cmeitot                        # 
+                real(kind=8)  vtrmc                          # 
+                real(kind=8)  vtrmi                          # 
+                real(kind=8)  umr                            # 
+                real(kind=8)  ums                            # 
+                real(kind=8)  qcsedten                       # 
+                real(kind=8)  qisedten                       # 
+                real(kind=8)  qrsedten                       # 
+                real(kind=8)  qssedten                       # 
+                real(kind=8)  pratot                         # 
+                real(kind=8)  prctot                         # 
+                real(kind=8)  mnuccctot                      # 
+                real(kind=8)  mnuccttot                      # 
+                real(kind=8)  msacwitot                      # 
+                real(kind=8)  psacwstot                      # 
+                real(kind=8)  bergstot                       # 
+                real(kind=8)  bergtot                        # 
+                real(kind=8)  melttot                        # 
+                real(kind=8)  homotot                        # 
+                real(kind=8)  qcrestot                       # 
+                real(kind=8)  prcitot                        # 
+                real(kind=8)  praitot                        # 
+                real(kind=8)  qirestot                       # 
+                real(kind=8)  mnuccrtot                      # 
+                real(kind=8)  pracstot                       # 
+                real(kind=8)  meltsdttot                     # 
+                real(kind=8)  frzrdttot                      # 
+                real(kind=8)  mnuccdtot                      # 
+                real(kind=8)  nrout                          # 
+                real(kind=8)  nsout                          # 
+                real(kind=8)  refl                           # 
+                real(kind=8)  arefl                          # 
+                real(kind=8)  areflz                         # 
+                real(kind=8)  frefl                          # 
+                real(kind=8)  csrfl                          # 
+                real(kind=8)  acsrfl                         # 
+                real(kind=8)  fcsrfl                         # 
+                real(kind=8)  rercld                         # 
+                real(kind=8)  ncai                           # 
+                real(kind=8)  ncal                           # 
+                real(kind=8)  qrout2                         # 
+                real(kind=8)  qsout2                         # 
+                real(kind=8)  nrout2                         # 
+                real(kind=8)  nsout2                         # 
+                real(kind=8)  drout2                         # 
+                real(kind=8)  dsout2                         # 
+                real(kind=8)  freqs                          # 
+                real(kind=8)  freqr                          # 
+                real(kind=8)  nfice                          # 
+                real(kind=8)  qcrat                          # 
+                character*128 errstring                      # Error string
+                real(kind=8)  prer_evap                      # 
