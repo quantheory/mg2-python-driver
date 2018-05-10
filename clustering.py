@@ -8,6 +8,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import netCDF4 as nc4
 import numdifftools as ndt
+import sklearn.cluster as clstr
 
 from mg2 import wv_sat_methods as wsm
 from mg2 import micro_mg2_0 as mg
@@ -15,15 +16,12 @@ from mg2 import micro_mg2_0 as mg
 from mg2_constants import *
 
 HIST_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
-CLUSTER_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.10_cluster_labels.0001-01-06-00000.nc"
 
-hfile = nc4.Dataset(HIST_FILE_NAME, 'r')
-cfile = nc4.Dataset(CLUSTER_FILE_NAME, 'r')
+file = nc4.Dataset(HIST_FILE_NAME, 'r')
 
-ncol = len(hfile.dimensions['ncol'])
-lev = len(hfile.dimensions['lev'])
-ilev = len(hfile.dimensions['ilev'])
-ncluster = len(cfile.dimensions['ncluster'])
+ncol = len(file.dimensions['ncol'])
+lev = len(file.dimensions['lev'])
+ilev = len(file.dimensions['ilev'])
 
 errstring = wsm.wv_sat_methods_init(kind, tmelt, h2otrip, tboil, ttrice, epsilo)
 
@@ -40,40 +38,38 @@ errstring = mg.micro_mg_init(kind, gravit, rair, rh2o, cpair, tmelt, latvap,
 assert errstring.decode().strip() == '', \
     "MG2 initialization error: "+errstring.decode()
 
-t = hfile.variables["MG2IN_T"]
-q = hfile.variables["MG2IN_Q"]
-qc = hfile.variables["MG2IN_QC"]
-qi = hfile.variables["MG2IN_QI"]
-nc = hfile.variables["MG2IN_NC"]
-ni = hfile.variables["MG2IN_NI"]
-qr = hfile.variables["MG2IN_QR"]
-qs = hfile.variables["MG2IN_QS"]
-nr = hfile.variables["MG2IN_NR"]
-ns = hfile.variables["MG2IN_NS"]
-relvar = hfile.variables["MG2IN_RELVAR"]
-accre_enhan = hfile.variables["MG2IN_ACCRE_ENHAN"]
-p = hfile.variables["MG2IN_P"]
-pdel = hfile.variables["MG2IN_PDEL"]
-precipf = hfile.variables["MG2IN_PRECIP"]
-liqcldf = hfile.variables["MG2IN_LIQCLDF"]
-icecldf = hfile.variables["MG2IN_ICECLDF"]
-naai = hfile.variables["MG2IN_NAAI"]
-npccn = hfile.variables["MG2IN_NPCCN"]
+t = file.variables["MG2IN_T"]
+q = file.variables["MG2IN_Q"]
+qc = file.variables["MG2IN_QC"]
+qi = file.variables["MG2IN_QI"]
+nc = file.variables["MG2IN_NC"]
+ni = file.variables["MG2IN_NI"]
+qr = file.variables["MG2IN_QR"]
+qs = file.variables["MG2IN_QS"]
+nr = file.variables["MG2IN_NR"]
+ns = file.variables["MG2IN_NS"]
+relvar = file.variables["MG2IN_RELVAR"]
+accre_enhan = file.variables["MG2IN_ACCRE_ENHAN"]
+p = file.variables["MG2IN_P"]
+pdel = file.variables["MG2IN_PDEL"]
+precipf = file.variables["MG2IN_PRECIP"]
+liqcldf = file.variables["MG2IN_LIQCLDF"]
+icecldf = file.variables["MG2IN_ICECLDF"]
+naai = file.variables["MG2IN_NAAI"]
+npccn = file.variables["MG2IN_NPCCN"]
 rndst = np.empty((t.shape[0], t.shape[1], t.shape[2], 4))
-rndst[:,:,:,0] = hfile.variables["MG2IN_RNDST1"][:]
-rndst[:,:,:,1] = hfile.variables["MG2IN_RNDST2"][:]
-rndst[:,:,:,2] = hfile.variables["MG2IN_RNDST3"][:]
-rndst[:,:,:,3] = hfile.variables["MG2IN_RNDST4"][:]
+rndst[:,:,:,0] = file.variables["MG2IN_RNDST1"][:]
+rndst[:,:,:,1] = file.variables["MG2IN_RNDST2"][:]
+rndst[:,:,:,2] = file.variables["MG2IN_RNDST3"][:]
+rndst[:,:,:,3] = file.variables["MG2IN_RNDST4"][:]
 nacon = np.empty((t.shape[0], t.shape[1], t.shape[2], 4))
-nacon[:,:,:,0] = hfile.variables["MG2IN_NACON1"][:]
-nacon[:,:,:,1] = hfile.variables["MG2IN_NACON2"][:]
-nacon[:,:,:,2] = hfile.variables["MG2IN_NACON3"][:]
-nacon[:,:,:,3] = hfile.variables["MG2IN_NACON4"][:]
-frzimm = hfile.variables["MG2IN_FRZIMM"]
-frzcnt = hfile.variables["MG2IN_FRZCNT"]
-frzdep = hfile.variables["MG2IN_FRZDEP"]
-
-label = cfile.variables["label"]
+nacon[:,:,:,0] = file.variables["MG2IN_NACON1"][:]
+nacon[:,:,:,1] = file.variables["MG2IN_NACON2"][:]
+nacon[:,:,:,2] = file.variables["MG2IN_NACON3"][:]
+nacon[:,:,:,3] = file.variables["MG2IN_NACON4"][:]
+frzimm = file.variables["MG2IN_FRZIMM"]
+frzcnt = file.variables["MG2IN_FRZCNT"]
+frzdep = file.variables["MG2IN_FRZDEP"]
 
 t_loc = np.empty((1, t.shape[1]), order='F')
 q_loc = np.empty((1, q.shape[1]), order='F')
@@ -189,6 +185,7 @@ short_names = [
     "snagg",
     "anadj",
 ]
+nproc = len(short_names)
 process_names = {
     "revap": "Rain Evaporation",
     "ssubl": "Snow Sublimation",
@@ -355,157 +352,35 @@ def mg2_tendencies(level, t, q, qc, nc, qi, ni, qr, nr, qs, ns):
     assert np.allclose(budget_total, tends["Total"])
     return tends
 
-def run_mg2(state, level):
-    """Run MG2 on a single column, and return state tendencies.
-
-    This function is specialized for use in finding the Jacobian at a single
-    level.
-    """
-    state = s.dot(state)
-    # Note that we have to deal with the possibility that floating-point error
-    # changes the sign of the hydrometeor masses/numbers.
-    my_t = t_loc.copy()
-    my_q = q_loc.copy()
-    my_qc = qc_loc.copy()
-    my_nc = nc_loc.copy()
-    my_qi = qi_loc.copy()
-    my_ni = ni_loc.copy()
-    my_qr = qr_loc.copy()
-    my_nr = nr_loc.copy()
-    my_qs = qs_loc.copy()
-    my_ns = ns_loc.copy()
-    my_t[0,level] = state[it]
-    my_q[0,level] = state[iq]
-    my_qc[0,level] = max(state[iqc], 0.)
-    my_nc[0,level] = max(state[inc], 1.e-12)
-    my_qi[0,level] = max(state[iqi], 0.)
-    my_ni[0,level] = max(state[ini], 1.e-12)
-    my_qr[0,level] = max(state[iqr], 0.)
-    my_nr[0,level] = max(state[inr], 1.e-12)
-    my_qs[0,level] = max(state[iqs], 0.)
-    my_ns[0,level] = max(state[ins], 1.e-12)
-    tends = mg2_tendencies(level, my_t, my_q, my_qc, my_nc, my_qi, my_ni, my_qr,
-                           my_nr, my_qs, my_ns)
-    return s_inv_mult(tends["Total"])
-
-ind = np.arange(len(short_names))
-
-column = 856
-
-t_loc[:,:] = t[0,:,column]
-q_loc[:,:] = q[0,:,column]
-qc_loc[:,:] = qc[0,:,column]
-qi_loc[:,:] = qi[0,:,column]
-nc_loc[:,:] = nc[0,:,column]
-ni_loc[:,:] = ni[0,:,column]
-qr_loc[:,:] = qr[0,:,column]
-qs_loc[:,:] = qs[0,:,column]
-nr_loc[:,:] = nr[0,:,column]
-ns_loc[:,:] = ns[0,:,column]
-relvar_loc[:,:] = relvar[0,:,column]
-accre_enhan_loc[:,:] = accre_enhan[0,:,column]
-p_loc[:,:] = p[0,:,column]
-pdel_loc[:,:] = pdel[0,:,column]
-precipf_loc[:,:] = precipf[0,:,column]
-liqcldf_loc[:,:] = liqcldf[0,:,column]
-icecldf_loc[:,:] = icecldf[0,:,column]
-naai_loc[:,:] = naai[0,:,column]
-npccn_loc[:,:] = npccn[0,:,column]
-rndst_loc[:,:,:] = rndst[0,:,column:column+1,:].transpose([1, 0, 2])
-nacon_loc[:,:,:] = nacon[0,:,column:column+1,:].transpose([1, 0, 2])
-frzimm_loc[:,:] = frzimm[0,:,column]
-frzcnt_loc[:,:] = frzcnt[0,:,column]
-frzdep_loc[:,:] = frzdep[0,:,column]
-
-def get_modes_at_level(level):
-    state = np.zeros((10,))
-    state[it] = t_loc[0,level]
-    state[iq] = q_loc[0,level]
-    state[iqc] = qc_loc[0,level]
-    state[inc] = nc_loc[0,level]
-    state[iqi] = qi_loc[0,level]
-    state[ini] = ni_loc[0,level]
-    state[iqr] = qr_loc[0,level]
-    state[inr] = nr_loc[0,level]
-    state[iqs] = qs_loc[0,level]
-    state[ins] = ns_loc[0,level]
-    tends = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                           qr_loc, nr_loc, qs_loc, ns_loc)
-
-    j_mg2 = ndt.Jacobian(run_mg2, method='forward', order=2)
-    j_loc = s.dot(sq.dot(la.solve_triangular(sr, j_mg2(s_inv_mult(state),
-                                                       level).T, trans='T')).T)
-    evals, evecs = la.eig(j_loc)
-    # Sometimes la.eig spits out complex eigenvalues unnecessarily.
-    if all(np.imag(evals) == 0.):
-        evals = np.real(evals)
-    if (np.imag(evecs) == 0.).all():
-        evecs = np.real(evecs)
-    return tends, evals, evecs
-
-def calculate_indices(tends, evals, evecs):
-    strengths = la.solve(evecs, tends["Total"])
-    strengths /= la.norm(strengths, 1)
-    participations = np.zeros((len(evals), len(ind)))
-    for j in range(len(ind)):
-        participations[:,j] = la.solve(evecs, tends[short_names[j]])
-    for i in range(len(evals)):
-        part_norm = la.norm(participations[i,:], 1)
-        str_sign = np.sign(np.real(strengths[i]))
-        # Skip normalization for "inactive" modes.
-        if part_norm == 0.:
-            continue
-        if str_sign == 0.:
-            str_sign = 1.
-        participations[i,:] /= part_norm * str_sign
-    return (strengths, participations)
-
-def evec_bar_graph(evals, strengths, participations):
-    width = 0.08
-    bar_plots = []
-    for i in range(len(evals)):
-        bar_plots.append(plt.bar(ind + width*i, participations[i,:], width))
-
-    ax = plt.gca()
-    ax.set_xticks(ind)
-    ax.set_xticklabels((process_names[name] for name in short_names),
-                       size='xx-small', rotation='vertical', wrap=True)
-    ax.tick_params('x', direction='out', pad=25)
-    plt.subplots_adjust(bottom=0.18)
-    plt.legend(bar_plots, ("Timescale={: .2e}s,Strength={: .2e}".format(1./evalue, np.abs(strength))
-                           for evalue, strength in zip(evals, strengths)),
-               loc='best', fontsize='xx-small')
-    plt.savefig('./evecs.eps')
-    plt.close()
-
-# For examining a given point
-#tends, evals, evecs = get_modes_at_level(54)
-#strengths, participations = calculate_indices(tends, evals, evecs)
-
-#evec_bar_graph(evals, strengths, participations)
-
-min_t = 1.e-2
-max_t = 1.e5
-cutoff1 = 0.1
-cutoff2 = 0.5
-cutoff3 = 0.9
 tend_cutoff = 1.e-10
-num_columns = 2048
+num_columns = ncol
 
-plt.autoscale(tight=True)
+tendencies = np.zeros((lev*num_columns, nproc))
 
-evalues1 = [dict() for i in range(ncluster)]
-evalues2 = [dict() for i in range(ncluster)]
-evalues3 = [dict() for i in range(ncluster)]
-for i in range(len(short_names)):
-    for j in range(ncluster):
-        evalues1[j][short_names[i]] = []
-        evalues2[j][short_names[i]] = []
-        evalues3[j][short_names[i]] = []
-
-tend_norms = []
-
-singular_counter = 0
+def collect_tendencies(tends):
+    tends_out = np.zeros((nproc,))
+    for i in range(nproc):
+        name = short_names[i]
+        if name in ("revap", "ssubl", "vdepo", "vnudp"):
+            tends_out[i] = tends[name][iq]
+        elif name in ("cbrgs", "cacws", "cnccc", "cncct", "cacwi", "cbrgi", "cauto", "caccr"):
+            tends_out[i] = tends[name][iqc]
+        elif name in ("rfrez", "racrs"):
+            tends_out[i] = tends[name][iqr]
+        elif name in ("iauto", "iaccr"):
+            tends_out[i] = tends[name][iqi]
+        elif name in ("rnagg",):
+            tends_out[i] = tends[name][inr]
+        elif name in ("snagg",):
+            tends_out[i] = tends[name][ins]
+        elif name in ("cnact",):
+            tends_out[i] = tends[name][inc]
+        elif name in ("anadj",):
+            tends_out[i] = tends[name][inc] + tends[name][ini] + \
+                           tends[name][ins] + tends[name][inr]
+        else:
+            assert False, "Unrecognized process short name "+name+"."
+    return tends_out
 
 for column in range(num_columns):
     print("On column: ", column)
@@ -534,174 +409,154 @@ for column in range(num_columns):
     frzcnt_loc[:,:] = frzcnt[0,:,column]
     frzdep_loc[:,:] = frzdep[0,:,column]
     for level in range(lev):
-        c = label[0,level,column]
-        tends, evals, evecs = get_modes_at_level(level)
-        tot_t = tends["Total"]
-        tend_norm = (abs(tot_t[iq]) + abs(tot_t[iqc]) + abs(tot_t[iqi]) +
-                     abs(tot_t[iqr]) + abs(tot_t[iqs])) / 2.
-        tend_norms.append(tend_norm)
-        if tend_norm < tend_cutoff:
-            continue
-        try:
-            strengths, participations = calculate_indices(tends, evals, evecs)
-        except la.LinAlgError:
-            singular_counter += 1
-            print("Singular matrix or something. Ahhhh!")
-            continue
-        for i in range(len(evals)):
-            for j in range(len(short_names)):
-                if participations[i,j] >= cutoff1:
-                    evalues1[c][short_names[j]].append(np.real(evals[i]))
-                    if participations[i,j] >= cutoff2:
-                        evalues2[c][short_names[j]].append(np.real(evals[i]))
-                        if participations[i,j] >= cutoff3:
-                            evalues3[c][short_names[j]].append(np.real(evals[i]))
-
-# Number of bins for plotting purposes.
-nbins = 50
-
-cmap = plt.get_cmap('Greys')
-
-for c in range(ncluster):
-    pos_evalues1 = {}
-    pos_evalues2 = {}
-    pos_evalues3 = {}
-    hist_values = np.zeros((len(short_names)-1, nbins))
-    bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-
-    nmodes = 0
-
-    for i in range(len(short_names)):
-        process = short_names[i]
-        if process == 'anadj':
-            continue
-        pos_evalues1[process] = np.array([t for t in evalues1[c][process] if t > 1./max_t and t < 1./min_t])
-        pos_evalues2[process] = np.array([t for t in evalues2[c][process] if t > 1./max_t and t < 1./min_t])
-        pos_evalues3[process] = np.array([t for t in evalues3[c][process] if t > 1./max_t and t < 1./min_t])
-        #if len(pos_evalues1[process]) == 0:
+        tends = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                               qr_loc, nr_loc, qs_loc, ns_loc)
+        #tot_t = tends["Total"]
+        #tend_norm = (abs(tot_t[iq]) + abs(tot_t[iqc]) + abs(tot_t[iqi]) +
+        #             abs(tot_t[iqr]) + abs(tot_t[iqs])) / 2.
+        #if tend_norm < tend_cutoff:
         #    continue
-        nmodes += len(pos_evalues2[process])
-        hist_values[i,:], _ = np.histogram(pos_evalues2[process], bins=bins)
-        #plt.hist(pos_evalues1[process], bins=bins)
-        #if len(pos_evalues2[process]) != 0:
-        #    plt.hist(pos_evalues2[process], bins=bins)
-        #    if len(pos_evalues3[process]) != 0:
-        #        plt.hist(pos_evalues3[process], bins=bins)
+        tendencies[level + column*lev,:] = collect_tendencies(tends)
 
-    plt.pcolor(bins, ind, hist_values, edgecolors='k', cmap=cmap)
-    plt.title("Number of positive eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
-              .format(c,
-                      nmodes,
-                      cutoff2))
-    plt.gca().set_xscale("log")
-    plt.xlabel("Eigenvalue (1/s)")
-    plt.xlim(1./max_t, 1./min_t)
-    ax = plt.gca()
-    ax.set_yticks(ind)
-    # ANADJ kludge: leave out last again.
-    ax.set_yticklabels((process_names[name] for name in short_names[:-1]),
-                       size='xx-small', wrap=True)
-    ax.tick_params('y', direction='out', pad=25)
-    plt.subplots_adjust(left=0.18)
-    plt.colorbar()
-    plt.savefig('./time_hist_2D_pos_c{}.eps'.format(c))
-    plt.close()
+# Normalize tendencies to treat processes equally.
+process_cutoffs = np.zeros((nproc,))
+mean_abs = np.zeros((nproc,))
+count = np.zeros((nproc,))
+process_cutoffs[short_names.index('revap')] = 2.e-7
+process_cutoffs[short_names.index('ssubl')] = 1.e-8
+process_cutoffs[short_names.index('vdepo')] = 1.e-8
+process_cutoffs[short_names.index('cbrgs')] = 2.e-9
+process_cutoffs[short_names.index('cacws')] = 1.e-8
+process_cutoffs[short_names.index('cnccc')] = 2.e-9
+process_cutoffs[short_names.index('cncct')] = 1.e-11
+process_cutoffs[short_names.index('cacwi')] = 1.e-11
+process_cutoffs[short_names.index('rfrez')] = 1.e-7
+process_cutoffs[short_names.index('racrs')] = 1.e-8
+process_cutoffs[short_names.index('cbrgi')] = 1.e-5
+process_cutoffs[short_names.index('cauto')] = 1.e-8
+process_cutoffs[short_names.index('caccr')] = 1.e-8
+process_cutoffs[short_names.index('iauto')] = 2.e-8
+process_cutoffs[short_names.index('iaccr')] = 2.e-9
+process_cutoffs[short_names.index('rnagg')] = 200.
+process_cutoffs[short_names.index('snagg')] = 0.5
+for i in range(nproc):
+    abs_tendencies = np.abs(tendencies[:,i])
+    abs_tendencies = np.where(abs_tendencies > process_cutoffs[i], abs_tendencies, 0.)
+    count[i] = np.count_nonzero(abs_tendencies)
+    if count[i] == 0:
+        string = "Process "+short_names[i]+" was not active in any grid cell.\n"
+        print(string)
+        with open('./process_rates.txt', 'a+') as proc_rate_file:
+            proc_rate_file.write(string)
+        continue
+    mean_abs[i] = abs_tendencies.sum()/count[i]
+    string = "Mean magnitude for process "+short_names[i]+" is "+repr(mean_abs[i])+".\n" + \
+             "Count for process "+short_names[i]+" is "+repr(count[i])+"/"+repr(lev*num_columns)+".\n"
+    print(string)
+    with open('./process_rates.txt', 'a+') as proc_rate_file:
+        proc_rate_file.write(string)
+    tendencies[:,i] /= mean_abs[i]
 
-    neg_evalues2 = {}
-    hist_values = np.zeros((len(short_names)-1, nbins))
-    bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
+# Furthermore, clip the scaled tendencies to remove the worst outliers.
+#tendencies = np.where(tendencies > 100., 100., np.where(tendencies < -100., -100., tendencies))
 
-    nmodes = 0
+plt.autoscale(tight=True)
 
-    for i in range(len(short_names)):
-        process = short_names[i]
-        if process == 'anadj':
-            continue
-        neg_evalues2[process] = np.array([-t for t in evalues2[c][process] if -t > 1./max_t and -t < 1./min_t])
-        nmodes += len(neg_evalues2[process])
-        hist_values[i,:], _ = np.histogram(neg_evalues2[process], bins=bins)
+n_clusters = 10
+# ANADJ kludge: we leave anadj out because we know that it's last.
+clusters = clstr.KMeans(n_clusters=n_clusters).fit(tendencies[:,:-1])
 
-    meshind, meshbins = np.meshgrid(ind, bins)
-    plt.pcolor(bins, ind, hist_values, edgecolors='k', cmap=cmap)
-    plt.title("Number of negative eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
-              .format(c,
-                      nmodes,
-                      cutoff2))
-    plt.gca().set_xscale("log")
-    plt.xlabel("Eigenvalue (1/s)")
-    plt.xlim(1./min_t, 1./max_t)
-    ax = plt.gca()
-    ax.set_yticks(ind)
-    # ANADJ kludge: leave out last again.
-    ax.set_yticklabels((process_names[name] for name in short_names[:-1]),
-                       size='xx-small', wrap=True)
-    ax.tick_params('y', direction='out', pad=25)
-    plt.subplots_adjust(left=0.18)
-    plt.colorbar()
-    plt.savefig('./time_hist_2D_neg_c{}.eps'.format(c))
-    plt.close()
+# Below is necessary for non-KMeans clustering algorithms.
+# cluster_centers = np.zeros((n_clusters,nproc))
+# points_in_cluster = np.zeros((n_clusters,))
+# for j in range(lev*num_columns):
+#     cluster_centers[clusters.labels_[j],:] += tendencies[j,:]
+#     points_in_cluster[clusters.labels_[j]] += 1
+# for i in range(n_clusters):
+#     cluster_centers[i,:] /= points_in_cluster[i]
 
-    n0_evalues2 = {}
-    hist_values = np.zeros((len(short_names)-1, nbins))
-    bins = np.linspace(-1./max_t, 1./max_t, nbins+1)
+OUT_FILE_NAME = '/g/g14/santos36/Data/MG2_data_collection.10_cluster_labels.0001-01-06-00000.nc'
 
-    nmodes = 0
+# Copy over dimensions from the history file.
+out_file = nc4.Dataset(OUT_FILE_NAME, 'w')
+out_file.createDimension("ncol", ncol)
+out_file.createDimension("time", None)
+out_file.createDimension("lev", lev)
+out_file.createDimension("nproc", nproc)
+out_file.createDimension("name_len", 64)
+out_file.createDimension("ncluster", n_clusters)
 
-    for i in range(len(short_names)):
-        process = short_names[i]
-        if process == 'anadj':
-            continue
-        n0_evalues2[process] = np.array([t for t in evalues2[c][process] if t <= 1./max_t and t >= -1./max_t])
-        nmodes += len(n0_evalues2[process])
-        hist_values[i,:], _ = np.histogram(n0_evalues2[process], bins=bins)
+out_file.createVariable("time", "f8", ("time",))
+out_file.variables['time'][:] = file.variables['time'][:]
+out_file.createVariable("lev", "f8", ("lev",))
+out_file.variables['lev'][:] = file.variables['lev'][:]
+out_file.createVariable("label", "u1", ("time", "lev", "ncol"))
+for column in range(num_columns):
+    for level in range(lev):
+        out_file.variables['label'][0,level,column] = clusters.labels_[level + column*lev]
+out_file.createVariable("process_names", "S1", ("nproc", "name_len"))
+out_file["process_names"]._Encoding = "utf-8"
+for i in range(len(short_names)):
+    out_file["process_names"][i] = process_names[short_names[i]]
+out_file.createVariable("inertia", "f8")
+out_file["inertia"][...] = clusters.inertia_
+out_file.createVariable("cluster_centers", "f8", ("ncluster", "nproc"))
+out_file["cluster_centers"][:,:-1] = clusters.cluster_centers_
+# anadj currently not output since it isn't part of the clustering.
+out_file["cluster_centers"][:,-1] = 0.
+out_file.createVariable("process_cutoffs", "f8", ("nproc",))
+out_file["process_cutoffs"][:] = process_cutoffs
+out_file.createVariable("mean_abs", "f8", ("nproc",))
+out_file["mean_abs"][:] = mean_abs
+out_file.createVariable("count", "f8", ("nproc",))
+out_file["count"][:] = count
+out_file.source_file = HIST_FILE_NAME
 
-    meshind, meshbins = np.meshgrid(ind, bins)
-    plt.pcolor(bins, ind, hist_values, edgecolors='k', cmap=cmap)
-    plt.title("Number of near-zero eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
-              .format(c,
-                      nmodes,
-                      cutoff2))
-    plt.xlabel("Eigenvalue (1/s)")
-    plt.xlim(-1./max_t, 1./max_t)
-    #plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-    ax = plt.gca()
-    ax.set_yticks(ind)
-    # ANADJ kludge: leave out last again.
-    ax.set_yticklabels((process_names[name] for name in short_names[:-1]),
-                       size='xx-small', wrap=True)
-    ax.tick_params('y', direction='out', pad=25)
-    plt.subplots_adjust(left=0.18)
-    plt.colorbar()
-    plt.savefig('./time_hist_2D_n0_c{}.eps'.format(c))
-    plt.close()
+out_file.close()
 
+width = 0.1
+ind = np.arange(nproc-1)
 
-# Tend plot
+# Plot with all clusters.
+bar_plots = []
+for i in range(n_clusters):
+    bar_plots.append(plt.bar(ind + width*i, clusters.cluster_centers_[i,:], width))
 
-num_points = len(tend_norms)
-tend_norms = np.array([t for t in tend_norms if t > 0.])
-num_non0_points = len(tend_norms)
-bins = np.linspace(0., np.percentile(tend_norms, 80.), 50)
-plt.hist(tend_norms, bins=bins)
-plt.title("Number of grid points with given net water mass tendency")
-plt.xlabel("Net water tendency")
-plt.ylabel("Number of grid points")
-plt.savefig('./tend_hist.eps')
+# Filename prefix for plotting outputs.
+PLOT_PREFIX = "clusters10_scaled"
+
+ax = plt.gca()
+ax.set_xticks(ind)
+# ANADJ kludge: leave out last again.
+ax.set_xticklabels((process_names[name] for name in short_names[:-1]),
+                   size='xx-small', rotation='vertical', wrap=True)
+ax.tick_params('x', direction='out', pad=25)
+plt.subplots_adjust(bottom=0.18)
+plt.legend(bar_plots, ("Cluster {}".format(i)
+                       for i in range(n_clusters)),
+           loc='best', fontsize='xx-small')
+plt.savefig('./{}.eps'.format(PLOT_PREFIX))
 plt.close()
 
-# Log version of plot
-
-bins = np.logspace(np.log10(tend_norms.min()), np.log10(tend_norms.max()), 50)
-plt.hist(tend_norms, bins=bins)
-plt.gca().set_xscale("log")
-plt.title("Number of grid points with given net water mass tendency")
-plt.xlabel("Net water tendency")
-plt.ylabel("Number of grid points")
-plt.savefig('./tend_hist_log.eps')
-plt.close()
-
-cutoff_score = stats.percentileofscore(tend_norms, tend_cutoff)
-print("Cutoff was {} ({}% of non-zero tendencies were below this).".format(tend_cutoff, cutoff_score))
-print("{}/{} grid points had non-zero water mass tendency.".format(num_non0_points, num_points))
-print("Minimum/Maximum tendency: ", tend_norms.min(), tend_norms.max())
-print("Number of grid points with singular matrix issues: ", singular_counter)
+# Plots for each cluster.
+width = 0.8
+for i in range(n_clusters):
+    count = 0
+    for label in clusters.labels_:
+        if label == i:
+            count += 1
+    plt.bar(ind, clusters.cluster_centers_[i,:], width)
+    with open('./cluster_centers10.txt', 'a+') as cluster_file:
+        string = "Cluster {} has inertia {!r} and centroid {!r}\n"
+        string = string.format(i, clusters.inertia_, clusters.cluster_centers_[i,:])
+        cluster_file.write(string)
+    ax = plt.gca()
+    ax.set_xticks(ind)
+    # ANADJ kludge: leave out last again.
+    ax.set_xticklabels((process_names[name] for name in short_names[:-1]),
+                       size='xx-small', rotation='vertical', wrap=True)
+    ax.tick_params('x', direction='out', pad=25)
+    plt.subplots_adjust(bottom=0.18)
+    plt.title("Center of mass of cluster {}, containing {} points".format(i, count))
+    plt.savefig('./{}_{}.eps'.format(PLOT_PREFIX, i))
+    plt.close()

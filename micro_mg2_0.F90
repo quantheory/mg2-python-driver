@@ -120,7 +120,8 @@ save
 public :: &
      micro_mg_init, &
      micro_mg_get_cols, &
-     micro_mg_tend
+     micro_mg_tend, &
+     calc_precip_frac
 
 ! switch for specification rather than prediction of droplet and crystal number
 ! note: number will be adjusted as needed to keep mean size within bounds,
@@ -358,6 +359,7 @@ subroutine micro_mg_tend ( &
      qcsinksum_rate1ord,                                         &
      naai,                         npccn,                        &
      rndst,                        nacon,                        &
+     precip_frac,                                                &
      tlat,                         qvlat,                        &
      qctend,                       qitend,                       &
      nctend,                       nitend,                       &
@@ -394,7 +396,7 @@ subroutine micro_mg_tend ( &
      drout2,                       dsout2,                       &
      freqs,                        freqr,                        &
      nfice,                        qcrat,                        &
-     precip_frac,                  nadjtot,                      &
+                                   nadjtot,                      &
      ncmeitot,           mnudeptot,          nnudeptot,          &
      npsacwstot,         nnuccctot,          nnuccttot,          &
      nsacwitot,          nnuccrtot,          mnuccritot,         &
@@ -576,7 +578,7 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: freqr(mgncol,nlev)        ! fractional occurrence of rain
   real(r8), intent(out) :: nfice(mgncol,nlev)        ! fractional occurrence of ice
   real(r8), intent(out) :: qcrat(mgncol,nlev)        ! limiter for qc process rates (1=no limit --> 0. no qc)
-  real(r8), intent(out) :: precip_frac(mgncol,nlev)  ! precip fraction assuming maximum overlap
+  real(r8), intent(in)  :: precip_frac(mgncol,nlev)  ! precip fraction assuming maximum overlap
   real(r8), intent(out) :: nsubrtot(mgncol,nlev)        ! rain number evaporation
   real(r8), intent(out) :: ncmeitot(mgncol,nlev)     ! number tendency from nucleation-sublimation (1/kg/s)
   real(r8), intent(out) :: mnudeptot(mgncol,nlev)    ! mass tendency of deposition nucleation (from external scheme)
@@ -1034,7 +1036,7 @@ subroutine micro_mg_tend ( &
   prodsnow = 0._r8
   cmeout = 0._r8
 
-  precip_frac = mincld
+!  precip_frac = mincld
 
   lamc=0._r8
 
@@ -1280,46 +1282,46 @@ subroutine micro_mg_tend ( &
   ! water or ice is present, so precip_frac will be correctly set below
   ! and nothing extra needs to be done here
 
-  precip_frac = cldm
+!  precip_frac = cldm
 
   micro_vert_loop: do k=1,nlev
 
-     if (trim(micro_mg_precip_frac_method) == 'in_cloud') then
+     ! if (trim(micro_mg_precip_frac_method) == 'in_cloud') then
 
-        if (k /= 1) then
-           where (qc(:,k) < qsmall .and. qi(:,k) < qsmall)
-              precip_frac(:,k) = precip_frac(:,k-1)
-           end where
-        endif
+     !    if (k /= 1) then
+     !       where (qc(:,k) < qsmall .and. qi(:,k) < qsmall)
+     !          precip_frac(:,k) = precip_frac(:,k-1)
+     !       end where
+     !    endif
 
-     else if (trim(micro_mg_precip_frac_method) == 'max_overlap') then
+     ! else if (trim(micro_mg_precip_frac_method) == 'max_overlap') then
 
-        ! calculate precip fraction based on maximum overlap assumption
+     !    ! calculate precip fraction based on maximum overlap assumption
 
-        ! if rain or snow mix ratios are smaller than threshold,
-        ! then leave precip_frac as cloud fraction at current level
-        if (k /= 1) then
-           where (qr(:,k-1) >= qsmall .or. qs(:,k-1) >= qsmall)
-              precip_frac(:,k)=max(precip_frac(:,k-1),precip_frac(:,k))
-           end where
-        end if
+     !    ! if rain or snow mix ratios are smaller than threshold,
+     !    ! then leave precip_frac as cloud fraction at current level
+     !    if (k /= 1) then
+     !       where (qr(:,k-1) >= qsmall .or. qs(:,k-1) >= qsmall)
+     !          precip_frac(:,k)=max(precip_frac(:,k-1),precip_frac(:,k))
+     !       end where
+     !    end if
 
-     else if (trim(micro_mg_precip_frac_method) == 'mass_gradient') then
-        if (k /= 1) then
-           qt = qr(:,k-1:k) + qs(:,k-1:k)
-           where (precip_frac(:,k) < precip_frac(:,k-1))
-              where (qt(:,1) > qt(:,2))
-                 weight = (alpha_grad * qt(:,2) + (1. - alpha_grad) * qt(:,1) + qsmall) &
-                      / (qt(:,1) + qsmall)
-              elsewhere
-                 weight = (beta_grad * qt(:,1) + (1. - beta_grad) * qt(:,2) + qsmall) &
-                      / (qt(:,2) + qsmall)
-              end where
-              precip_frac(:,k) = weight * precip_frac(:,k-1) + &
-                   (1._r8 - weight) * precip_frac(:,k)
-           end where
-        endif
-     endif
+     ! else if (trim(micro_mg_precip_frac_method) == 'mass_gradient') then
+     !    if (k /= 1) then
+     !       qt = qr(:,k-1:k) + qs(:,k-1:k)
+     !       where (precip_frac(:,k) < precip_frac(:,k-1))
+     !          where (qt(:,1) > qt(:,2))
+     !             weight = (alpha_grad * qt(:,2) + (1. - alpha_grad) * qt(:,1) + qsmall) &
+     !                  / (qt(:,1) + qsmall)
+     !          elsewhere
+     !             weight = (beta_grad * qt(:,1) + (1. - beta_grad) * qt(:,2) + qsmall) &
+     !                  / (qt(:,2) + qsmall)
+     !          end where
+     !          precip_frac(:,k) = weight * precip_frac(:,k-1) + &
+     !               (1._r8 - weight) * precip_frac(:,k)
+     !       end where
+     !    endif
+     ! endif
 
      do i = 1, mgncol
 
@@ -3143,6 +3145,89 @@ return
 end subroutine get_dcst
 !!== KZ_DCS
 
+subroutine calc_precip_frac(mgncol, nlev, qc, qi, qr, qs, cldn, liqcldf, icecldf, precip_frac)
+  integer, intent(in) :: mgncol, nlev
+  real(r8), intent(in) :: qc(mgncol,nlev), qi(mgncol,nlev)
+  real(r8), intent(in) :: qr(mgncol,nlev), qs(mgncol,nlev)
+  real(r8), intent(in) :: cldn(mgncol,nlev), liqcldf(mgncol,nlev), icecldf(mgncol,nlev)
+  real(r8), intent(out) :: precip_frac(mgncol,nlev)
+  integer :: k
+  real(r8) :: lcldm(mgncol,nlev), icldm(mgncol,nlev), cldm(mgncol, nlev)
+  real(r8) :: qt(mgncol,2)
+  real(r8) :: weight(mgncol)
+
+  ! cldn: used to set cldm, unused for subcolumns
+  ! liqcldf: used to set lcldm, unused for subcolumns
+  ! icecldf: used to set icldm, unused for subcolumns
+
+  if (microp_uniform) then
+     ! subcolumns, set cloud fraction variables to one
+     ! if cloud water or ice is present, if not present
+     ! set to mincld (mincld used instead of zero, to prevent
+     ! possible division by zero errors).
+
+     where (qc >= qsmall)
+        lcldm = 1._r8
+     elsewhere
+        lcldm = mincld
+     end where
+
+     where (qi >= qsmall)
+        icldm = 1._r8
+     elsewhere
+        icldm = mincld
+     end where
+
+     cldm = max(icldm, lcldm)
+
+  else
+     ! get cloud fraction, check for minimum
+     cldm = max(cldn,mincld)
+     lcldm = max(liqcldf,mincld)
+     icldm = max(icecldf,mincld)
+  end if
+
+  precip_frac = cldm
+
+  do k = 1, nlev
+     if (trim(micro_mg_precip_frac_method) == 'in_cloud') then
+
+        if (k /= 1) then
+           where (qc(:,k) < qsmall .and. qi(:,k) < qsmall)
+              precip_frac(:,k) = precip_frac(:,k-1)
+           end where
+        endif
+
+     else if (trim(micro_mg_precip_frac_method) == 'max_overlap') then
+
+        ! calculate precip fraction based on maximum overlap assumption
+
+        ! if rain or snow mix ratios are smaller than threshold,
+        ! then leave precip_frac as cloud fraction at current level
+        if (k /= 1) then
+           where (qr(:,k-1) >= qsmall .or. qs(:,k-1) >= qsmall)
+              precip_frac(:,k)=max(precip_frac(:,k-1),precip_frac(:,k))
+           end where
+        end if
+
+     else if (trim(micro_mg_precip_frac_method) == 'mass_gradient') then
+        if (k /= 1) then
+           qt = qr(:,k-1:k) + qs(:,k-1:k)
+           where (precip_frac(:,k) < precip_frac(:,k-1))
+              where (qt(:,1) > qt(:,2))
+                 weight = (alpha_grad * qt(:,2) + (1. - alpha_grad) * qt(:,1) + qsmall) &
+                      / (qt(:,1) + qsmall)
+              elsewhere
+                 weight = (beta_grad * qt(:,1) + (1. - beta_grad) * qt(:,2) + qsmall) &
+                      / (qt(:,2) + qsmall)
+              end where
+              precip_frac(:,k) = weight * precip_frac(:,k-1) + &
+                   (1._r8 - weight) * precip_frac(:,k)
+           end where
+        endif
+     endif
+  end do
+end subroutine calc_precip_frac
 
 
 end module micro_mg2_0
