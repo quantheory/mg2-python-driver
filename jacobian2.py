@@ -564,9 +564,10 @@ for column in range(num_columns):
                 if np.abs(participations[i,j]) >= cutoff1:
                     evalues1[c][short_names[j]].append(np.real(evals[i]))
                     if np.abs(participations[i,j]) >= cutoff2:
-                        evalues2[c][short_names[j]].append(np.real(evals[i]))
-                        for j2 in range(len(short_names)):
-                            evalue_correlation[short_names[j]][short_names[j2]] += np.abs(participations[i,j2])
+                        if np.real(evals[i]) < -0.1:
+                            evalues2[c][short_names[j]].append(np.real(evals[i]))
+                            for j2 in range(len(short_names)):
+                                evalue_correlation[short_names[j]][short_names[j2]] += np.abs(participations[i,j2])
                         if np.abs(participations[i,j]) >= cutoff3:
                             evalues3[c][short_names[j]].append(np.real(evals[i]))
 
