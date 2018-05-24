@@ -66,7 +66,8 @@ public :: &
      accrete_cloud_water_rain, &
      self_collection_rain, &
      accrete_cloud_ice_snow, &
-     evaporate_sublimate_precip, &
+     evaporate_rain, &
+     sublimate_snow, &
      bergeron_process_snow, &
      sedimentation
 
@@ -1242,9 +1243,96 @@ end subroutine accrete_cloud_ice_snow
 ! in-cloud condensation/deposition of rain and snow is neglected
 ! except for transfer of cloud water to snow through bergeron process
 
-elemental subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi, &
-     lcldm, precip_frac, arn, asn, qcic, qiic, qric, qsic, lamr, n0r, lams, n0s, &
-     pre, prds)
+elemental subroutine evaporate_rain(t, rho, p, q, qvl, &
+     lcldm, precip_frac, arn, qcic, qiic, qric, lamr, n0r, pre)
+
+  real(r8), intent(in) :: t    ! temperature
+  real(r8), intent(in) :: rho  ! air density
+  real(r8), intent(in) :: p    ! pressure
+  real(r8), intent(in) :: q    ! humidity
+  real(r8), intent(in) :: qvl  ! saturation humidity (water)
+  real(r8), intent(in) :: lcldm  ! liquid cloud fraction
+  real(r8), intent(in) :: precip_frac ! precipitation fraction (maximum overlap)
+
+  ! fallspeed parameters
+  real(r8), intent(in) :: arn  ! rain
+
+  ! In-cloud MMRs
+  real(r8), intent(in) :: qcic ! cloud liquid
+  real(r8), intent(in) :: qiic ! cloud ice
+  real(r8), intent(in) :: qric ! rain
+
+  ! Size parameters
+  ! rain
+  real(r8), intent(in) :: lamr
+  real(r8), intent(in) :: n0r
+
+  ! Output tendencies
+  real(r8), intent(out) :: pre
+ 
+  real(r8) :: qclr   ! water vapor mixing ratio in clear air
+  real(r8) :: ab     ! correction to account for latent heat
+  real(r8) :: eps    ! 1/ sat relaxation timescale
+  real(r8) :: dv   ! water vapor diffusivity
+  real(r8) :: mu   ! viscosity
+  real(r8) :: sc   ! schmidt number
+
+  real(r8) :: dum
+
+  ! set temporary cloud fraction to zero if cloud water + ice is very small
+  ! this will ensure that evaporation/sublimation of precip occurs over
+  ! entire grid cell, since min cloud fraction is specified otherwise
+  if (qcic+qiic < 1.e-6_r8) then
+     dum = 0._r8
+  else
+     dum = lcldm
+  end if
+
+  ! only calculate if there is some precip fraction > cloud fraction
+
+  if (precip_frac > dum) then
+
+     ! calculate q for out-of-cloud region
+     qclr=(q-dum*qvl)/(1._r8-dum)
+
+     ! evaporation of rain
+     if (qric >= qsmall) then
+
+        dv = 8.794E-5_r8 * t**1.81_r8 / p
+        mu = 1.496E-6_r8 * t**1.5_r8 / (t + 120._r8)
+        sc = mu/(rho*dv)
+
+        ab = calc_ab(t, qvl, xxlv)
+        eps = 2._r8*pi*n0r*rho*Dv* &
+             (f1r/(lamr*lamr)+ &
+             f2r*(arn*rho/mu)**0.5_r8* &
+             sc**(1._r8/3._r8)*gamma_half_br_plus5/ &
+             (lamr**(5._r8/2._r8+br/2._r8)))
+
+        pre = eps*(qclr-qvl)/ab
+
+        ! only evaporate in out-of-cloud region
+        ! and distribute across precip_frac
+        pre=min(pre*(precip_frac-dum),0._r8)
+        pre=pre/precip_frac
+     else
+        pre = 0._r8
+     end if
+
+  else
+     pre = 0._r8
+  end if
+
+end subroutine evaporate_rain
+
+! calculate evaporation/sublimation of rain and snow
+!===================================================================
+! note: evaporation/sublimation occurs only in cloud-free portion of grid cell
+! in-cloud condensation/deposition of rain and snow is neglected
+! except for transfer of cloud water to snow through bergeron process
+
+elemental subroutine sublimate_snow(t, rho, dv, mu, sc, q, qvl, qvi, &
+     lcldm, precip_frac, asn, qcic, qiic, qsic, lams, n0s, prds)
 
   real(r8), intent(in) :: t    ! temperature
   real(r8), intent(in) :: rho  ! air density
@@ -1258,25 +1346,19 @@ elemental subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi,
   real(r8), intent(in) :: precip_frac ! precipitation fraction (maximum overlap)
 
   ! fallspeed parameters
-  real(r8), intent(in) :: arn  ! rain
   real(r8), intent(in) :: asn  ! snow
 
   ! In-cloud MMRs
   real(r8), intent(in) :: qcic ! cloud liquid
   real(r8), intent(in) :: qiic ! cloud ice
-  real(r8), intent(in) :: qric ! rain
   real(r8), intent(in) :: qsic ! snow
 
   ! Size parameters
-  ! rain
-  real(r8), intent(in) :: lamr
-  real(r8), intent(in) :: n0r
   ! snow
   real(r8), intent(in) :: lams
   real(r8), intent(in) :: n0s
 
   ! Output tendencies
-  real(r8), intent(out) :: pre
   real(r8), intent(out) :: prds
 
   real(r8) :: qclr   ! water vapor mixing ratio in clear air
@@ -1301,26 +1383,6 @@ elemental subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi,
      ! calculate q for out-of-cloud region
      qclr=(q-dum*qvl)/(1._r8-dum)
 
-     ! evaporation of rain
-     if (qric >= qsmall) then
-
-        ab = calc_ab(t, qvl, xxlv)
-        eps = 2._r8*pi*n0r*rho*Dv* &
-             (f1r/(lamr*lamr)+ &
-             f2r*(arn*rho/mu)**0.5_r8* &
-             sc**(1._r8/3._r8)*gamma_half_br_plus5/ &
-             (lamr**(5._r8/2._r8+br/2._r8)))
-
-        pre = eps*(qclr-qvl)/ab
-
-        ! only evaporate in out-of-cloud region
-        ! and distribute across precip_frac
-        pre=min(pre*(precip_frac-dum),0._r8)
-        pre=pre/precip_frac
-     else
-        pre = 0._r8
-     end if
-
      ! sublimation of snow
      if (qsic >= qsmall) then
         ab = calc_ab(t, qvi, xxls)
@@ -1340,10 +1402,9 @@ elemental subroutine evaporate_sublimate_precip(t, rho, dv, mu, sc, q, qvl, qvi,
 
   else
      prds = 0._r8
-     pre = 0._r8
   end if
 
-end subroutine evaporate_sublimate_precip
+end subroutine sublimate_snow
 
 ! bergeron process - evaporation of droplets and deposition onto snow
 !===================================================================

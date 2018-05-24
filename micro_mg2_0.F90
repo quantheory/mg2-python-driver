@@ -347,7 +347,8 @@ end subroutine micro_mg_init
 !microphysics routine for each timestep goes here...
 
 subroutine micro_mg_tend ( &
-     mgncol,             nlev,               deltatin,           &
+     mgncol,             nlev,               evap_col_steps,     &
+     evap_steps,         col_steps,          deltatin,           &
      t,                            q,                            &
      qcn,                          qin,                          &
      ncn,                          nin,                          &
@@ -442,7 +443,8 @@ subroutine micro_mg_tend ( &
        accrete_cloud_water_rain, &
        self_collection_rain, &
        accrete_cloud_ice_snow, &
-       evaporate_sublimate_precip, &
+       evaporate_rain, &
+       sublimate_snow, &
        bergeron_process_snow, &
        sedimentation
 
@@ -452,6 +454,9 @@ subroutine micro_mg_tend ( &
   ! input arguments
   integer,  intent(in) :: mgncol         ! number of microphysics columns
   integer,  intent(in) :: nlev           ! number of layers
+  integer,  intent(in) :: evap_col_steps ! Evap/collection substeps per MG2 steps
+  integer,  intent(in) :: evap_steps     ! Rain evaporation substeps per evap/col step
+  integer,  intent(in) :: col_steps      ! Self-collection substeps per evap/col step
   real(r8), intent(in) :: deltatin       ! time step (s)
   real(r8), intent(in) :: t(mgncol,nlev)        ! input temperature (K)
   real(r8), intent(in) :: q(mgncol,nlev)        ! input h20 vapor mixing ratio (kg/kg)
@@ -842,13 +847,17 @@ subroutine micro_mg_tend ( &
   ! of sedimentation to MG2 timestep, respectively.
   real(r8) :: sed_deltat, sed_time, sed_step_ratio
 
+  real(r8) :: dumt(mgncol), dumq(mgncol), dumrho(mgncol), dumqvl(mgncol)
+  real(r8) :: dumlamr(mgncol), dumn0r(mgncol), dumarn(mgncol), dumr2(mgncol), dumnr2(mgncol)
+  real(r8) :: dumnragg(mgncol), dumnragg2(mgncol), dumpre(mgncol)
+
   ! Processes that can be disabled.
   logical :: do_sed_loc, do_inst_loc
 
   ! loop array variables
   ! "i" and "k" are column/level iterators for internal (MG) variables
-  ! "n" is used for other looping (currently just sedimentation)
-  integer i, k, n
+  ! "m" and "n" are used for other looping
+  integer i, k, m, n
 
   ! number of sub-steps for loops over "n" (for sedimentation)
   integer nstep
@@ -1534,8 +1543,6 @@ subroutine micro_mg_tend ( &
      call accrete_cloud_water_rain(microp_uniform, qric(:,k), qcic(:,k), &
           ncic(:,k), relvar(:,k), accre_enhan(:,k), pra(:,k), npra(:,k))
 
-     call self_collection_rain(rho(:,k), qric(:,k), nric(:,k), nragg(:,k))
-
      if (do_cldice) then
         call accrete_cloud_ice_snow(t(:,k), rho(:,k), asn(:,k), qiic(:,k), niic(:,k), &
              qsic(:,k), lams(:,k), n0s(:,k), prai(:,k), nprai(:,k))
@@ -1544,11 +1551,10 @@ subroutine micro_mg_tend ( &
         nprai(:,k) = 0._r8
      end if
 
-     call evaporate_sublimate_precip(t(:,k), rho(:,k), &
+     call sublimate_snow(t(:,k), rho(:,k), &
           dv(:,k), mu(:,k), sc(:,k), q(:,k), qvl(:,k), qvi(:,k), &
-          lcldm(:,k), precip_frac(:,k), arn(:,k), asn(:,k), qcic(:,k), qiic(:,k), &
-          qric(:,k), qsic(:,k), lamr(:,k), n0r(:,k), lams(:,k), n0s(:,k), &
-          pre(:,k), prds(:,k))
+          lcldm(:,k), precip_frac(:,k), asn(:,k), qcic(:,k), qiic(:,k), &
+          qsic(:,k), lams(:,k), n0s(:,k), prds(:,k))
 
      call bergeron_process_snow(t(:,k), rho(:,k), dv(:,k), mu(:,k), sc(:,k), &
           qvl(:,k), qvi(:,k), asn(:,k), qcic(:,k), qsic(:,k), lams(:,k), n0s(:,k), &
@@ -1647,6 +1653,62 @@ subroutine micro_mg_tend ( &
            end if
         end if
 
+     end do
+
+     dumr(:,k) = qric(:,k)
+     dumnr(:,k) = nric(:,k)
+     dumt = t(:,k)
+     dumq = q(:,k)
+     nragg(:,k) = 0._r8
+     pre(:,k) = 0._r8
+     do m = 1, evap_col_steps
+        dumrho = p(:,k)/(r*dumt)
+
+        ! Need separate temporary nr for the two loops because they have to jointly
+        ! conserve rain number.
+        dumnr2 = dumnr(:,k)
+        dumnragg2 = 0._r8
+        do n = 1, col_steps
+           call self_collection_rain(dumrho, dumr(:,k), dumnr2, dumnragg)
+           dumnragg = max(dumnragg, -dumnr2*col_steps*evap_col_steps/deltat)
+           nragg(:,k) = nragg(:,k) + dumnragg / col_steps
+           dumnragg2 = dumnragg2 + dumnragg / col_steps
+           dumnr2 = max(dumnr2 + dumnragg*deltat/(col_steps*evap_col_steps), 0._r8)
+        end do
+
+        dumnr2 = dumnr(:,k)
+        do n = 1, evap_steps
+           dumrho = p(:,k)/(r*dumt)
+           dumarn = ar*(rhosu/dumrho)**0.54_r8
+           do i = 1, mgncol
+              call qsat_water(dumt(i), p(i,k), dum, dumqvl(i))
+           end do
+           call size_dist_param_basic(mg_rain_props, dumr(:,k), dumnr2, &
+                dumlamr, dumn0r)
+           call evaporate_rain(dumt, dumrho, p(:,k), dumq, dumqvl, &
+                lcldm(:,k), precip_frac(:,k), dumarn, qcic(:,k), qiic(:,k), &
+                dumr(:,k), dumlamr, dumn0r, dumpre)
+           dumpre = max(dumpre, -dumr(:,k)*evap_steps*evap_col_steps/deltat)
+           pre(:,k) = pre(:,k) + dumpre / evap_steps
+           dumnr2 = max(dumnr2 + (dumnr2/dumr(:,k))*dumpre*deltat/(evap_steps*evap_col_steps), 0._r8)
+           dumr(:,k) = max(dumr(:,k) + dumpre*deltat/(evap_steps*evap_col_steps), 0._r8)
+           ! Not that dumq and dumt are grid-mean, not in-precip quantities.
+           dumq = dumq - precip_frac(:,k)*dumpre*deltat/(evap_steps*evap_col_steps)
+           dumt = dumt + xxlv*precip_frac(:,k)*dumpre*deltat/(evap_steps*evap_col_steps)
+        end do
+
+        ! Joint conservation of rain number; adjust self-collection only for
+        ! consistency with existing checks, and since evaporation should not be
+        ! limited by number directly anyway.
+        where (-dumnragg2*deltat/evap_col_steps > dumnr2)
+           dumnragg = dumnragg2
+           dumnragg2 = -dumnr2 * evap_col_steps / deltat
+           nragg(:,k) = nragg(:,k) + dumnragg2 - dumnragg
+           ! Note: might be better to use size_dist_param_basic to set min here.
+           dumnr(:,k) = 0._r8
+        elsewhere
+           dumnr(:,k) = dumnr2 + dumnragg2*deltat/evap_col_steps
+        end where
      end do
 
      do i=1,mgncol
