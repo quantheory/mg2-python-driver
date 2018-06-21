@@ -1,4 +1,6 @@
 *.pyf
 *.pyfe
 *.so
+*darwin.so.dSYM
 .ipynb_checkpoints/
+__pycache__
