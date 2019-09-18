@@ -295,12 +295,15 @@ def mg2_tendencies(level, t, q, qc, nc, qi, ni, qr, nr, qs, ns):
     tends["anadj"][inr] = nadjtot[0,0,2]
     tends["anadj"][ins] = nadjtot[0,0,3]
     # Check the above now.
-    # TODO: fix substepped code process rates so that this works again.
-    #budget_total = np.zeros((10,))
-    #for name in process_names:
-    #    budget_total += tends[name]
-    #assert np.allclose(budget_total, tends["Total"])
-    return (tends, drout2)
+    budget_total = np.zeros((10,))
+    for name in process_names:
+        budget_total += tends[name]
+    assert np.allclose(budget_total, tends["Total"])
+    water_mass_change = tends["Total"][iq] + tends["Total"][iqc] + \
+                        tends["Total"][iqi] + tends["Total"][iqr] + \
+                        tends["Total"][iqs]
+    assert np.allclose(0., water_mass_change)
+    return (tends, drout2, subqr, subnr, subdr)
 
 def update_state(level, tends, deltat):
     t_loc[0,level] += tends["Total"][it] * deltat
@@ -356,39 +359,49 @@ def calc_twmt(diff1, diff2, deltat):
 
 ind = np.arange(len(short_names))
 
-num_columns = 2048
+num_columns = 48602
+cluster = 9
 
 plt.autoscale(tight=True)
 
 mean_1s_twmt = 0.
+mean_30s_twmt = 0.
 mean_300s_twmt = 0.
 mean_together_twmt = 0.
 mean_evap_twmt = 0.
 mean_hybrid_twmt = 0.
+mean_hybrid2_twmt = 0.
 mean_1s300s_twmt = 0.
+mean_1s30s_twmt = 0.
 mean_300stogether_twmt = 0.
 mean_300shybrid_twmt = 0.
+mean_300shybrid2_twmt = 0.
 mean_300sevap_twmt = 0.
 mean_300scol_twmt = 0.
 mean_300sapart_twmt = 0.
 mean_1stogether_twmt = 0.
 mean_1shybrid_twmt = 0.
+mean_1shybrid2_twmt = 0.
 mean_1sevap_twmt = 0.
 mean_1scol_twmt = 0.
 mean_1sapart_twmt = 0.
 
 mean_drout_1s = 0.
+mean_drout_30s = 0.
 mean_drout_300s = 0.
 mean_drout_together = 0.
 mean_drout_hybrid = 0.
+mean_drout_hybrid2 = 0.
 mean_drout_evap = 0.
 mean_drout_col = 0.
 mean_drout_apart = 0.
 
 mean_nr_1s = 0.
+mean_nr_30s = 0.
 mean_nr_300s = 0.
 mean_nr_together = 0.
 mean_nr_hybrid = 0.
+mean_nr_hybrid2 = 0.
 mean_nr_evap = 0.
 mean_nr_col = 0.
 mean_nr_apart = 0.
@@ -396,6 +409,17 @@ mean_nr_apart = 0.
 tend_norms = []
 
 number_grid_cells = 0
+
+q_time_series_1s = np.zeros((301,))
+n_time_series_1s = np.zeros((301,))
+d_time_series_1s = np.zeros((301,))
+q_alt_time_series_1s = np.zeros((301,))
+q_time_series_together = np.zeros((301,))
+n_time_series_together = np.zeros((301,))
+d_time_series_together = np.zeros((301,))
+#q_time_series_evap = np.zeros((301,))
+#n_time_series_evap = np.zeros((301,))
+#d_time_series_evap = np.zeros((301,))
 
 for column in range(num_columns):
     print("On column: ", column)
@@ -428,93 +452,169 @@ for column in range(num_columns):
                                       icecldf_loc, mgncol=1, nlev=lev)
     for level in range(lev):
         c = label[0,level,column]
-        if c != 9:
+        if c != cluster:
             continue
         number_grid_cells += 1
+        #print('precip_frac is ', precip_frac[0,level])
+        #print('t is ', t_loc[0,level])
+        #print('p is ', p_loc[0,level])
+        #print('qr is ', qr_loc[0,level])
+        #print('nr is ', nr_loc[0,level])
+        #print('q is ', q_loc[0,level])
+        #print('liqcldf is ', liqcldf_loc[0,level])
         timestep = 1.
         evap_col_steps = 1
         evap_steps = 1
         col_steps = 1
         tot_t_1s = np.zeros((10,))
+        q_time_series_1s[0] += qr_loc[0,level] / precip_frac[0,level]
+        n_time_series_1s[0] += nr_loc[0,level] / precip_frac[0,level]
+        d_time_series_1s[0] += (qr_loc[0,level] / (nr_loc[0,level] * np.pi * 1.e3)) ** (1./3.)
+        q_alt_time_series_1s[0] += qr_loc[0,level] / precip_frac[0,level]
         for m in range(300):
-            tends, drout_1s = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                             qr_loc, nr_loc, qs_loc, ns_loc)
+            #precip_frac = mg.calc_precip_frac(qc_loc, qi_loc, qr_loc,
+            #                                  qs_loc, precipf_loc, liqcldf_loc,
+            #                                  icecldf_loc, mgncol=1, nlev=lev)
+            tends, drout_1s, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                                  qr_loc, nr_loc, qs_loc, ns_loc)
             tot_t_1s += tends["Total"]
             update_state(level, tends, timestep)
+            q_time_series_1s[m+1] += subqr[0,0,0]
+            n_time_series_1s[m+1] += subnr[0,0,0]
+            d_time_series_1s[m+1] += subdr[0,0,0]
+            q_alt_time_series_1s[m+1] += qr_loc[0,level] / precip_frac[0,level]
         mean_nr_1s += nr_loc[0,level]
+        #drout_1s = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
         state_diff_1s = diff_states(level, column)
         reset_state(level, column)
+        precip_frac = mg.calc_precip_frac(qc_loc, qi_loc, qr_loc,
+                                          qs_loc, precipf_loc, liqcldf_loc,
+                                          icecldf_loc, mgncol=1, nlev=lev)
+        timestep = 30.
+        evap_col_steps = 1
+        evap_steps = 1
+        col_steps = 1
+        tot_t_30s = np.zeros((10,))
+        for m in range(10):
+            #precip_frac = mg.calc_precip_frac(qc_loc, qi_loc, qr_loc,
+            #                                  qs_loc, precipf_loc, liqcldf_loc,
+            #                                  icecldf_loc, mgncol=1, nlev=lev)
+            tends, drout_30s, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                                  qr_loc, nr_loc, qs_loc, ns_loc)
+            tot_t_30s += tends["Total"]
+            update_state(level, tends, timestep)
+        mean_nr_30s += nr_loc[0,level]
+        #drout_30s = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
+        state_diff_30s = diff_states(level, column)
+        reset_state(level, column)
+        precip_frac = mg.calc_precip_frac(qc_loc, qi_loc, qr_loc,
+                                          qs_loc, precipf_loc, liqcldf_loc,
+                                          icecldf_loc, mgncol=1, nlev=lev)
         timestep = 300.
         evap_col_steps = 1
         evap_steps = 1
         col_steps = 1
-        tends, drout_300s = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                           qr_loc, nr_loc, qs_loc, ns_loc)
+        tends, drout_300s, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                                qr_loc, nr_loc, qs_loc, ns_loc)
         update_state(level, tends, timestep)
         mean_nr_300s += nr_loc[0,level]
+        #drout_300s = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
         state_diff_300s = diff_states(level, column)
         reset_state(level, column)
         timestep = 300.
         evap_col_steps = 300
         evap_steps = 1
         col_steps = 1
-        tends, drout_together = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                               qr_loc, nr_loc, qs_loc, ns_loc)
+        q_time_series_together[0] += qr_loc[0,level] / precip_frac[0,level]
+        n_time_series_together[0] += nr_loc[0,level] / precip_frac[0,level]
+        d_time_series_together[0] += (qr_loc[0,level] / (nr_loc[0,level] * np.pi * 1.e3)) ** (1./3.)
+        tends, drout_together, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                                    qr_loc, nr_loc, qs_loc, ns_loc)
         update_state(level, tends, timestep)
+        q_time_series_together[1:] += subqr[0,:,0]
+        n_time_series_together[1:] += subnr[0,:,0]
+        d_time_series_together[1:] += subdr[0,:,0]
         mean_nr_together += nr_loc[0,level]
+        #drout_together = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
         state_diff_substep_together = diff_states(level, column)
         reset_state(level, column)
         timestep = 300.
         evap_col_steps = 10
         evap_steps = 30
         col_steps = 1
-        tends, drout_hybrid = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                             qr_loc, nr_loc, qs_loc, ns_loc)
+        tends, drout_hybrid, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                                  qr_loc, nr_loc, qs_loc, ns_loc)
         update_state(level, tends, timestep)
         mean_nr_hybrid += nr_loc[0,level]
+        #drout_hybrid = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
         state_diff_substep_hybrid = diff_states(level, column)
+        reset_state(level, column)
+        timestep = 300.
+        evap_col_steps = 10
+        evap_steps = 1
+        col_steps = 30
+        tends, drout_hybrid2, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                                  qr_loc, nr_loc, qs_loc, ns_loc)
+        update_state(level, tends, timestep)
+        mean_nr_hybrid2 += nr_loc[0,level]
+        #drout_hybrid2 = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
+        state_diff_substep_hybrid2 = diff_states(level, column)
         reset_state(level, column)
         timestep = 300.
         evap_col_steps = 1
         evap_steps = 300
         col_steps = 1
-        tends, drout_evap = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                           qr_loc, nr_loc, qs_loc, ns_loc)
+        #q_time_series_evap[0] += qr_loc[0,level] / precip_frac[0,level]
+        #n_time_series_evap[0] += nr_loc[0,level] / precip_frac[0,level]
+        #d_time_series_evap[0] += (qr_loc[0,level] / (nr_loc[0,level] * np.pi * 1.e3)) ** (1./3.)
+        tends, drout_evap, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                                qr_loc, nr_loc, qs_loc, ns_loc)
         update_state(level, tends, timestep)
+        #q_time_series_evap[1:] += subqr[0,:,0]
+        #n_time_series_evap[1:] += subnr[0,:,0]
+        #d_time_series_evap[1:] += subdr[0,:,0]
         mean_nr_evap += nr_loc[0,level]
+        #drout_evap = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
         state_diff_substep_evap = diff_states(level, column)
         reset_state(level, column)
         timestep = 300.
         evap_col_steps = 1
         evap_steps = 1
         col_steps = 300
-        tends, drout_col = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                          qr_loc, nr_loc, qs_loc, ns_loc)
+        tends, drout_col, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                               qr_loc, nr_loc, qs_loc, ns_loc)
         update_state(level, tends, timestep)
         mean_nr_col += nr_loc[0,level]
+        #drout_col = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
         state_diff_substep_col = diff_states(level, column)
         reset_state(level, column)
         timestep = 300.
         evap_col_steps = 1
         evap_steps = 300
         col_steps = 300
-        tends, drout_apart = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                            qr_loc, nr_loc, qs_loc, ns_loc)
+        tends, drout_apart, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                                 qr_loc, nr_loc, qs_loc, ns_loc)
         update_state(level, tends, timestep)
         mean_nr_apart += nr_loc[0,level]
+        #drout_apart = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
         state_diff_substep_apart = diff_states(level, column)
         reset_state(level, column)
         
         mean_1s_twmt += calc_twmt(0., state_diff_1s, 300.)
+        mean_30s_twmt += calc_twmt(0., state_diff_30s, 300.)
         mean_300s_twmt += calc_twmt(0., state_diff_300s, 300.)
         mean_together_twmt += calc_twmt(0., state_diff_substep_together, 300.)
         mean_hybrid_twmt += calc_twmt(0., state_diff_substep_hybrid, 300.)
+        mean_hybrid2_twmt += calc_twmt(0., state_diff_substep_hybrid2, 300.)
         mean_evap_twmt += calc_twmt(0., state_diff_substep_evap, 300.)
         mean_1s300s_twmt += calc_twmt(state_diff_300s, state_diff_1s, 300.)
+        mean_1s30s_twmt += calc_twmt(state_diff_30s, state_diff_1s, 300.)
         mean_300stogether_twmt += calc_twmt(state_diff_300s,
                                             state_diff_substep_together, 300.)
         mean_300shybrid_twmt += calc_twmt(state_diff_300s,
                                             state_diff_substep_hybrid, 300.)
+        mean_300shybrid2_twmt += calc_twmt(state_diff_300s,
+                                            state_diff_substep_hybrid2, 300.)
         mean_300sevap_twmt += calc_twmt(state_diff_300s,
                                         state_diff_substep_evap, 300.)
         mean_300scol_twmt += calc_twmt(state_diff_300s,
@@ -525,6 +625,8 @@ for column in range(num_columns):
                                           state_diff_substep_together, 300.)
         mean_1shybrid_twmt += calc_twmt(state_diff_1s,
                                         state_diff_substep_hybrid, 300.)
+        mean_1shybrid2_twmt += calc_twmt(state_diff_1s,
+                                         state_diff_substep_hybrid2, 300.)
         mean_1sevap_twmt += calc_twmt(state_diff_1s,
                                       state_diff_substep_evap, 300.)
         mean_1scol_twmt += calc_twmt(state_diff_1s,
@@ -532,75 +634,135 @@ for column in range(num_columns):
         mean_1sapart_twmt += calc_twmt(state_diff_1s,
                                        state_diff_substep_apart, 300.)
         mean_drout_1s += drout_1s
+        mean_drout_30s += drout_30s
         mean_drout_300s += drout_300s
         mean_drout_together += drout_together
         mean_drout_hybrid += drout_hybrid
+        mean_drout_hybrid2 += drout_hybrid2
         mean_drout_apart += drout_apart
         mean_drout_col += drout_col
         mean_drout_evap += drout_evap
 
 mean_1s_twmt *= 1.e3 / number_grid_cells
+mean_30s_twmt *= 1.e3 / number_grid_cells
 mean_300s_twmt *= 1.e3 / number_grid_cells
 mean_together_twmt *= 1.e3 / number_grid_cells
 mean_hybrid_twmt *= 1.e3 / number_grid_cells
+mean_hybrid2_twmt *= 1.e3 / number_grid_cells
 mean_evap_twmt *= 1.e3 / number_grid_cells
 mean_1s300s_twmt *= 1.e3 / number_grid_cells
+mean_1s30s_twmt *= 1.e3 / number_grid_cells
 mean_300stogether_twmt *= 1.e3 / number_grid_cells
 mean_300shybrid_twmt *= 1.e3 / number_grid_cells
+mean_300shybrid2_twmt *= 1.e3 / number_grid_cells
 mean_300sevap_twmt *= 1.e3 / number_grid_cells
 mean_300scol_twmt *= 1.e3 / number_grid_cells
 mean_300sapart_twmt *= 1.e3 / number_grid_cells
 mean_1stogether_twmt *= 1.e3 / number_grid_cells
 mean_1shybrid_twmt *= 1.e3 / number_grid_cells
+mean_1shybrid2_twmt *= 1.e3 / number_grid_cells
 mean_1sevap_twmt *= 1.e3 / number_grid_cells
 mean_1scol_twmt *= 1.e3 / number_grid_cells
 mean_1sapart_twmt *= 1.e3 / number_grid_cells
 
 mean_drout_1s *= 1.e6 / number_grid_cells
+mean_drout_30s *= 1.e6 / number_grid_cells
 mean_drout_300s *= 1.e6 / number_grid_cells
 mean_drout_together *= 1.e6 / number_grid_cells
 mean_drout_hybrid *= 1.e6 / number_grid_cells
+mean_drout_hybrid2 *= 1.e6 / number_grid_cells
 mean_drout_apart *= 1.e6 / number_grid_cells
 mean_drout_col *= 1.e6 / number_grid_cells
 mean_drout_evap *= 1.e6 / number_grid_cells
 
 mean_nr_1s *= 1. / number_grid_cells
+mean_nr_30s *= 1. / number_grid_cells
 mean_nr_300s *= 1. / number_grid_cells
 mean_nr_together *= 1. / number_grid_cells
 mean_nr_hybrid *= 1. / number_grid_cells
+mean_nr_hybrid2 *= 1. / number_grid_cells
 mean_nr_apart *= 1. / number_grid_cells
 mean_nr_col *= 1. / number_grid_cells
 mean_nr_evap *= 1. / number_grid_cells
 
+q_time_series_1s *= 1. / number_grid_cells
+n_time_series_1s *= 1. / number_grid_cells
+d_time_series_1s *= 1. / number_grid_cells
+q_alt_time_series_1s *= 1. / number_grid_cells
+q_time_series_together *= 1. / number_grid_cells
+n_time_series_together *= 1. / number_grid_cells
+d_time_series_together *= 1. / number_grid_cells
+#q_time_series_evap *= 1. / number_grid_cells
+#n_time_series_evap *= 1. / number_grid_cells
+#d_time_series_evap *= 1. / number_grid_cells
+
 print("mean 1s twmt:", mean_1s_twmt)
+print("mean 30s twmt:", mean_30s_twmt)
 print("mean 300s twmt:", mean_300s_twmt)
 print("mean together twmt:", mean_together_twmt)
 print("mean hybrid twmt:", mean_hybrid_twmt)
+print("mean hybrid2 twmt:", mean_hybrid2_twmt)
 print("mean evap twmt:", mean_evap_twmt)
 print("mean 300s - 1s twmt diff:", mean_1s300s_twmt)
+print("mean 30s - 1s twmt diff:", mean_1s30s_twmt)
 print("mean together - 300s twmt diff:", mean_300stogether_twmt)
 print("mean hybrid - 300s twmt diff:", mean_300shybrid_twmt)
+print("mean hybrid2 - 300s twmt diff:", mean_300shybrid2_twmt)
 print("mean evap - 300s twmt diff:", mean_300sevap_twmt)
 print("mean col - 300s twmt diff:", mean_300scol_twmt)
 print("mean apart - 300s twmt diff:", mean_300sapart_twmt)
 print("mean together - 1s twmt diff:", mean_1stogether_twmt)
 print("mean hybrid - 1s twmt diff:", mean_1shybrid_twmt)
+print("mean hybrid2 - 1s twmt diff:", mean_1shybrid2_twmt)
 print("mean evap - 1s twmt diff:", mean_1sevap_twmt)
 print("mean col - 1s twmt diff:", mean_1scol_twmt)
 print("mean apart - 1s twmt diff:", mean_1sapart_twmt)
 
 print("mean 1s drout:", mean_drout_1s)
+print("mean 30s drout:", mean_drout_30s)
 print("mean 300s drout:", mean_drout_300s)
 print("mean together drout:", mean_drout_together)
 print("mean hybrid drout:", mean_drout_hybrid)
+print("mean hybrid2 drout:", mean_drout_hybrid2)
 print("mean apart drout:", mean_drout_apart)
 print("mean col drout:", mean_drout_col)
 print("mean evap drout:", mean_drout_evap)
 
 print("mean 1s nr:", mean_nr_1s)
+print("mean 30s nr:", mean_nr_30s)
 print("mean 300s nr:", mean_nr_300s)
 print("mean together nr:", mean_nr_together)
 print("mean hybrid nr:", mean_nr_hybrid)
+print("mean hybrid2 nr:", mean_nr_hybrid2)
 print("mean apart nr:", mean_nr_apart)
 print("mean col nr:", mean_nr_col)
 print("mean evap nr:", mean_nr_evap)
+
+sub_times = np.arange(301)
+plt.plot(sub_times, q_time_series_1s, label='1s timestep')
+plt.plot(sub_times, q_time_series_together, label='substep together')
+#plt.plot(sub_times, q_alt_time_series_1s, label='1s timestep, end-of-function')
+plt.xlabel('Time (s)')
+plt.ylabel('qr (kg/kg)')
+plt.axis('tight')
+plt.legend(loc='best')
+plt.savefig('q_time_series_c{}.eps'.format(cluster))
+plt.close()
+
+plt.plot(sub_times, n_time_series_1s, label='1s timestep')
+plt.plot(sub_times, n_time_series_together, label='substep together')
+plt.xlabel('Time (s)')
+plt.ylabel('nr (1/kg)')
+plt.axis('tight')
+plt.legend(loc='best')
+plt.savefig('n_time_series_c{}.eps'.format(cluster))
+plt.close()
+
+plt.plot(sub_times, d_time_series_1s, label='1s timestep')
+plt.plot(sub_times, d_time_series_together, label='substep together')
+plt.xlabel('Time (s)')
+plt.ylabel('Diameter (m)')
+plt.axis('tight')
+plt.legend(loc='best')
+plt.savefig('d_time_series_c{}.eps'.format(cluster))
+plt.close()

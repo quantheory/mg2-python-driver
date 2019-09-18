@@ -30,5 +30,5 @@ prc_exp = 3.19
 prc_exp1 = -1.2
 cld_sed = 1.
 mg_prc_coeff_fix = True
-alpha_grad = 1.
+alpha_grad = 2.
 beta_grad = 1.

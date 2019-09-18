@@ -348,7 +348,8 @@ end subroutine micro_mg_init
 
 subroutine micro_mg_tend ( &
      mgncol,             nlev,               evap_col_steps,     &
-     evap_steps,         col_steps,          deltatin,           &
+     evap_steps,         col_steps,          auto_accr_steps,    &
+     auto_steps,         accr_steps,         deltatin,           &
      t,                            q,                            &
      qcn,                          qin,                          &
      ncn,                          nin,                          &
@@ -405,6 +406,7 @@ subroutine micro_mg_tend ( &
      nprctot,            nprc1tot,           npraitot,           &
      nprcitot,           nsubrtot,           nraggtot,           &
      nsaggtot,                                                   &
+     subqr,              subnr,              subdr,              &
      errstring, & ! Below arguments are "optional" (pass null pointers to omit).
      tnd_qsnow,          tnd_nsnow,          re_ice,             &
      prer_evap,                                                      &
@@ -457,6 +459,9 @@ subroutine micro_mg_tend ( &
   integer,  intent(in) :: evap_col_steps ! Evap/collection substeps per MG2 steps
   integer,  intent(in) :: evap_steps     ! Rain evaporation substeps per evap/col step
   integer,  intent(in) :: col_steps      ! Self-collection substeps per evap/col step
+  integer,  intent(in) :: auto_accr_steps! Autoconversion/accretion substeps per MG2 steps
+  integer,  intent(in) :: auto_steps     ! Autoconversion substeps per auto/accr step
+  integer,  intent(in) :: accr_steps     ! Accretion substeps per auto/accr step
   real(r8), intent(in) :: deltatin       ! time step (s)
   real(r8), intent(in) :: t(mgncol,nlev)        ! input temperature (K)
   real(r8), intent(in) :: q(mgncol,nlev)        ! input h20 vapor mixing ratio (kg/kg)
@@ -606,6 +611,9 @@ subroutine micro_mg_tend ( &
   real(r8), intent(out) :: nadjtot(mgncol,nlev,4)    ! size adjustment for each hydrometeor
   real(r8), intent(out) :: prer_evap(mgncol,nlev)
 
+  real(r8), intent(out) :: subqr(mgncol,evap_col_steps,nlev) ! Mass at each substep
+  real(r8), intent(out) :: subnr(mgncol,evap_col_steps,nlev) ! Number at each substep
+  real(r8), intent(out) :: subdr(mgncol,evap_col_steps,nlev) ! Diameter at each substep
   character(128),   intent(out) :: errstring  ! output status (non-blank for error return)
 
   ! Tendencies calculated by external schemes that can replace MG's native
@@ -848,8 +856,15 @@ subroutine micro_mg_tend ( &
   real(r8) :: sed_deltat, sed_time, sed_step_ratio
 
   real(r8) :: dumt(mgncol), dumq(mgncol), dumrho(mgncol), dumqvl(mgncol)
-  real(r8) :: dumlamr(mgncol), dumn0r(mgncol), dumarn(mgncol), dumr2(mgncol), dumnr2(mgncol)
+  real(r8) :: dumlamr(mgncol), dumn0r(mgncol), dumarn(mgncol)
+  real(r8) :: dumc2(mgncol), dumnc2(mgncol), dumr2(mgncol), dumnr2(mgncol)
   real(r8) :: dumnragg(mgncol), dumnragg2(mgncol), dumpre(mgncol)
+  real(r8) :: dumprc(mgncol), dumnprc(mgncol), dumnprc1(mgncol)
+  real(r8) :: dumprc2(mgncol), dumnprc2(mgncol), dumnprc12(mgncol)
+  real(r8) :: dumpra(mgncol), dumnpra(mgncol)
+  real(r8) :: dumpra2(mgncol), dumnpra2(mgncol)
+  real(r8) :: dumratio(mgncol)
+  real(r8) :: dumlamc(mgncol), dumpgam(mgncol)
 
   ! Processes that can be disabled.
   logical :: do_sed_loc, do_inst_loc
@@ -1348,12 +1363,6 @@ subroutine micro_mg_tend ( &
      end do
 
      !========================================================================
-     ! autoconversion of cloud liquid water to rain
-     ! formula from Khrouditnov and Kogan (2000), modified for sub-grid distribution of qc
-     ! minimum qc of 1 x 10^-8 prevents floating point error
-
-     call kk2000_liq_autoconversion(microp_uniform, qcic(:,k), &
-          ncic(:,k), rho(:,k), relvar(:,k),mg_prc_coeff_fix,prc_coef1,prc_exp,prc_exp1, prc(:,k), nprc(:,k), nprc1(:,k))
 
      ! assign qric based on prognostic qr, using assumed precip fraction
      ! note: this could be moved above for consistency with qcic and qiic calculations
@@ -1361,7 +1370,7 @@ subroutine micro_mg_tend ( &
      nric(:,k) = nr(:,k)/precip_frac(:,k)
 
      ! limit in-precip mixing ratios to 10 g/kg
-     qric(:,k)=min(qric(:,k),0.01_r8)
+     !qric(:,k)=min(qric(:,k),0.01_r8)
 
      ! add autoconversion to precip from above to get provisional rain mixing ratio
      ! and number concentration (qric and nric)
@@ -1540,9 +1549,6 @@ subroutine micro_mg_tend ( &
      call heterogeneous_rain_freezing(t(:,k), qric(:,k), nric(:,k), lamr(:,k), &
           mnuccr(:,k), nnuccr(:,k))
 
-     call accrete_cloud_water_rain(microp_uniform, qric(:,k), qcic(:,k), &
-          ncic(:,k), relvar(:,k), accre_enhan(:,k), pra(:,k), npra(:,k))
-
      if (do_cldice) then
         call accrete_cloud_ice_snow(t(:,k), rho(:,k), asn(:,k), qiic(:,k), niic(:,k), &
              qsic(:,k), lams(:,k), n0s(:,k), prai(:,k), nprai(:,k))
@@ -1586,6 +1592,168 @@ subroutine micro_mg_tend ( &
 
      end if !do_cldice
      !---PMC 12/3/12
+
+     dumr(:,k) = qric(:,k)
+     dumc(:,k) = qcic(:,k)
+     dumnc(:,k) = ncic(:,k)
+     prc(:,k) = 0._r8
+     nprc(:,k) = 0._r8
+     nprc1(:,k) = 0._r8
+     pra(:,k) = 0._r8
+     npra(:,k) = 0._r8
+     do m = 1, auto_accr_steps
+
+        dumc2 = dumc(:,k)
+        dumnc2 = dumnc(:,k)
+        dumprc2 = 0._r8
+        dumnprc2 = 0._r8
+        dumnprc12 = 0._r8
+        do n = 1, auto_steps
+           ! autoconversion of cloud liquid water to rain
+           ! formula from Khrouditnov and Kogan (2000), modified for sub-grid distribution of qc
+           ! minimum qc of 1 x 10^-8 prevents floating point error
+
+           call kk2000_liq_autoconversion(microp_uniform, dumc2, &
+                dumnc2, rho(:,k), relvar(:,k),mg_prc_coeff_fix,prc_coef1,prc_exp,prc_exp1, dumprc, dumnprc, dumnprc1)
+           dumprc = min(dumprc, dumc2*auto_steps*auto_accr_steps/deltat)
+           dumnprc1 = min(dumnprc1, dumnc2*auto_steps*auto_accr_steps/deltat)
+           dumprc2 = dumprc2 + dumprc / auto_steps
+           dumnprc2 = dumnprc2 + dumnprc / auto_steps
+           dumnprc12 = dumnprc12 + dumnprc1 / auto_steps
+           dumc2 = max(dumc2 - dumprc*deltat/(auto_steps*auto_accr_steps), 0._r8)
+           dumnc2 = max(dumnc2 - dumnprc1*deltat/(auto_steps*auto_accr_steps), 0._r8)
+           ! Don't have to update dumr/dumnr because they aren't input to autoconversion.
+        end do
+
+        dumc2 = dumc(:,k)
+        dumnc2 = dumnc(:,k)
+        dumr2 = dumr(:,k)
+        dumpra2 = 0._r8
+        dumnpra2 = 0._r8
+        do n = 1, accr_steps
+           call accrete_cloud_water_rain(microp_uniform, dumr2, dumc2, &
+                dumnc2, relvar(:,k), accre_enhan(:,k), dumpra, dumnpra)
+           dumpra = min(dumpra, dumc2*accr_steps*auto_accr_steps/deltat)
+           dumnpra = min(dumnpra, dumnc2*accr_steps*auto_accr_steps/deltat)
+           dumpra2 = dumpra2 + dumpra / accr_steps
+           dumnpra2 = dumnpra2 + dumnpra / accr_steps
+           dumc2 = max(dumc2 - dumpra*deltat/(accr_steps*auto_accr_steps), 0._r8)
+           dumnc2 = max(dumnc2 - dumnpra*deltat/(accr_steps*auto_accr_steps), 0._r8)
+           dumr2 = dumr2 + dumpra*deltat/(accr_steps*auto_accr_steps)
+        end do
+
+        ! Conserve cloud mass
+        where ((dumprc2+dumpra2)*deltat/auto_accr_steps > dumc(:,k))
+           dumratio = dumc(:,k)*auto_accr_steps / (deltat * (dumprc2 + dumpra2))
+        elsewhere
+           dumratio = 1.
+        end where
+        dumprc2 = dumprc2 * dumratio
+        dumpra2 = dumpra2 * dumratio
+        prc(:,k) = prc(:,k) + dumprc2 / auto_accr_steps
+        pra(:,k) = pra(:,k) + dumpra2 / auto_accr_steps
+
+        dumc(:,k) = max(dumc(:,k) - (dumprc2+dumpra2)*deltat/auto_accr_steps, 0._r8)
+        dumr(:,k) = dumr(:,k) + (dumprc2+dumpra2)*deltat/auto_accr_steps
+
+        ! Conserve cloud number
+        where ((dumnprc12+dumnpra2)*deltat/auto_accr_steps > dumnc(:,k))
+           dumratio = dumnc(:,k)*auto_accr_steps / (deltat * (dumnprc12 + dumnpra2))
+        elsewhere
+           dumratio = 1.
+        end where
+        dumnprc12 = dumnprc12 * dumratio
+        dumnpra2 = dumnpra2 * dumratio
+        nprc(:,k) = nprc(:,k) + dumnprc2 / auto_accr_steps
+        nprc1(:,k) = nprc1(:,k) + dumnprc12 / auto_accr_steps
+        npra(:,k) = npra(:,k) + dumnpra2 / auto_accr_steps
+
+        dumnc(:,k) = max(dumnc(:,k) - (dumnprc12+dumnpra2)*deltat/auto_accr_steps, 0._r8)
+        ! Size limiter, currently not used to actually adjust nprc/npra,
+        ! but only to change the state as seen within this loop.
+        call size_dist_param_liq(mg_liq_props, dumc(:,k), dumnc(:,k), rho(:,k), &
+             dumpgam, dumlamc)
+     end do
+
+     dumr(:,k) = qric(:,k)
+     dumnr(:,k) = nric(:,k)
+     dumt = t(:,k)
+     dumq = q(:,k)
+     nragg(:,k) = 0._r8
+     pre(:,k) = 0._r8
+     do m = 1, evap_col_steps
+        dumrho = p(:,k)/(r*dumt)
+
+        ! Need separate temporary nr for the two loops because they have to jointly
+        ! conserve rain number.
+        dumnr2 = dumnr(:,k)
+        dumnragg2 = 0._r8
+        do n = 1, col_steps
+           call self_collection_rain(dumrho, dumr(:,k), dumnr2, dumnragg)
+           dumnragg = max(dumnragg, -dumnr2*col_steps*evap_col_steps/deltat)
+           dumnragg2 = dumnragg2 + dumnragg / col_steps
+           dumnr2 = max(dumnr2 + dumnragg*deltat/(col_steps*evap_col_steps), 0._r8)
+        end do
+
+        dumnr2 = dumnr(:,k)
+        call size_dist_param_basic(mg_rain_props, dumr(:,k), dumnr2, &
+             dumlamr, dumn0r)
+        do n = 1, evap_steps
+           dumrho = p(:,k)/(r*dumt)
+           dumarn = ar*(rhosu/dumrho)**0.54_r8
+           do i = 1, mgncol
+              call qsat_water(dumt(i), p(i,k), dum, dumqvl(i))
+           end do
+           call evaporate_rain(dumt, dumrho, p(:,k), dumq, dumqvl, &
+                lcldm(:,k), precip_frac(:,k), dumarn, qcic(:,k), qiic(:,k), &
+                dumr(:,k), dumlamr, dumn0r, dumpre)
+           dumpre = max(dumpre, -dumr(:,k)*evap_steps*evap_col_steps/deltat)
+           pre(:,k) = pre(:,k) + dumpre / (evap_steps * evap_col_steps)
+           dumnr2 = max(dumnr2 + (dumnr2/dumr(:,k))*dumpre*deltat/(evap_steps*evap_col_steps), 0._r8)
+           dumr(:,k) = max(dumr(:,k) + dumpre*deltat/(evap_steps*evap_col_steps), 0._r8)
+           ! Not that dumq and dumt are grid-mean, not in-precip quantities.
+           dumq = dumq - precip_frac(:,k)*dumpre*deltat/(evap_steps*evap_col_steps)
+           dumt = dumt + xxlv*precip_frac(:,k)*dumpre*deltat/(evap_steps*evap_col_steps)/cpp
+           call size_dist_param_basic(mg_rain_props, dumr(:,k), dumnr2, &
+                dumlamr, dumn0r)
+           !subqr(:,n,k) = dumr(:,k)
+           !subnr(:,n,k) = dumnr2
+           !subdr(:,n,k) = 1./dumlamr
+        end do
+
+        ! Joint conservation of rain number; adjust self-collection only for
+        ! consistency with existing checks, and since evaporation should not be
+        ! limited by number directly anyway.
+        where (-dumnragg2*deltat/evap_col_steps > dumnr2)
+           dumnragg2 = -dumnr2 * evap_col_steps / deltat
+           ! Note: might be better to use size_dist_param_basic to set min here.
+           dumnr(:,k) = 0._r8
+        elsewhere
+           dumnr(:,k) = dumnr2 + dumnragg2*deltat/evap_col_steps
+        end where
+
+        nragg(:,k) = nragg(:,k) + dumnragg2 / evap_col_steps
+
+        ! Below is to enforce size limiters. Not clear that this is necessary
+        ! or even does much.
+        dumnr2 = dumnr(:,k)
+        call size_dist_param_basic(mg_rain_props, dumr(:,k), dumnr(:,k), &
+             dumlamr, dumn0r)
+        nragg(:,k) = nragg(:,k) + (dumnr(:,k) - dumnr2) / deltat
+
+        subqr(:,m,k) = dumr(:,k)
+        subnr(:,m,k) = dumnr(:,k)
+        subdr(:,m,k) = 1./dumlamr
+
+     end do
+
+     do i = 1, mgncol
+        dumr(i,k) = max(qr(i,k)+pre(i,k)*precip_frac(i,k)*deltat,0._r8)
+!        dumnr(i,k) = dumnr(i,k)*precip_frac(i,k)
+        dumnr(i,k) = max(nr(i,k)+(pre(i,k)*nr(i,k)/qr(i,k) + nragg(i,k))*precip_frac(i,k)*deltat,0._r8)
+        call size_dist_param_basic(mg_rain_props, dumr(i,k), dumnr(i,k), dumlamr(i))
+        drout2(i,k) = 1./dumlamr(i)
+     end do
 
      do i=1,mgncol
 
@@ -1655,62 +1823,6 @@ subroutine micro_mg_tend ( &
 
      end do
 
-     dumr(:,k) = qric(:,k)
-     dumnr(:,k) = nric(:,k)
-     dumt = t(:,k)
-     dumq = q(:,k)
-     nragg(:,k) = 0._r8
-     pre(:,k) = 0._r8
-     do m = 1, evap_col_steps
-        dumrho = p(:,k)/(r*dumt)
-
-        ! Need separate temporary nr for the two loops because they have to jointly
-        ! conserve rain number.
-        dumnr2 = dumnr(:,k)
-        dumnragg2 = 0._r8
-        do n = 1, col_steps
-           call self_collection_rain(dumrho, dumr(:,k), dumnr2, dumnragg)
-           dumnragg = max(dumnragg, -dumnr2*col_steps*evap_col_steps/deltat)
-           nragg(:,k) = nragg(:,k) + dumnragg / col_steps
-           dumnragg2 = dumnragg2 + dumnragg / col_steps
-           dumnr2 = max(dumnr2 + dumnragg*deltat/(col_steps*evap_col_steps), 0._r8)
-        end do
-
-        dumnr2 = dumnr(:,k)
-        do n = 1, evap_steps
-           dumrho = p(:,k)/(r*dumt)
-           dumarn = ar*(rhosu/dumrho)**0.54_r8
-           do i = 1, mgncol
-              call qsat_water(dumt(i), p(i,k), dum, dumqvl(i))
-           end do
-           call size_dist_param_basic(mg_rain_props, dumr(:,k), dumnr2, &
-                dumlamr, dumn0r)
-           call evaporate_rain(dumt, dumrho, p(:,k), dumq, dumqvl, &
-                lcldm(:,k), precip_frac(:,k), dumarn, qcic(:,k), qiic(:,k), &
-                dumr(:,k), dumlamr, dumn0r, dumpre)
-           dumpre = max(dumpre, -dumr(:,k)*evap_steps*evap_col_steps/deltat)
-           pre(:,k) = pre(:,k) + dumpre / evap_steps
-           dumnr2 = max(dumnr2 + (dumnr2/dumr(:,k))*dumpre*deltat/(evap_steps*evap_col_steps), 0._r8)
-           dumr(:,k) = max(dumr(:,k) + dumpre*deltat/(evap_steps*evap_col_steps), 0._r8)
-           ! Not that dumq and dumt are grid-mean, not in-precip quantities.
-           dumq = dumq - precip_frac(:,k)*dumpre*deltat/(evap_steps*evap_col_steps)
-           dumt = dumt + xxlv*precip_frac(:,k)*dumpre*deltat/(evap_steps*evap_col_steps)
-        end do
-
-        ! Joint conservation of rain number; adjust self-collection only for
-        ! consistency with existing checks, and since evaporation should not be
-        ! limited by number directly anyway.
-        where (-dumnragg2*deltat/evap_col_steps > dumnr2)
-           dumnragg = dumnragg2
-           dumnragg2 = -dumnr2 * evap_col_steps / deltat
-           nragg(:,k) = nragg(:,k) + dumnragg2 - dumnragg
-           ! Note: might be better to use size_dist_param_basic to set min here.
-           dumnr(:,k) = 0._r8
-        elsewhere
-           dumnr(:,k) = dumnr2 + dumnragg2*deltat/evap_col_steps
-        end where
-     end do
-
      do i=1,mgncol
 
         !===================================================================
@@ -1774,9 +1886,7 @@ subroutine micro_mg_tend ( &
 
         ! Add evaporation of rain number.
         if (pre(i,k) < 0._r8) then
-           dum = pre(i,k)*deltat/qr(i,k)
-           dum = max(-1._r8,dum)
-           nsubr(i,k) = dum*nr(i,k)/deltat
+           nsubr(i,k) = pre(i,k)*nr(i,k)/qr(i,k)
         else
            nsubr(i,k) = 0._r8
         end if
@@ -2953,7 +3063,7 @@ subroutine micro_mg_tend ( &
      nrout2 = nrout * precip_frac
      ! The avg_diameter call does the actual calculation; other diameter
      ! outputs are just drout2 times constants.
-     drout2 = avg_diameter(qrout, nrout, rho, rhow)
+     !drout2 = avg_diameter(qrout, nrout, rho, rhow)
      freqr = precip_frac
 
      reff_rain=1.5_r8*drout2*1.e6_r8
@@ -3283,6 +3393,7 @@ subroutine calc_precip_frac(mgncol, nlev, qc, qi, qr, qs, cldn, liqcldf, icecldf
                  weight = (beta_grad * qt(:,1) + (1. - beta_grad) * qt(:,2) + qsmall) &
                       / (qt(:,2) + qsmall)
               end where
+              weight = max(weight, 0._r8)
               precip_frac(:,k) = weight * precip_frac(:,k-1) + &
                    (1._r8 - weight) * precip_frac(:,k)
            end where

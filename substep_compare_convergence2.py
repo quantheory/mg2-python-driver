@@ -14,6 +14,8 @@ from mg2 import micro_mg2_0 as mg
 
 from mg2_constants import *
 
+import accumulator as acc
+
 HIST_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
 CLUSTER_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.10_cluster_labels.0001-01-06-00000.nc"
 
@@ -176,7 +178,7 @@ def mg2_tendencies(level, t, q, qc, nc, qi, ni, qr, nr, qs, ns):
         nsacwitot, nnuccrtot, mnuccritot, nnuccritot, npracstot, npratot, nprctot, \
         nprc1tot, npraitot, nprcitot, nsubrtot, nraggtot, nsaggtot, subqr, subnr, \
         subdr, errstring, prer_evap \
-        = mg.micro_mg_tend(evap_col_steps, evap_steps, col_steps, timestep, t[0,level],
+        = mg.micro_mg_tend(evap_col_steps, evap_steps, col_steps, auto_accr_steps, auto_steps, accr_steps, timestep, t[0,level],
                            q[0,level], qc[0,level], qi[0,level], nc[0,level],
                            ni[0,level], qr[0,level], qs[0,level], nr[0,level], ns[0,level],
                            relvar_loc[0,level], accre_enhan_loc[0,level], p_loc[0,level], pdel_loc[0,level],
@@ -295,12 +297,15 @@ def mg2_tendencies(level, t, q, qc, nc, qi, ni, qr, nr, qs, ns):
     tends["anadj"][inr] = nadjtot[0,0,2]
     tends["anadj"][ins] = nadjtot[0,0,3]
     # Check the above now.
-    # TODO: fix substepped code process rates so that this works again.
-    #budget_total = np.zeros((10,))
-    #for name in process_names:
-    #    budget_total += tends[name]
-    #assert np.allclose(budget_total, tends["Total"])
-    return (tends, drout2)
+    budget_total = np.zeros((10,))
+    for name in process_names:
+        budget_total += tends[name]
+    assert np.allclose(budget_total, tends["Total"])
+    water_mass_change = tends["Total"][iq] + tends["Total"][iqc] + \
+                        tends["Total"][iqi] + tends["Total"][iqr] + \
+                        tends["Total"][iqs]
+    assert np.allclose(0., water_mass_change)
+    return (tends, drout2, subqr, subnr, subdr)
 
 def update_state(level, tends, deltat):
     t_loc[0,level] += tends["Total"][it] * deltat
@@ -354,49 +359,63 @@ def calc_twmt(diff1, diff2, deltat):
     return (abs(diff_tends[iq]) + abs(diff_tends[iqc]) + abs(diff_tends[iqi]) +
                  abs(diff_tends[iqr]) + abs(diff_tends[iqs])) / 2.
 
+flag = False
+
+def run_mg2_substepped(num_steps):
+    # Icky global usage.
+    global timestep
+    timestep = 300./num_steps
+    global flag
+    flag = False
+    for m in range(num_steps):
+        tends, drout, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
+                                                              qr_loc, nr_loc, qs_loc, ns_loc)
+        other_tends = tends["Total"] - tends["anadj"] - tends["cnact"] - tends["cauto"] - tends["caccr"] - tends["rnagg"] - tends["revap"]
+        if abs(other_tends[iqi]) > 1.e-10 or abs(other_tends[iqs]) > 1.e-10 or abs(tends["revap"][iqr]) > 1.e-10:
+            flag = True
+        update_state(level, tends, timestep)
+    #drout = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
+    state_diff = diff_states(level, column)
+    reset_state(level, column)
+    return state_diff
+
 ind = np.arange(len(short_names))
 
-num_columns = 2048
+num_columns = 48602
+#num_columns = 1024
+cluster = 6
+max_power = 11
 
 plt.autoscale(tight=True)
 
-mean_1s_twmt = 0.
-mean_300s_twmt = 0.
-mean_together_twmt = 0.
-mean_evap_twmt = 0.
-mean_hybrid_twmt = 0.
-mean_1s300s_twmt = 0.
-mean_300stogether_twmt = 0.
-mean_300shybrid_twmt = 0.
-mean_300sevap_twmt = 0.
-mean_300scol_twmt = 0.
-mean_300sapart_twmt = 0.
-mean_1stogether_twmt = 0.
-mean_1shybrid_twmt = 0.
-mean_1sevap_twmt = 0.
-mean_1scol_twmt = 0.
-mean_1sapart_twmt = 0.
+mean_twnt_ref = 0.
+mean_delqr_ref = 0.
+mean_twnt_coarse = 0.
+mean_delqr_coarse = 0.
 
-mean_drout_1s = 0.
-mean_drout_300s = 0.
-mean_drout_together = 0.
-mean_drout_hybrid = 0.
-mean_drout_evap = 0.
-mean_drout_col = 0.
-mean_drout_apart = 0.
+coarse_diff_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
+coarse_dqr_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
 
-mean_nr_1s = 0.
-mean_nr_300s = 0.
-mean_nr_together = 0.
-mean_nr_hybrid = 0.
-mean_nr_evap = 0.
-mean_nr_col = 0.
-mean_nr_apart = 0.
+make_accs = lambda n: [acc.Accumulator([acc.mean, acc.median, acc.max])
+                       for i in range(n)]
 
-tend_norms = []
+all_diff_acc = make_accs(max_power-1)
+together_diff_acc = make_accs(max_power-1)
+auto_diff_acc = make_accs(max_power-1)
+accr_diff_acc = make_accs(max_power-1)
+
+all_dqr_acc = make_accs(max_power-1)
+together_dqr_acc = make_accs(max_power-1)
+auto_dqr_acc = make_accs(max_power-1)
+accr_dqr_acc = make_accs(max_power-1)
+
+coarse_qrs = []
 
 number_grid_cells = 0
 
+evap_col_steps = 1
+evap_steps = 1
+col_steps = 1
 for column in range(num_columns):
     print("On column: ", column)
     t_loc[:,:] = t[0,:,column]
@@ -428,179 +447,200 @@ for column in range(num_columns):
                                       icecldf_loc, mgncol=1, nlev=lev)
     for level in range(lev):
         c = label[0,level,column]
-        if c != 9:
+        if c != cluster:
+            continue
+        #print('precip_frac is ', precip_frac[0,level])
+        #print('t is ', t_loc[0,level])
+        #print('p is ', p_loc[0,level])
+        #print('qr is ', qr_loc[0,level])
+        #print('nr is ', nr_loc[0,level])
+        #print('q is ', q_loc[0,level])
+        #print('liqcldf is ', liqcldf_loc[0,level])
+        auto_accr_steps = 1
+        auto_steps = 1
+        accr_steps = 1
+        state_diff_ref = run_mg2_substepped(2**max_power)
+        if flag:
             continue
         number_grid_cells += 1
-        timestep = 1.
-        evap_col_steps = 1
-        evap_steps = 1
-        col_steps = 1
-        tot_t_1s = np.zeros((10,))
-        for m in range(300):
-            tends, drout_1s = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                             qr_loc, nr_loc, qs_loc, ns_loc)
-            tot_t_1s += tends["Total"]
-            update_state(level, tends, timestep)
-        mean_nr_1s += nr_loc[0,level]
-        state_diff_1s = diff_states(level, column)
-        reset_state(level, column)
-        timestep = 300.
-        evap_col_steps = 1
-        evap_steps = 1
-        col_steps = 1
-        tends, drout_300s = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                           qr_loc, nr_loc, qs_loc, ns_loc)
-        update_state(level, tends, timestep)
-        mean_nr_300s += nr_loc[0,level]
-        state_diff_300s = diff_states(level, column)
-        reset_state(level, column)
-        timestep = 300.
-        evap_col_steps = 300
-        evap_steps = 1
-        col_steps = 1
-        tends, drout_together = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                               qr_loc, nr_loc, qs_loc, ns_loc)
-        update_state(level, tends, timestep)
-        mean_nr_together += nr_loc[0,level]
-        state_diff_substep_together = diff_states(level, column)
-        reset_state(level, column)
-        timestep = 300.
-        evap_col_steps = 10
-        evap_steps = 30
-        col_steps = 1
-        tends, drout_hybrid = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                             qr_loc, nr_loc, qs_loc, ns_loc)
-        update_state(level, tends, timestep)
-        mean_nr_hybrid += nr_loc[0,level]
-        state_diff_substep_hybrid = diff_states(level, column)
-        reset_state(level, column)
-        timestep = 300.
-        evap_col_steps = 1
-        evap_steps = 300
-        col_steps = 1
-        tends, drout_evap = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                           qr_loc, nr_loc, qs_loc, ns_loc)
-        update_state(level, tends, timestep)
-        mean_nr_evap += nr_loc[0,level]
-        state_diff_substep_evap = diff_states(level, column)
-        reset_state(level, column)
-        timestep = 300.
-        evap_col_steps = 1
-        evap_steps = 1
-        col_steps = 300
-        tends, drout_col = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                          qr_loc, nr_loc, qs_loc, ns_loc)
-        update_state(level, tends, timestep)
-        mean_nr_col += nr_loc[0,level]
-        state_diff_substep_col = diff_states(level, column)
-        reset_state(level, column)
-        timestep = 300.
-        evap_col_steps = 1
-        evap_steps = 300
-        col_steps = 300
-        tends, drout_apart = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
-                                            qr_loc, nr_loc, qs_loc, ns_loc)
-        update_state(level, tends, timestep)
-        mean_nr_apart += nr_loc[0,level]
-        state_diff_substep_apart = diff_states(level, column)
-        reset_state(level, column)
-        
-        mean_1s_twmt += calc_twmt(0., state_diff_1s, 300.)
-        mean_300s_twmt += calc_twmt(0., state_diff_300s, 300.)
-        mean_together_twmt += calc_twmt(0., state_diff_substep_together, 300.)
-        mean_hybrid_twmt += calc_twmt(0., state_diff_substep_hybrid, 300.)
-        mean_evap_twmt += calc_twmt(0., state_diff_substep_evap, 300.)
-        mean_1s300s_twmt += calc_twmt(state_diff_300s, state_diff_1s, 300.)
-        mean_300stogether_twmt += calc_twmt(state_diff_300s,
-                                            state_diff_substep_together, 300.)
-        mean_300shybrid_twmt += calc_twmt(state_diff_300s,
-                                            state_diff_substep_hybrid, 300.)
-        mean_300sevap_twmt += calc_twmt(state_diff_300s,
-                                        state_diff_substep_evap, 300.)
-        mean_300scol_twmt += calc_twmt(state_diff_300s,
-                                       state_diff_substep_col, 300.)
-        mean_300sapart_twmt += calc_twmt(state_diff_300s,
-                                         state_diff_substep_apart, 300.)
-        mean_1stogether_twmt += calc_twmt(state_diff_1s,
-                                          state_diff_substep_together, 300.)
-        mean_1shybrid_twmt += calc_twmt(state_diff_1s,
-                                        state_diff_substep_hybrid, 300.)
-        mean_1sevap_twmt += calc_twmt(state_diff_1s,
-                                      state_diff_substep_evap, 300.)
-        mean_1scol_twmt += calc_twmt(state_diff_1s,
-                                     state_diff_substep_col, 300.)
-        mean_1sapart_twmt += calc_twmt(state_diff_1s,
-                                       state_diff_substep_apart, 300.)
-        mean_drout_1s += drout_1s
-        mean_drout_300s += drout_300s
-        mean_drout_together += drout_together
-        mean_drout_hybrid += drout_hybrid
-        mean_drout_apart += drout_apart
-        mean_drout_col += drout_col
-        mean_drout_evap += drout_evap
+        mean_twnt_ref += calc_twmt(state_diff_ref, 0., 300.)
+        mean_delqr_ref += state_diff_ref[iqr] / 300.
+        state_diff_coarse = run_mg2_substepped(1)
+        mean_twnt_coarse += calc_twmt(state_diff_coarse, 0., 300.)
+        mean_delqr_coarse += state_diff_coarse[iqr] / 300.
+        coarse_qrs.append(1.e3*(state_diff_coarse[iqr] + qr_loc[0,level]))
+        state_diffs_all = np.zeros((max_power-1, 10))
+        for i in range(1, max_power):
+            state_diffs_all[i-1,:] = run_mg2_substepped(2**i)
+        state_diffs_together = np.zeros((max_power-1, 10))
+        for i in range(1, max_power):
+            auto_accr_steps = 2**i
+            state_diffs_together[i-1,:] = run_mg2_substepped(1)
+        auto_accr_steps = 1
+        state_diffs_auto = np.zeros((max_power-1, 10))
+        for i in range(1, max_power):
+            auto_steps = 2**i
+            state_diffs_auto[i-1,:] = run_mg2_substepped(1)
+        auto_steps = 300
+        state_diff_substep_auto = run_mg2_substepped(1)
+        auto_steps = 1
+        state_diffs_accr = np.zeros((max_power-1, 10))
+        for i in range(1, max_power):
+            accr_steps = 2**i
+            state_diffs_accr[i-1,:] = run_mg2_substepped(1)
+        accr_steps = 300
+        state_diff_substep_accr = run_mg2_substepped(1)
 
-mean_1s_twmt *= 1.e3 / number_grid_cells
-mean_300s_twmt *= 1.e3 / number_grid_cells
-mean_together_twmt *= 1.e3 / number_grid_cells
-mean_hybrid_twmt *= 1.e3 / number_grid_cells
-mean_evap_twmt *= 1.e3 / number_grid_cells
-mean_1s300s_twmt *= 1.e3 / number_grid_cells
-mean_300stogether_twmt *= 1.e3 / number_grid_cells
-mean_300shybrid_twmt *= 1.e3 / number_grid_cells
-mean_300sevap_twmt *= 1.e3 / number_grid_cells
-mean_300scol_twmt *= 1.e3 / number_grid_cells
-mean_300sapart_twmt *= 1.e3 / number_grid_cells
-mean_1stogether_twmt *= 1.e3 / number_grid_cells
-mean_1shybrid_twmt *= 1.e3 / number_grid_cells
-mean_1sevap_twmt *= 1.e3 / number_grid_cells
-mean_1scol_twmt *= 1.e3 / number_grid_cells
-mean_1sapart_twmt *= 1.e3 / number_grid_cells
+        coarse_diff_acc.push(calc_twmt(state_diff_coarse, state_diff_ref, 300.))
+        for i in range(max_power-1):
+            all_diff_acc[i].push(calc_twmt(state_diffs_all[i,:], state_diff_ref, 300.))
+            together_diff_acc[i].push(calc_twmt(state_diffs_together[i,:], state_diff_ref, 300.))
+            auto_diff_acc[i].push(calc_twmt(state_diffs_auto[i,:], state_diff_ref, 300.))
+            accr_diff_acc[i].push(calc_twmt(state_diffs_accr[i,:], state_diff_ref, 300.))
 
-mean_drout_1s *= 1.e6 / number_grid_cells
-mean_drout_300s *= 1.e6 / number_grid_cells
-mean_drout_together *= 1.e6 / number_grid_cells
-mean_drout_hybrid *= 1.e6 / number_grid_cells
-mean_drout_apart *= 1.e6 / number_grid_cells
-mean_drout_col *= 1.e6 / number_grid_cells
-mean_drout_evap *= 1.e6 / number_grid_cells
+        coarse_dqr_acc.push(np.abs(state_diff_coarse[iqr] - state_diff_ref[iqr]) / 300.)
+        for i in range(max_power-1):
+            all_dqr_acc[i].push(np.abs(state_diffs_all[i,iqr] - state_diff_ref[iqr]) / 300.)
+            together_dqr_acc[i].push(np.abs(state_diffs_together[i,iqr] - state_diff_ref[iqr]) / 300.)
+            auto_dqr_acc[i].push(np.abs(state_diffs_auto[i,iqr] - state_diff_ref[iqr]) / 300.)
+            accr_dqr_acc[i].push(np.abs(state_diffs_accr[i,iqr] - state_diff_ref[iqr]) / 300.)
 
-mean_nr_1s *= 1. / number_grid_cells
-mean_nr_300s *= 1. / number_grid_cells
-mean_nr_together *= 1. / number_grid_cells
-mean_nr_hybrid *= 1. / number_grid_cells
-mean_nr_apart *= 1. / number_grid_cells
-mean_nr_col *= 1. / number_grid_cells
-mean_nr_evap *= 1. / number_grid_cells
+mean_all_diffs = np.zeros((max_power,))
+mean_together_diffs = np.zeros((max_power,))
+mean_auto_diffs = np.zeros((max_power,))
+mean_accr_diffs = np.zeros((max_power,))
 
-print("mean 1s twmt:", mean_1s_twmt)
-print("mean 300s twmt:", mean_300s_twmt)
-print("mean together twmt:", mean_together_twmt)
-print("mean hybrid twmt:", mean_hybrid_twmt)
-print("mean evap twmt:", mean_evap_twmt)
-print("mean 300s - 1s twmt diff:", mean_1s300s_twmt)
-print("mean together - 300s twmt diff:", mean_300stogether_twmt)
-print("mean hybrid - 300s twmt diff:", mean_300shybrid_twmt)
-print("mean evap - 300s twmt diff:", mean_300sevap_twmt)
-print("mean col - 300s twmt diff:", mean_300scol_twmt)
-print("mean apart - 300s twmt diff:", mean_300sapart_twmt)
-print("mean together - 1s twmt diff:", mean_1stogether_twmt)
-print("mean hybrid - 1s twmt diff:", mean_1shybrid_twmt)
-print("mean evap - 1s twmt diff:", mean_1sevap_twmt)
-print("mean col - 1s twmt diff:", mean_1scol_twmt)
-print("mean apart - 1s twmt diff:", mean_1sapart_twmt)
+median_all_diffs = np.zeros((max_power,))
+median_together_diffs = np.zeros((max_power,))
+median_auto_diffs = np.zeros((max_power,))
+median_accr_diffs = np.zeros((max_power,))
 
-print("mean 1s drout:", mean_drout_1s)
-print("mean 300s drout:", mean_drout_300s)
-print("mean together drout:", mean_drout_together)
-print("mean hybrid drout:", mean_drout_hybrid)
-print("mean apart drout:", mean_drout_apart)
-print("mean col drout:", mean_drout_col)
-print("mean evap drout:", mean_drout_evap)
+max_all_diffs = np.zeros((max_power,))
+max_together_diffs = np.zeros((max_power,))
+max_auto_diffs = np.zeros((max_power,))
+max_accr_diffs = np.zeros((max_power,))
 
-print("mean 1s nr:", mean_nr_1s)
-print("mean 300s nr:", mean_nr_300s)
-print("mean together nr:", mean_nr_together)
-print("mean hybrid nr:", mean_nr_hybrid)
-print("mean apart nr:", mean_nr_apart)
-print("mean col nr:", mean_nr_col)
-print("mean evap nr:", mean_nr_evap)
+mean_all_dqrs = np.zeros((max_power,))
+mean_together_dqrs = np.zeros((max_power,))
+mean_auto_dqrs = np.zeros((max_power,))
+mean_accr_dqrs = np.zeros((max_power,))
+
+mean_coarse_diff, median_coarse_diff, max_coarse_diff = coarse_diff_acc.output()
+mean_coarse_diff *= 1.e3
+median_coarse_diff *= 1.e3
+max_coarse_diff *= 1.e3
+mean_all_diffs[0] = mean_coarse_diff
+mean_together_diffs[0] = mean_coarse_diff
+mean_auto_diffs[0] = mean_coarse_diff
+mean_accr_diffs[0] = mean_coarse_diff
+median_all_diffs[0] = median_coarse_diff
+median_together_diffs[0] = median_coarse_diff
+median_auto_diffs[0] = median_coarse_diff
+median_accr_diffs[0] = median_coarse_diff
+max_all_diffs[0] = max_coarse_diff
+max_together_diffs[0] = max_coarse_diff
+max_auto_diffs[0] = max_coarse_diff
+max_accr_diffs[0] = max_coarse_diff
+
+mean_coarse_dqr = coarse_dqr_acc.output()[0]
+mean_coarse_dqr *= 1.e3
+mean_all_dqrs[0] = mean_coarse_dqr
+mean_together_dqrs[0] = mean_coarse_dqr
+mean_auto_dqrs[0] = mean_coarse_dqr
+mean_accr_dqrs[0] = mean_coarse_dqr
+
+mean_twnt_ref *= 1.e3 / number_grid_cells
+mean_delqr_ref *= 1.e3 / number_grid_cells
+mean_twnt_coarse *= 1.e3 / number_grid_cells
+mean_delqr_coarse *= 1.e3 / number_grid_cells
+
+for i in range(1, max_power):
+    accums = all_diff_acc[i-1].output()
+    mean_all_diffs[i] = accums[0] * 1.e3
+    median_all_diffs[i] = accums[1] * 1.e3
+    max_all_diffs[i] = accums[2] * 1.e3
+    accums = together_diff_acc[i-1].output()
+    mean_together_diffs[i] = accums[0] * 1.e3
+    median_together_diffs[i] = accums[1] * 1.e3
+    max_together_diffs[i] = accums[2] * 1.e3
+    accums = accr_diff_acc[i-1].output()
+    mean_accr_diffs[i] = accums[0] * 1.e3
+    median_accr_diffs[i] = accums[1] * 1.e3
+    max_accr_diffs[i] = accums[2] * 1.e3
+    accums = auto_diff_acc[i-1].output()
+    mean_auto_diffs[i] = accums[0] * 1.e3
+    median_auto_diffs[i] = accums[1] * 1.e3
+    max_auto_diffs[i] = accums[2] * 1.e3
+    accums = all_dqr_acc[i-1].output()
+    mean_all_dqrs[i] = accums[0] * 1.e3
+    accums = together_dqr_acc[i-1].output()
+    mean_together_dqrs[i] = accums[0] * 1.e3
+    accums = auto_dqr_acc[i-1].output()
+    mean_auto_dqrs[i] = accums[0] * 1.e3
+    accums = accr_dqr_acc[i-1].output()
+    mean_accr_dqrs[i] = accums[0] * 1.e3
+
+print("Reference mean twnt and dqr/dt: ", mean_twnt_ref, mean_delqr_ref)
+
+print("Coarse run mean twnt and dqr/dt: ", mean_twnt_coarse, mean_delqr_coarse)
+
+timesteps = 300. / (2 ** np.arange(max_power))
+
+plt.loglog(timesteps, mean_all_diffs, label='mean_all')
+plt.loglog(timesteps, mean_together_diffs, label='mean_together')
+plt.loglog(timesteps, mean_auto_diffs, label='mean_auto')
+plt.loglog(timesteps, mean_accr_diffs, label='mean_accr')
+plt.loglog(timesteps, timesteps*mean_all_diffs[-4]/timesteps[-4], 'k--',
+           label='1st-order reference')
+plt.xlabel('Timestep (s)')
+plt.ylabel('TWMT diff (g/kg/s)')
+plt.axis('tight')
+plt.legend(loc='best')
+plt.savefig('substep_convergence_mean_c{}.eps'.format(cluster))
+plt.close()
+
+plt.loglog(timesteps, median_all_diffs, label='median_all')
+plt.loglog(timesteps, median_together_diffs, label='median_together')
+plt.loglog(timesteps, median_auto_diffs, label='median_auto')
+plt.loglog(timesteps, median_accr_diffs, label='median_accr')
+plt.loglog(timesteps, timesteps*median_all_diffs[-4]/timesteps[-4], 'k--',
+           label='1st-order reference')
+plt.xlabel('Timestep (s)')
+plt.ylabel('TWMT diff (g/kg/s)')
+plt.axis('tight')
+plt.legend(loc='best')
+plt.savefig('substep_convergence_median_c{}.eps'.format(cluster))
+plt.close()
+
+plt.loglog(timesteps, max_all_diffs, label='max_all')
+plt.loglog(timesteps, max_together_diffs, label='max_together')
+plt.loglog(timesteps, max_auto_diffs, label='max_auto')
+plt.loglog(timesteps, max_accr_diffs, label='max_accr')
+plt.loglog(timesteps, timesteps*max_all_diffs[-4]/timesteps[-4], 'k--',
+           label='1st-order reference')
+plt.xlabel('Timestep (s)')
+plt.ylabel('TWMT diff (g/kg/s)')
+plt.axis('tight')
+plt.legend(loc='best')
+plt.savefig('substep_convergence_max_c{}.eps'.format(cluster))
+plt.close()
+
+plt.loglog(timesteps, mean_all_dqrs, label='substep_all')
+plt.loglog(timesteps, mean_together_dqrs, label='substep_together')
+plt.loglog(timesteps, mean_auto_dqrs, label='substep_auto')
+plt.loglog(timesteps, mean_accr_dqrs, label='substep_accr')
+plt.loglog(timesteps, timesteps*mean_all_dqrs[-4]/timesteps[-4], 'k--',
+           label='1st-order reference')
+plt.xlabel('Timestep (s)')
+plt.ylabel('Rain tendency diff (g/kg/s)')
+plt.axis('tight')
+plt.legend(loc='best')
+plt.savefig('substep_convergence_qr_c{}.eps'.format(cluster))
+plt.close()
+
+plt.hist(coarse_qrs, bins=200)
+plt.xlabel('Final QR (g/kg)')
+plt.ylabel('Number of cases ({} total)'.format(number_grid_cells))
+plt.axis('tight')
+plt.savefig('post_300s_qr_c{}.eps'.format(cluster))
+plt.close()
