@@ -16,8 +16,10 @@ from mg2_constants import *
 
 import accumulator as acc
 
-HIST_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
-CLUSTER_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.10_cluster_labels.0001-01-06-00000.nc"
+matplotlib.rcParams['lines.linewidth'] = 2.0
+
+HIST_FILE_NAME = "/home/santos/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
+CLUSTER_FILE_NAME = "/home/santos/Data/MG2_data_collection.10_cluster_labels.0001-01-06-00000.nc"
 
 hfile = nc4.Dataset(HIST_FILE_NAME, 'r')
 cfile = nc4.Dataset(CLUSTER_FILE_NAME, 'r')
@@ -370,7 +372,7 @@ def run_mg2_substepped(num_steps):
     for m in range(num_steps):
         tends, drout, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
                                                               qr_loc, nr_loc, qs_loc, ns_loc)
-        other_tends = tends["Total"] - tends["anadj"] - tends["cnact"] - tends["cauto"] - tends["caccr"] - tends["rnagg"] - tends["revap"]
+        other_tends = tends["Total"] - tends["anadj"] - tends["cnact"] - tends["cauto"] - tends["caccr"]# - tends["rnagg"] - tends["revap"]
         if abs(other_tends[iqi]) > 1.e-10 or abs(other_tends[iqs]) > 1.e-10 or abs(tends["revap"][iqr]) > 1.e-10:
             flag = True
         update_state(level, tends, timestep)
@@ -401,11 +403,13 @@ make_accs = lambda n: [acc.Accumulator([acc.mean, acc.median, acc.max])
 
 all_diff_acc = make_accs(max_power-1)
 together_diff_acc = make_accs(max_power-1)
+apart_diff_acc = make_accs(max_power-1)
 auto_diff_acc = make_accs(max_power-1)
 accr_diff_acc = make_accs(max_power-1)
 
 all_dqr_acc = make_accs(max_power-1)
 together_dqr_acc = make_accs(max_power-1)
+apart_dqr_acc = make_accs(max_power-1)
 auto_dqr_acc = make_accs(max_power-1)
 accr_dqr_acc = make_accs(max_power-1)
 
@@ -417,7 +421,8 @@ evap_col_steps = 1
 evap_steps = 1
 col_steps = 1
 for column in range(num_columns):
-    print("On column: ", column)
+    if column % 10 == 0:
+        print("On column: ", column)
     t_loc[:,:] = t[0,:,column]
     q_loc[:,:] = q[0,:,column]
     qc_loc[:,:] = qc[0,:,column]
@@ -477,24 +482,29 @@ for column in range(num_columns):
             auto_accr_steps = 2**i
             state_diffs_together[i-1,:] = run_mg2_substepped(1)
         auto_accr_steps = 1
+        state_diffs_apart = np.zeros((max_power-1, 10))
+        for i in range(1, max_power):
+            auto_steps = 2**i
+            accr_steps = 2**i
+            state_diffs_apart[i-1,:] = run_mg2_substepped(1)
+        auto_steps = 1
+        accr_steps = 1
         state_diffs_auto = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             auto_steps = 2**i
             state_diffs_auto[i-1,:] = run_mg2_substepped(1)
-        auto_steps = 300
-        state_diff_substep_auto = run_mg2_substepped(1)
         auto_steps = 1
         state_diffs_accr = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             accr_steps = 2**i
             state_diffs_accr[i-1,:] = run_mg2_substepped(1)
-        accr_steps = 300
-        state_diff_substep_accr = run_mg2_substepped(1)
+        accr_steps = 1
 
         coarse_diff_acc.push(calc_twmt(state_diff_coarse, state_diff_ref, 300.))
         for i in range(max_power-1):
             all_diff_acc[i].push(calc_twmt(state_diffs_all[i,:], state_diff_ref, 300.))
             together_diff_acc[i].push(calc_twmt(state_diffs_together[i,:], state_diff_ref, 300.))
+            apart_diff_acc[i].push(calc_twmt(state_diffs_apart[i,:], state_diff_ref, 300.))
             auto_diff_acc[i].push(calc_twmt(state_diffs_auto[i,:], state_diff_ref, 300.))
             accr_diff_acc[i].push(calc_twmt(state_diffs_accr[i,:], state_diff_ref, 300.))
 
@@ -502,26 +512,31 @@ for column in range(num_columns):
         for i in range(max_power-1):
             all_dqr_acc[i].push(np.abs(state_diffs_all[i,iqr] - state_diff_ref[iqr]) / 300.)
             together_dqr_acc[i].push(np.abs(state_diffs_together[i,iqr] - state_diff_ref[iqr]) / 300.)
+            apart_dqr_acc[i].push(np.abs(state_diffs_apart[i,iqr] - state_diff_ref[iqr]) / 300.)
             auto_dqr_acc[i].push(np.abs(state_diffs_auto[i,iqr] - state_diff_ref[iqr]) / 300.)
             accr_dqr_acc[i].push(np.abs(state_diffs_accr[i,iqr] - state_diff_ref[iqr]) / 300.)
 
 mean_all_diffs = np.zeros((max_power,))
 mean_together_diffs = np.zeros((max_power,))
+mean_apart_diffs = np.zeros((max_power,))
 mean_auto_diffs = np.zeros((max_power,))
 mean_accr_diffs = np.zeros((max_power,))
 
 median_all_diffs = np.zeros((max_power,))
 median_together_diffs = np.zeros((max_power,))
+median_apart_diffs = np.zeros((max_power,))
 median_auto_diffs = np.zeros((max_power,))
 median_accr_diffs = np.zeros((max_power,))
 
 max_all_diffs = np.zeros((max_power,))
 max_together_diffs = np.zeros((max_power,))
+max_apart_diffs = np.zeros((max_power,))
 max_auto_diffs = np.zeros((max_power,))
 max_accr_diffs = np.zeros((max_power,))
 
 mean_all_dqrs = np.zeros((max_power,))
 mean_together_dqrs = np.zeros((max_power,))
+mean_apart_dqrs = np.zeros((max_power,))
 mean_auto_dqrs = np.zeros((max_power,))
 mean_accr_dqrs = np.zeros((max_power,))
 
@@ -531,14 +546,17 @@ median_coarse_diff *= 1.e3
 max_coarse_diff *= 1.e3
 mean_all_diffs[0] = mean_coarse_diff
 mean_together_diffs[0] = mean_coarse_diff
+mean_apart_diffs[0] = mean_coarse_diff
 mean_auto_diffs[0] = mean_coarse_diff
 mean_accr_diffs[0] = mean_coarse_diff
 median_all_diffs[0] = median_coarse_diff
 median_together_diffs[0] = median_coarse_diff
+median_apart_diffs[0] = median_coarse_diff
 median_auto_diffs[0] = median_coarse_diff
 median_accr_diffs[0] = median_coarse_diff
 max_all_diffs[0] = max_coarse_diff
 max_together_diffs[0] = max_coarse_diff
+max_apart_diffs[0] = max_coarse_diff
 max_auto_diffs[0] = max_coarse_diff
 max_accr_diffs[0] = max_coarse_diff
 
@@ -546,6 +564,7 @@ mean_coarse_dqr = coarse_dqr_acc.output()[0]
 mean_coarse_dqr *= 1.e3
 mean_all_dqrs[0] = mean_coarse_dqr
 mean_together_dqrs[0] = mean_coarse_dqr
+mean_apart_dqrs[0] = mean_coarse_dqr
 mean_auto_dqrs[0] = mean_coarse_dqr
 mean_accr_dqrs[0] = mean_coarse_dqr
 
@@ -563,6 +582,10 @@ for i in range(1, max_power):
     mean_together_diffs[i] = accums[0] * 1.e3
     median_together_diffs[i] = accums[1] * 1.e3
     max_together_diffs[i] = accums[2] * 1.e3
+    accums = apart_diff_acc[i-1].output()
+    mean_apart_diffs[i] = accums[0] * 1.e3
+    median_apart_diffs[i] = accums[1] * 1.e3
+    max_apart_diffs[i] = accums[2] * 1.e3
     accums = accr_diff_acc[i-1].output()
     mean_accr_diffs[i] = accums[0] * 1.e3
     median_accr_diffs[i] = accums[1] * 1.e3
@@ -575,6 +598,8 @@ for i in range(1, max_power):
     mean_all_dqrs[i] = accums[0] * 1.e3
     accums = together_dqr_acc[i-1].output()
     mean_together_dqrs[i] = accums[0] * 1.e3
+    accums = apart_dqr_acc[i-1].output()
+    mean_apart_dqrs[i] = accums[0] * 1.e3
     accums = auto_dqr_acc[i-1].output()
     mean_auto_dqrs[i] = accums[0] * 1.e3
     accums = accr_dqr_acc[i-1].output()
@@ -586,49 +611,54 @@ print("Coarse run mean twnt and dqr/dt: ", mean_twnt_coarse, mean_delqr_coarse)
 
 timesteps = 300. / (2 ** np.arange(max_power))
 
-plt.loglog(timesteps, mean_all_diffs, label='mean_all')
-plt.loglog(timesteps, mean_together_diffs, label='mean_together')
-plt.loglog(timesteps, mean_auto_diffs, label='mean_auto')
-plt.loglog(timesteps, mean_accr_diffs, label='mean_accr')
+plt.loglog(timesteps, mean_all_diffs, label='MG2')
+plt.loglog(timesteps, mean_auto_diffs, label='Autoconversion only')
+plt.loglog(timesteps, mean_accr_diffs, label='Accretion only')
+plt.loglog(timesteps, mean_together_diffs, label='Coupled Auto/Accr')
+#plt.loglog(timesteps, mean_apart_diffs, label='Auto/Accr Separately')
 plt.loglog(timesteps, timesteps*mean_all_diffs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
+plt.title('Mean error')
 plt.xlabel('Timestep (s)')
-plt.ylabel('TWMT diff (g/kg/s)')
+plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='best')
 plt.savefig('substep_convergence_mean_c{}.eps'.format(cluster))
 plt.close()
 
-plt.loglog(timesteps, median_all_diffs, label='median_all')
-plt.loglog(timesteps, median_together_diffs, label='median_together')
-plt.loglog(timesteps, median_auto_diffs, label='median_auto')
-plt.loglog(timesteps, median_accr_diffs, label='median_accr')
+plt.loglog(timesteps, median_all_diffs, label='MG2')
+plt.loglog(timesteps, median_auto_diffs, label='Autoconversion only')
+plt.loglog(timesteps, median_accr_diffs, label='Accretion only')
+plt.loglog(timesteps, median_together_diffs, label='Coupled Auto/Accr')
+#plt.loglog(timesteps, median_apart_diffs, label='Auto/Accr Separately')
 plt.loglog(timesteps, timesteps*median_all_diffs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
 plt.xlabel('Timestep (s)')
-plt.ylabel('TWMT diff (g/kg/s)')
+plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='best')
 plt.savefig('substep_convergence_median_c{}.eps'.format(cluster))
 plt.close()
 
-plt.loglog(timesteps, max_all_diffs, label='max_all')
-plt.loglog(timesteps, max_together_diffs, label='max_together')
-plt.loglog(timesteps, max_auto_diffs, label='max_auto')
-plt.loglog(timesteps, max_accr_diffs, label='max_accr')
+plt.loglog(timesteps, max_all_diffs, label='MG2')
+plt.loglog(timesteps, max_auto_diffs, label='Autoconversion only')
+plt.loglog(timesteps, max_accr_diffs, label='Accretion only')
+plt.loglog(timesteps, max_together_diffs, label='Coupled Auto/Accr')
+#plt.loglog(timesteps, max_apart_diffs, label='Auto/Accr Separately')
 plt.loglog(timesteps, timesteps*max_all_diffs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
 plt.xlabel('Timestep (s)')
-plt.ylabel('TWMT diff (g/kg/s)')
+plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='best')
 plt.savefig('substep_convergence_max_c{}.eps'.format(cluster))
 plt.close()
 
-plt.loglog(timesteps, mean_all_dqrs, label='substep_all')
-plt.loglog(timesteps, mean_together_dqrs, label='substep_together')
-plt.loglog(timesteps, mean_auto_dqrs, label='substep_auto')
-plt.loglog(timesteps, mean_accr_dqrs, label='substep_accr')
+plt.loglog(timesteps, mean_all_dqrs, label='MG2')
+plt.loglog(timesteps, mean_auto_dqrs, label='Autoconversion only')
+plt.loglog(timesteps, mean_accr_dqrs, label='Accretion only')
+plt.loglog(timesteps, mean_together_dqrs, label='Coupled Auto/Accr')
+#plt.loglog(timesteps, mean_apart_dqrs, label='Auto/Accr Separately')
 plt.loglog(timesteps, timesteps*mean_all_dqrs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
 plt.xlabel('Timestep (s)')

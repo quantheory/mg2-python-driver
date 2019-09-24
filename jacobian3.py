@@ -5,9 +5,6 @@ import sys
 import numpy as np
 import scipy.linalg as la
 import scipy.stats as stats
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 import netCDF4 as nc4
 import numdifftools as ndt
 
@@ -16,16 +13,18 @@ from mg2 import micro_mg2_0 as mg
 
 from mg2_constants import *
 
+start_column = int(sys.argv[1])
+end_column = int(sys.argv[2])
+
+
 HIST_FILE_NAME = "/home/santos/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
-CLUSTER_FILE_NAME = "/home/santos/Data/MG2_data_collection.10_cluster_labels.0001-01-06-00000.nc"
+OUT_FILE_NAME = "/home/santos/Data/Jacobian_cutoff_{}-{}.nc".format(start_column, end_column)
 
 hfile = nc4.Dataset(HIST_FILE_NAME, 'r')
-cfile = nc4.Dataset(CLUSTER_FILE_NAME, 'r')
 
 ncol = len(hfile.dimensions['ncol'])
 lev = len(hfile.dimensions['lev'])
 ilev = len(hfile.dimensions['ilev'])
-ncluster = len(cfile.dimensions['ncluster'])
 
 errstring = wsm.wv_sat_methods_init(kind, tmelt, h2otrip, tboil, ttrice, epsilo)
 
@@ -74,8 +73,6 @@ nacon[:,:,:,3] = hfile.variables["MG2IN_NACON4"][:]
 frzimm = hfile.variables["MG2IN_FRZIMM"]
 frzcnt = hfile.variables["MG2IN_FRZCNT"]
 frzdep = hfile.variables["MG2IN_FRZDEP"]
-
-label = cfile.variables["label"]
 
 t_loc = np.empty((1, t.shape[1]), order='F')
 q_loc = np.empty((1, q.shape[1]), order='F')
@@ -198,6 +195,7 @@ short_names = [
     "cnact",
     "anadj",
 ]
+nproc = len(short_names)
 process_names = {
     "revap": "Rain Evap.",
     "ssubl": "Snow Subl.",
@@ -396,13 +394,13 @@ def run_mg2(state, level):
     my_ns[0,level] = max(state[ins], 1.e-12)
     tends = mg2_tendencies(level, my_t, my_q, my_qc, my_nc, my_qi, my_ni, my_qr,
                            my_nr, my_qs, my_ns)
-    output = np.zeros((10*(len(ind)+1),))
+    output = np.zeros((10*(nproc+1),))
     output[0:10] = s_inv_mult(tends["Total"])
-    for i in range(len(ind)):
+    for i in range(nproc):
         output[10*(i+1):10*(i+2)] = s_inv_mult(tends[short_names[i]])
     return output
 
-ind = np.arange(len(short_names))
+ind = np.arange(nproc)
 
 def get_modes_at_level(level):
     state = np.zeros((10,))
@@ -418,7 +416,11 @@ def get_modes_at_level(level):
     state[ins] = ns_loc[0,level]
     tends = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
                            qr_loc, nr_loc, qs_loc, ns_loc)
-
+    tot_t = tends["Total"]
+    tend_norm = (abs(tot_t[iq]) + abs(tot_t[iqc]) + abs(tot_t[iqi]) +
+                 abs(tot_t[iqr]) + abs(tot_t[iqs])) / 2.
+    if tend_norm < tend_cutoff:
+        return tends, tend_norm, None, None, None
     j_mg2 = ndt.Jacobian(run_mg2, method='forward', order=2)
     j_locs_dimless = j_mg2(s_inv_mult(state), level)
     j_loc = s.dot(sq.dot(la.solve_triangular(sr, j_locs_dimless[0:10,:].T, trans='T')).T)
@@ -428,23 +430,23 @@ def get_modes_at_level(level):
         evals = np.real(evals)
     if (np.imag(evecs) == 0.).all():
         evecs = np.real(evecs)
-    associations = np.zeros((10, len(ind)))
-    for i in range(len(ind)):
+    associations = np.zeros((10, nproc))
+    for i in range(nproc):
         j_proc_loc = s.dot(sq.dot(la.solve_triangular(sr, j_locs_dimless[10*(i+1):10*(i+2),:].T, trans='T')).T)
         j_proc_j_basis = la.solve(evecs, j_proc_loc.dot(evecs))
         associations[:,i] = np.abs(np.diag(j_proc_j_basis))
     for i in range(10):
-        assoc_norm = la.norm(associations[i,:], 1)
+        assoc_norm = associations[i,:].sum()
         if assoc_norm != 0.:
             associations[i,:] /= assoc_norm
-    return tends, evals, evecs, associations
+    return tends, tend_norm, evals, evecs, associations
 
 def calculate_indices(tends, evals, evecs):
     strengths = la.solve(evecs, tends["Total"])
     strengths /= la.norm(strengths, 1)
-    participations = np.zeros((len(evals), len(ind)))
-    for j in range(len(ind)):
-        participations[:,j] = la.solve(evecs, tends[short_names[j]])
+    participations = np.zeros((len(evals), nproc))
+    for j in range(nproc):
+        participations[:,j] = np.real(la.solve(evecs, tends[short_names[j]]))
     for i in range(len(evals)):
         part_norm = la.norm(participations[i,:], 1)
         str_sign = np.sign(np.real(strengths[i]))
@@ -456,61 +458,21 @@ def calculate_indices(tends, evals, evecs):
         participations[i,:] /= part_norm * str_sign
     return (strengths, participations)
 
-def evec_bar_graph(evals, strengths, participations):
-    width = 0.08
-    bar_plots = []
-    for i in range(len(evals)):
-        bar_plots.append(plt.bar(ind + width*i, participations[i,:], width))
-
-    ax = plt.gca()
-    ax.set_xticks(ind)
-    ax.set_xticklabels((process_names[name] for name in short_names),
-                       size='xx-small', rotation='vertical', wrap=True)
-    ax.tick_params('x', direction='out', pad=25)
-    plt.subplots_adjust(bottom=0.18)
-    plt.legend(bar_plots, ("Timescale={: .2e}s,Strength={: .2e}".format(1./evalue, np.abs(strength))
-                           for evalue, strength in zip(evals, strengths)),
-               loc='best', fontsize='xx-small')
-    plt.savefig('./evecs.eps')
-    plt.close()
-
-# For examining a given point
-#tends, evals, evecs = get_modes_at_level(54)
-#strengths, participations = calculate_indices(tends, evals, evecs)
-
-#evec_bar_graph(evals, strengths, participations)
-
 min_t = 1.e-2
 max_t = 1.e5
-cutoff1 = 0.1
 cutoff2 = 0.5
-cutoff3 = 0.9
 tend_cutoff = 1.e-10
-num_columns = 128
+#num_columns = 48602
 
-plt.autoscale(tight=True)
-
-evalues_all = [[] for i in range(ncluster)]
-evalues1 = [dict() for i in range(ncluster)]
-evalues2 = [dict() for i in range(ncluster)]
-evalues3 = [dict() for i in range(ncluster)]
-evalue_correlation = dict()
-cluster_cases = [0 for i in range(ncluster)]
-for name in short_names:
-    for j in range(ncluster):
-        evalues1[j][name] = []
-        evalues2[j][name] = []
-        evalues3[j][name] = []
-    evalue_correlation[name] = dict()
-    for name2 in short_names:
-        evalue_correlation[name][name2] = 0.
+grid_cells = []
 
 tend_norms = []
 
 singular_counter = 0
 
-for column in range(num_columns):
-#    if column % 16 == 0:
+num_above_cutoff = 0
+
+for column in range(start_column, end_column+1):
     print("On column: ", column, file=sys.stderr)
     t_loc[:,:] = t[0,:,column]
     q_loc[:,:] = q[0,:,column]
@@ -540,413 +502,67 @@ for column in range(num_columns):
                                       qs_loc, precipf_loc, liqcldf_loc,
                                       icecldf_loc, mgncol=1, nlev=lev)
     for level in range(lev):
-        c = label[0,level,column]
-        tends, evals, evecs, associations = get_modes_at_level(level)
-        tot_t = tends["Total"]
-        tend_norm = (abs(tot_t[iq]) + abs(tot_t[iqc]) + abs(tot_t[iqi]) +
-                     abs(tot_t[iqr]) + abs(tot_t[iqs])) / 2.
+        tends, tend_norm, evals, evecs, associations = get_modes_at_level(level)
         tend_norms.append(tend_norm)
         if tend_norm < tend_cutoff:
             continue
+        num_above_cutoff += 1
         try:
             strengths, participations = calculate_indices(tends, evals, evecs)
         except la.LinAlgError:
             singular_counter += 1
             print("Singular matrix or something. Ahhhh!")
             continue
-        cluster_cases[c] += 1
-        for i in range(len(evals)):
-            evalues_all[c].append(np.real(evals[i]))
-            for j in range(len(short_names)):
-                if np.abs(associations[i,j]) >= cutoff1:
-                    evalues1[c][short_names[j]].append(np.real(evals[i]))
-                    if np.abs(associations[i,j]) >= cutoff2:
-                        if np.real(evals[i]) < -0.1:
-                            evalues2[c][short_names[j]].append(np.real(evals[i]))
-                            for j2 in range(len(short_names)):
-                                evalue_correlation[short_names[j]][short_names[j2]] += np.abs(associations[i,j2])
-                        if np.abs(associations[i,j]) >= cutoff3:
-                            evalues3[c][short_names[j]].append(np.real(evals[i]))
+        this_cell = dict()
+        this_cell["coords"] = np.array((column, level))
+        this_cell["tends"] = tends
+        this_cell["evals"] = evals
+        this_cell["participations"] = participations
+        this_cell["associations"] = associations
+        grid_cells.append(this_cell)
 
-#Convert the correlation sum to an average.
-evalue_corr_array = np.zeros((len(short_names),len(short_names)))
-for i in range(len(short_names)):
-    num_evalues = 0
-    for c in range(ncluster):
-        num_evalues += len(evalues2[c][short_names[i]])
-    if num_evalues == 0:
-        continue
-    for j in range(len(short_names)):
-        evalue_corr_array[i,j] = evalue_correlation[short_names[i]][short_names[j]] / num_evalues
-        if i == j:
-            evalue_corr_array[i,j] -= 0.5
+num_cell = len(grid_cells)
 
-# Number of bins for plotting purposes.
-nbins = 50
+out_file = nc4.Dataset(OUT_FILE_NAME, 'w')
+out_file.createDimension("num_cell", num_cell)
+out_file.createDimension("ncoords", 2)
+out_file.createDimension("nproc", nproc)
+out_file.createDimension("nvars", 10)
+out_file.createDimension("name_len", 5)
 
-for c in range(ncluster):
-    print("Number of cases in cluster {} is {}.".format(c, cluster_cases[c]))
+out_file.createVariable("process_names", "S1", ("nproc", "name_len"))
+out_file["process_names"]._Encoding = "ascii"
+process_name_data = np.array(short_names, dtype="S5")
+out_file["process_names"][:] = nc4.stringtochar(process_name_data)
 
-cmap = plt.get_cmap('Reds')
+out_file.createVariable("cell_coords", "u4", ("num_cell", "ncoords"))
+out_file.createVariable("total_rates", "f8", ("num_cell", "nvars"))
+out_file.createVariable("process_rates", "f8", ("num_cell", "nvars", "nproc"))
 
-# Histogram of all positive eigenvalues.
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-evalues_all_clusters = []
-evalues_all_anadj = []
-for c in range(ncluster):
-    evalues_all_clusters += [t for t in evalues_all[c] if t > 1./max_t and t < 1./min_t]
-    evalues_all_anadj += [t for t in evalues2[c]['anadj'] if t > 1./max_t and t < 1./min_t]
-evalues_all_nonanadj = evalues_all_clusters[:]
-for e in evalues_all_anadj:
-    evalues_all_nonanadj.remove(e)
-plt.hist(evalues_all_clusters, bins=bins)
-plt.hist(evalues_all_nonanadj, bins=bins)
-plt.title("Number of positive eigenvalues \n(based on {} modes)"
-          .format(len(evalues_all_clusters)))
-plt.gca().set_xscale("log")
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./max_t, 1./min_t)
-plt.ylabel("Number of modes")
-plt.savefig('./time_hist_all_values_pos_new.eps')
-plt.close()
+# Build complex type.
+complex128 = np.dtype([("real", np.float64), ("imag", np.float64)])
+c128 = out_file.createCompoundType(complex128, "c128")
 
-# Histogram of all negative eigenvalues.
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-evalues_all_clusters = []
-evalues_all_anadj = []
-for c in range(ncluster):
-    evalues_all_clusters += [-t for t in evalues_all[c] if -t > 1./max_t and -t < 1./min_t]
-    evalues_all_anadj += [-t for t in evalues2[c]['anadj'] if -t > 1./max_t and -t < 1./min_t]
-evalues_all_nonanadj = evalues_all_clusters[:]
-for e in evalues_all_anadj:
-    evalues_all_nonanadj.remove(e)
-plt.hist(evalues_all_clusters, bins=bins)
-plt.hist(evalues_all_nonanadj, bins=bins)
-plt.title("Number of negative eigenvalues \n(based on {} modes)"
-          .format(len(evalues_all_clusters)))
-plt.gca().set_xscale("log")
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./min_t, 1./max_t)
-plt.ylabel("Number of modes")
-plt.savefig('./time_hist_all_values_neg_new.eps')
-plt.close()
+out_file.createVariable("eigenvalues", c128, ("num_cell", "nvars"))
+out_file.createVariable("associations", "f8", ("num_cell", "nvars", "nproc"))
+out_file.createVariable("participations", "f8", ("num_cell", "nvars", "nproc"))
 
-# Histogram of all near-zero eigenvalues.
-bins = np.linspace(-1./max_t, 1./max_t, nbins+1)
-evalues_all_clusters = []
-evalues_all_anadj = []
-for c in range(ncluster):
-    evalues_all_clusters += [t for t in evalues_all[c] if t <= 1./max_t and t >= -1./max_t]
-    evalues_all_anadj += [t for t in evalues2[c]['anadj'] if t <= 1./max_t and t >= -1./max_t]
-evalues_all_nonanadj = evalues_all_clusters[:]
-for e in evalues_all_anadj:
-    evalues_all_nonanadj.remove(e)
-plt.hist(evalues_all_clusters, bins=bins)
-plt.hist(evalues_all_nonanadj, bins=bins)
-plt.title("Number of near-zero eigenvalues \n(based on {} modes)"
-          .format(len(evalues_all_clusters)))
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(-1./max_t, 1./max_t)
-plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-plt.ylabel("Number of modes")
-plt.savefig('./time_hist_all_values_n0_new.eps')
-plt.close()
+for i in range(num_cell):
+    cell = grid_cells[i]
+    out_file["cell_coords"][i,:] = cell["coords"]
+    out_file["total_rates"][i,:] = cell["tends"]["Total"]
+    for j in range(nproc):
+        out_file["process_rates"][i,:,j] = cell["tends"][short_names[j]]
+    evals = np.empty((10,), complex128)
+    evals["real"] = cell["evals"].real
+    evals["imag"] = cell["evals"].imag
+    out_file["eigenvalues"][i,:] = evals
+    out_file["associations"][i,:,:] = cell["associations"]
+    out_file["participations"][i,:,:] = cell["participations"]
 
-# Now broken out by cluster.
-cind = np.arange(ncluster+1)
+out_file.tendency_cutoff = tend_cutoff
 
-# Histogram of all positive eigenvalues.
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-hist_values = np.zeros((ncluster, nbins))
-for c in range(ncluster):
-    hist_values[c,:], _ = np.histogram([t for t in evalues_all[c] if t > 1./max_t and t < 1./min_t], bins=bins)
-    row_norm = hist_values[c,:].sum()
-    print("Cluster {} has {} positive eigenvalues.".format(c, row_norm))
-    if row_norm != 0:
-        hist_values[c,:] /= row_norm
-plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of positive eigenvalues by process \n(based on {} modes)"
-          .format(len(evalues_all_clusters)))
-plt.gca().set_xscale("log")
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./max_t, 1./min_t)
-plt.ylabel("Cluster Index")
-plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
-plt.savefig('./time_hist_cluster_2D_pos_new.eps')
-plt.close()
-
-# Histogram of all negative eigenvalues.
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-hist_values = np.zeros((ncluster, nbins))
-for c in range(ncluster):
-    hist_values[c,:], _ = np.histogram([-t for t in evalues_all[c] if -t > 1./max_t and -t < 1./min_t], bins=bins)
-    row_norm = hist_values[c,:].sum()
-    print("Cluster {} has {} negative eigenvalues.".format(c, row_norm))
-    if row_norm != 0:
-        hist_values[c,:] /= row_norm
-plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of negative eigenvalues by process \n(based on {} modes)"
-          .format(len(evalues_all_clusters)))
-plt.gca().set_xscale("log")
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./min_t, 1./max_t)
-plt.ylabel("Cluster Index")
-plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
-plt.savefig('./time_hist_cluster_2D_neg_new.eps')
-plt.close()
-
-# Histogram of all near-zero eigenvalues.
-bins = np.linspace(-1./max_t, 1./max_t, nbins+1)
-hist_values = np.zeros((ncluster, nbins))
-for c in range(ncluster):
-    hist_values[c,:], _ = np.histogram([t for t in evalues_all[c] if t <= 1./max_t and t >= -1./max_t], bins=bins)
-    row_norm = hist_values[c,:].sum()
-    print("Cluster {} has {} near-zero eigenvalues.".format(c, row_norm))
-    if row_norm != 0:
-        hist_values[c,:] /= row_norm
-plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of near-zero eigenvalues by process \n(based on {} modes)"
-          .format(len(evalues_all_clusters)))
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(-1./max_t, 1./max_t)
-plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-plt.ylabel("Cluster Index")
-plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
-plt.savefig('./time_hist_cluster_2D_n0_new.eps')
-plt.close()
-
-# Now broken up by process.
-pind = np.arange(len(ind)+1)
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-hist_values = np.zeros((len(short_names), nbins))
-for i in range(len(short_names)):
-    pos_evalues = []
-    for c in range(ncluster):
-        pos_evalues += [t for t in evalues2[c][short_names[i]] if t > 1./max_t and t < 1./min_t]
-    hist_values[i,:], _ = np.histogram(pos_evalues, bins=bins)
-    row_norm = hist_values[i,:].sum()
-    print("Process {} has {} positive eigenvalues.".format(process_names[short_names[i]], row_norm))
-    if row_norm != 0:
-        hist_values[i,:] /= row_norm
-plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of positive eigenvalues by process")
-plt.gca().set_xscale("log")
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./max_t, 1./min_t)
-ax = plt.gca()
-ax.set_yticks(pind)
-ax.set_yticklabels((process_names[name] for name in short_names),
-                   size='small', wrap=True)
-ax.tick_params('y', direction='out')
-plt.subplots_adjust(left=0.25)
-plt.ylabel("Process")
-plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
-plt.savefig('./time_hist_process_2D_pos_new.eps')
-plt.close()
-
-# Histogram of all negative eigenvalues.
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-hist_values = np.zeros((len(short_names), nbins))
-for i in range(len(short_names)):
-    neg_evalues = []
-    for c in range(ncluster):
-        neg_evalues += [-t for t in evalues2[c][short_names[i]] if -t > 1./max_t and -t < 1./min_t]
-    hist_values[i,:], _ = np.histogram(neg_evalues, bins=bins)
-    row_norm = hist_values[i,:].sum()
-    print("Process {} has {} negative eigenvalues.".format(process_names[short_names[i]], row_norm))
-    if row_norm != 0:
-        hist_values[i,:] /= row_norm
-plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of negative eigenvalues by process")
-plt.gca().set_xscale("log")
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./min_t, 1./max_t)
-ax = plt.gca()
-ax.set_yticks(pind)
-ax.set_yticklabels((process_names[name] for name in short_names),
-                   size='small', wrap=True)
-ax.tick_params('y', direction='out')
-plt.subplots_adjust(left=0.25)
-plt.ylabel("Process")
-plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
-plt.savefig('./time_hist_process_2D_neg_new.eps')
-plt.close()
-
-# Histogram of all near-zero eigenvalues.
-bins = np.linspace(-1./max_t, 1./max_t, nbins+1)
-hist_values = np.zeros((len(short_names), nbins))
-for i in range(len(short_names)):
-    n0_evalues = []
-    for c in range(ncluster):
-        n0_evalues += [t for t in evalues2[c][short_names[i]] if t <= 1./max_t and t >= -1./max_t]
-    hist_values[i,:], _ = np.histogram(n0_evalues, bins=bins)
-    row_norm = hist_values[i,:].sum()
-    print("Process {} has {} non-zero eigenvalues.".format(process_names[short_names[i]], row_norm))
-    if row_norm != 0:
-        hist_values[i,:] /= row_norm
-plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of near-zero eigenvalues by process")
-plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(-1./max_t, 1./max_t)
-plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-ax = plt.gca()
-ax.set_yticks(pind)
-ax.set_yticklabels((process_names[name] for name in short_names),
-                   size='small', wrap=True)
-ax.tick_params('y', direction='out')
-plt.subplots_adjust(left=0.25)
-plt.ylabel("Process")
-plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
-plt.savefig('./time_hist_process_2D_n0_new.eps')
-plt.close()
-
-# Correlation array.
-print("==========evalue_corr_array==========")
-print(evalue_corr_array)
-print("=====================================")
-plt.pcolor(pind, pind, evalue_corr_array, edgecolors='k', cmap=cmap)
-plt.title("Degree of association between given modes by primary process")
-ax = plt.gca()
-ax.set_xticks(pind)
-ax.set_xticklabels((process_names[name] for name in short_names),
-                   size='small', rotation='vertical', wrap=True)
-ax.tick_params('x', direction='out', pad=40)
-plt.subplots_adjust(bottom=0.25)
-plt.xlabel("Process with given cutoff")
-ax.set_yticks(pind)
-ax.set_yticklabels((process_names[name] for name in short_names),
-                   size='small', wrap=False)
-ax.tick_params('y', direction='out')
-plt.subplots_adjust(left=0.25)
-plt.ylabel("Primary process")
-plt.colorbar()
-plt.savefig('./process_association_new.eps')
-plt.close()
-
-
-# Cluster and process.
-for c in range(ncluster):
-    pos_evalues1 = {}
-    pos_evalues2 = {}
-    pos_evalues3 = {}
-    hist_values = np.zeros((len(short_names)-1, nbins))
-    bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-
-    nmodes = 0
-
-    for i in range(len(short_names)):
-        process = short_names[i]
-        if process == 'anadj':
-            continue
-        pos_evalues1[process] = np.array([t for t in evalues1[c][process] if t > 1./max_t and t < 1./min_t])
-        pos_evalues2[process] = np.array([t for t in evalues2[c][process] if t > 1./max_t and t < 1./min_t])
-        pos_evalues3[process] = np.array([t for t in evalues3[c][process] if t > 1./max_t and t < 1./min_t])
-        #if len(pos_evalues1[process]) == 0:
-        #    continue
-        nmodes += len(pos_evalues2[process])
-        hist_values[i,:], _ = np.histogram(pos_evalues2[process], bins=bins)
-        #plt.hist(pos_evalues1[process], bins=bins)
-        #if len(pos_evalues2[process]) != 0:
-        #    plt.hist(pos_evalues2[process], bins=bins)
-        #    if len(pos_evalues3[process]) != 0:
-        #        plt.hist(pos_evalues3[process], bins=bins)
-
-
-    plt.pcolor(bins, ind, hist_values, edgecolors='k', cmap=cmap)
-    plt.title("Number of positive eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
-              .format(c,
-                      nmodes,
-                      cutoff2))
-    plt.gca().set_xscale("log")
-    plt.xlabel("Eigenvalue (1/s)")
-    plt.xlim(1./max_t, 1./min_t)
-    ax = plt.gca()
-    ax.set_yticks(ind)
-    # ANADJ kludge: leave out last again.
-    ax.set_yticklabels((process_names[name] for name in short_names[:-1]),
-                       size='small', wrap=True)
-    ax.tick_params('y', direction='out')
-    plt.subplots_adjust(left=0.25)
-    plt.colorbar()
-    plt.savefig('./time_hist_2D_pos_c{}_new.eps'.format(c))
-    plt.close()
-
-    neg_evalues2 = {}
-    hist_values = np.zeros((len(short_names)-1, nbins))
-    bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
-
-    nmodes = 0
-
-    for i in range(len(short_names)):
-        process = short_names[i]
-        if process == 'anadj':
-            continue
-        neg_evalues2[process] = np.array([-t for t in evalues2[c][process] if -t > 1./max_t and -t < 1./min_t])
-        nmodes += len(neg_evalues2[process])
-        hist_values[i,:], _ = np.histogram(neg_evalues2[process], bins=bins)
-
-    meshind, meshbins = np.meshgrid(ind, bins)
-
-    plt.pcolor(bins, ind, hist_values, edgecolors='k', cmap=cmap)
-    plt.title("Number of negative eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
-              .format(c,
-                      nmodes,
-                      cutoff2))
-    plt.gca().set_xscale("log")
-    plt.xlabel("Eigenvalue (1/s)")
-    plt.xlim(1./min_t, 1./max_t)
-    ax = plt.gca()
-    ax.set_yticks(ind)
-    # ANADJ kludge: leave out last again.
-    ax.set_yticklabels((process_names[name] for name in short_names[:-1]),
-                       size='small', wrap=True)
-    ax.tick_params('y', direction='out')
-    plt.subplots_adjust(left=0.25)
-    plt.colorbar()
-    plt.savefig('./time_hist_2D_neg_c{}_new.eps'.format(c))
-    plt.close()
-
-    n0_evalues2 = {}
-    hist_values = np.zeros((len(short_names)-1, nbins))
-    bins = np.linspace(-1./max_t, 1./max_t, nbins+1)
-
-    nmodes = 0
-
-    for i in range(len(short_names)):
-        process = short_names[i]
-        if process == 'anadj':
-            continue
-        n0_evalues2[process] = np.array([t for t in evalues2[c][process] if t <= 1./max_t and t >= -1./max_t])
-        nmodes += len(n0_evalues2[process])
-        hist_values[i,:], _ = np.histogram(n0_evalues2[process], bins=bins)
-
-    meshind, meshbins = np.meshgrid(ind, bins)
-
-    plt.pcolor(bins, ind, hist_values, edgecolors='k', cmap=cmap)
-    plt.title("Number of near-zero eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
-              .format(c,
-                      nmodes,
-                      cutoff2))
-    plt.xlabel("Eigenvalue (1/s)")
-    plt.xlim(-1./max_t, 1./max_t)
-    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-    #plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-    ax = plt.gca()
-    ax.set_yticks(ind)
-    # ANADJ kludge: leave out last again.
-    ax.set_yticklabels((process_names[name] for name in short_names[:-1]),
-                       size='small', wrap=True)
-    ax.tick_params('y', direction='out')
-    plt.subplots_adjust(left=0.25)
-    plt.colorbar()
-    plt.savefig('./time_hist_2D_n0_c{}_new.eps'.format(c))
-    plt.close()
+out_file.close()
 
 
 # Tend plot
@@ -954,29 +570,9 @@ for c in range(ncluster):
 num_points = len(tend_norms)
 tend_norms = np.array([t for t in tend_norms if t > 0.])
 num_non0_points = len(tend_norms)
-bins = np.linspace(0., np.percentile(tend_norms, 80.), 50)
-
-plt.hist(tend_norms, bins=bins)
-plt.title("Number of grid points with given net water mass tendency")
-plt.xlabel("Net water tendency")
-plt.ylabel("Number of grid points")
-plt.savefig('./tend_hist_new.eps')
-plt.close()
-
-# Log version of plot
-
-bins = np.logspace(np.log10(tend_norms.min()), np.log10(tend_norms.max()), 50)
-
-plt.hist(tend_norms, bins=bins)
-plt.gca().set_xscale("log")
-plt.title("Number of grid points with given net water mass tendency")
-plt.xlabel("Net water tendency")
-plt.ylabel("Number of grid points")
-plt.savefig('./tend_hist_log_new.eps')
-plt.close()
 
 cutoff_score = stats.percentileofscore(tend_norms, tend_cutoff)
-print("Cutoff was {} ({}% of non-zero tendencies were below this).".format(tend_cutoff, cutoff_score))
+print("Cutoff was {} ({}% of non-zero tendencies were below this, {} points were above).".format(tend_cutoff, cutoff_score, num_above_cutoff))
 print("{}/{} grid points had non-zero water mass tendency.".format(num_non0_points, num_points))
 print("Minimum/Maximum tendency: ", tend_norms.min(), tend_norms.max())
 print("Number of grid points with singular matrix issues: ", singular_counter)
