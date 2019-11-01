@@ -2,3 +2,5 @@
 *.pyfe
 *.so
 *.eps
+*.png
+jacobian_log_*.txt

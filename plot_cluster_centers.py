@@ -19,7 +19,7 @@ cluster_centers = np.abs(cfile.variables["cluster_centers"][:,:])
 process_names = [
     "Rain Evap.",
     "Snow Subl.",
-    "Vapor/Ice DMS",
+    "Vapor/Ice Transfer",
     "Nucleation Dep.",
     "Berg. (Snow)",
     "Liq. Accr. Snow",

@@ -19,6 +19,9 @@ from mg2_constants import *
 blocksize = 4096
 num_files = 12
 end_column = 48601
+#blocksize = 4096
+#num_files = 1
+#end_column = 4095
 
 splits = [(blocksize*i, blocksize*(i+1)-1) for i in range(num_files)]
 splits[-1] = (splits[-1][0], end_column)
@@ -87,7 +90,7 @@ short_names = [
 process_names = {
     "revap": "Rain Evap.",
     "ssubl": "Snow Subl.",
-    "vdepo": "Vapor/Ice DMS",
+    "vdepo": "Vapor/Ice Transfer",
     "vnudp": "Nucleation Dep.",
     "cbrgs": "Berg. (Snow)",
     "cacws": "Liq. Accr. Snow",
@@ -152,8 +155,15 @@ for efile in efiles:
     for ci in range(num_cell):
         column = efile["cell_coords"][ci,0]
         level = efile["cell_coords"][ci,1]
-        evals = efile["eigenvalues"][ci,:]["real"]
         tends = efile["process_rates"][ci,:,:]
+        # Actually use the eigenvalues
+        evals = efile["eigenvalues"][ci,:]["real"]
+        # Process tendency association method
+        #total_tends = efile["total_rates"][ci,:]
+        #associations = np.zeros((10, nproc))
+        #for j in range(nproc):
+        #    associations[:,j] = calc_twmd(tends[:,j]) / calc_twmd(total_tends)
+        # Regular association method
         associations = efile["associations"][ci,:,:]
         c = label[0,level,column]
         cluster_cases[c] += 1
@@ -202,12 +212,12 @@ for c in range(ncluster):
 plt.hist(evalues_all_clusters, bins=bins)
 plt.hist(evalues_all_rel, bins=bins)
 plt.hist(evalues_all_assoc, bins=bins)
-plt.title("Number of positive eigenvalues \n(based on {} modes)"
+plt.title("Number of positive eigenvalues \n(based on {} eigenvalues)"
           .format(len(evalues_all_clusters)))
 plt.gca().set_xscale("log")
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(1./max_t, 1./min_t)
-plt.ylabel("Number of modes")
+plt.ylabel("Number of eigenvalues")
 plt.savefig('./time_hist_all_values_pos.eps')
 plt.close()
 
@@ -225,12 +235,12 @@ plt.hist(evalues_all_clusters, bins=bins)
 plt.hist(evalues_all_rel, bins=bins)
 plt.hist(evalues_all_assoc, bins=bins)
 plt.axvline(x=1./300., color='k', linewidth=2.)
-plt.title("Number of negative eigenvalues \n(based on {} modes)"
+plt.title("Number of negative eigenvalues \n(based on {} eigenvalues)"
           .format(len(evalues_all_clusters)))
 plt.gca().set_xscale("log")
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(1./min_t, 1./max_t)
-plt.ylabel("Number of modes")
+plt.ylabel("Number of eigenvalues")
 plt.savefig('./time_hist_all_values_neg.eps')
 plt.close()
 
@@ -247,12 +257,12 @@ for c in range(ncluster):
 plt.hist(evalues_all_clusters, bins=bins)
 plt.hist(evalues_all_rel, bins=bins)
 plt.hist(evalues_all_assoc, bins=bins)
-plt.title("Number of near-zero eigenvalues \n(based on {} modes)"
+plt.title("Number of near-zero eigenvalues \n(based on {} eigenvalues)"
           .format(len(evalues_all_clusters)))
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(-1./max_t, 1./max_t)
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-plt.ylabel("Number of modes")
+plt.ylabel("Number of eigenvalues")
 plt.savefig('./time_hist_all_values_n0.eps')
 plt.close()
 
@@ -266,7 +276,7 @@ eig_count = []
 for c in range(ncluster):
     hist_values[c,:], _ = np.histogram([t for t in evalues_all[c] if t > 1./max_t and t < 1./min_t], bins=bins)
     row_norm = hist_values[c,:].sum()
-    eig_count.append(row_norm)
+    eig_count.append(int(row_norm))
     if row_norm != 0:
         hist_values[c,:] /= row_norm
 plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
@@ -281,23 +291,24 @@ ax.set_yticks(cind)
 ax.set_yticklabels([str(i) for i in cind[:-1]],
                    fontdict={'verticalalignment': 'bottom'})
 ax.tick_params('y', direction='out')
+plt.clim(vmin=0., vmax=0.2)
+plt.colorbar(pad=0.1)
 ax2 = ax.twinx()
 ax2.set_yticks(cind)
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'bottom'})
-ax2.tick_params('y', direction='out')
-plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
 plt.savefig('./time_hist_cluster_2D_pos.eps')
 plt.close()
 
 # Histogram of all negative eigenvalues.
 bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
 hist_values = np.zeros((ncluster, nbins))
+eig_count = []
 for c in range(ncluster):
     hist_values[c,:], _ = np.histogram([-t for t in evalues_all[c] if -t > 1./max_t and -t < 1./min_t], bins=bins)
     row_norm = hist_values[c,:].sum()
     print("Cluster {} has {} negative eigenvalues.".format(c, row_norm))
+    eig_count.append(int(row_norm))
     if row_norm != 0:
         hist_values[c,:] /= row_norm
 plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
@@ -314,17 +325,23 @@ ax.set_yticklabels([str(i) for i in cind[:-1]],
                    fontdict={'verticalalignment': 'bottom'})
 ax.tick_params('y', direction='out')
 plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
+plt.colorbar(pad=0.15)
+ax2 = ax.twinx()
+ax2.set_yticks(cind)
+ax2.set_yticklabels([str(i) for i in eig_count],
+                    fontdict={'verticalalignment': 'bottom'})
 plt.savefig('./time_hist_cluster_2D_neg.eps')
 plt.close()
 
 # Histogram of all near-zero eigenvalues.
 bins = np.linspace(-1./max_t, 1./max_t, nbins+1)
 hist_values = np.zeros((ncluster, nbins))
+eig_count = []
 for c in range(ncluster):
     hist_values[c,:], _ = np.histogram([t for t in evalues_all[c] if t <= 1./max_t and t >= -1./max_t], bins=bins)
     row_norm = hist_values[c,:].sum()
     print("Cluster {} has {} near-zero eigenvalues.".format(c, row_norm))
+    eig_count.append(int(row_norm))
     if row_norm != 0:
         hist_values[c,:] /= row_norm
 plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
@@ -340,7 +357,11 @@ ax.set_yticklabels([str(i) for i in cind[:-1]],
                    fontdict={'verticalalignment': 'bottom'})
 ax.tick_params('y', direction='out')
 plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
+plt.colorbar(pad=0.1)
+ax2 = ax.twinx()
+ax2.set_yticks(cind)
+ax2.set_yticklabels([str(i) for i in eig_count],
+                    fontdict={'verticalalignment': 'bottom'})
 plt.savefig('./time_hist_cluster_2D_n0.eps')
 plt.close()
 
@@ -348,12 +369,14 @@ plt.close()
 pind = np.arange(nproc, -1, -1)
 bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
 hist_values = np.zeros((nproc, nbins))
+eig_count = []
 for i in range(nproc):
     pos_evalues = []
     for c in range(ncluster):
         pos_evalues += [t for t in evalues2[c][short_names[i]] if t > 1./max_t and t < 1./min_t]
     hist_values[i,:], _ = np.histogram(pos_evalues, bins=bins)
     row_norm = hist_values[i,:].sum()
+    eig_count.append(int(row_norm))
     print("Process {} has {} positive eigenvalues.".format(process_names[short_names[i]], row_norm))
     if row_norm != 0:
         hist_values[i,:] /= row_norm
@@ -371,19 +394,25 @@ ax.tick_params('y', direction='out')
 plt.subplots_adjust(left=0.25)
 plt.ylabel("Process")
 plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
+plt.colorbar(pad=0.14)
+ax2 = ax.twinx()
+ax2.set_yticks(pind)
+ax2.set_yticklabels([str(i) for i in eig_count],
+                    fontdict={'verticalalignment': 'top'})
 plt.savefig('./time_hist_process_2D_pos.eps')
 plt.close()
 
 # Histogram of all negative eigenvalues.
 bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
 hist_values = np.zeros((nproc, nbins))
+eig_count = []
 for i in range(nproc):
     neg_evalues = []
     for c in range(ncluster):
         neg_evalues += [-t for t in evalues2[c][short_names[i]] if -t > 1./max_t and -t < 1./min_t]
     hist_values[i,:], _ = np.histogram(neg_evalues, bins=bins)
     row_norm = hist_values[i,:].sum()
+    eig_count.append(int(row_norm))
     print("Process {} has {} negative eigenvalues.".format(process_names[short_names[i]], row_norm))
     if row_norm != 0:
         hist_values[i,:] /= row_norm
@@ -402,19 +431,25 @@ ax.tick_params('y', direction='out')
 plt.subplots_adjust(left=0.25)
 plt.ylabel("Process")
 plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
+plt.colorbar(pad=0.16)
+ax2 = ax.twinx()
+ax2.set_yticks(pind)
+ax2.set_yticklabels([str(i) for i in eig_count],
+                    fontdict={'verticalalignment': 'top'})
 plt.savefig('./time_hist_process_2D_neg.eps')
 plt.close()
 
 # Histogram of all near-zero eigenvalues.
 bins = np.linspace(-1./max_t, 1./max_t, nbins+1)
 hist_values = np.zeros((nproc, nbins))
+eig_count = []
 for i in range(nproc):
     n0_evalues = []
     for c in range(ncluster):
         n0_evalues += [t for t in evalues2[c][short_names[i]] if t <= 1./max_t and t >= -1./max_t]
     hist_values[i,:], _ = np.histogram(n0_evalues, bins=bins)
     row_norm = hist_values[i,:].sum()
+    eig_count.append(int(row_norm))
     print("Process {} has {} non-zero eigenvalues.".format(process_names[short_names[i]], row_norm))
     if row_norm != 0:
         hist_values[i,:] /= row_norm
@@ -432,7 +467,11 @@ ax.tick_params('y', direction='out')
 plt.subplots_adjust(left=0.25)
 plt.ylabel("Process")
 plt.clim(vmin=0., vmax=0.2)
-plt.colorbar()
+plt.colorbar(pad=0.1)
+ax2 = ax.twinx()
+ax2.set_yticks(pind)
+ax2.set_yticklabels([str(i) for i in eig_count],
+                    fontdict={'verticalalignment': 'top'})
 plt.savefig('./time_hist_process_2D_n0.eps')
 plt.close()
 
@@ -441,7 +480,7 @@ print("==========evalue_corr_array==========")
 print(evalue_corr_array)
 print("=====================================")
 plt.pcolor(np.flipud(pind), pind, evalue_corr_array, edgecolors='k', cmap=cmap)
-plt.title("Degree of association between given modes by primary process")
+plt.title("Degree of association between given eigenvalues by primary process")
 ax = plt.gca()
 ax.set_xticks(np.flipud(pind))
 ax.set_xticklabels((process_names[name] for name in short_names),
@@ -476,7 +515,7 @@ for c in range(ncluster):
         hist_values[i,:], _ = np.histogram(pos_evalues2[process], bins=bins)
 
     plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
-    plt.title("Number of positive eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
+    plt.title("Number of positive eigenvalues for cluster {} \n(based on {} eigenvalues, cutoff={})"
               .format(c,
                       nmodes,
                       cutoff2))
@@ -511,7 +550,7 @@ for c in range(ncluster):
 
     plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
     plt.axvline(x=1./300., color='k', linewidth=2.)
-    plt.title("Number of negative eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
+    plt.title("Number of negative eigenvalues for cluster {} \n(based on {} eigenvalues, cutoff={})"
               .format(c,
                       nmodes,
                       cutoff2))
@@ -547,14 +586,13 @@ for c in range(ncluster):
             hist_values[i,:] /= row_norm
 
     plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
-    plt.title("Number of near-zero eigenvalues for cluster {} \n(based on {} modes, cutoff={})"
+    plt.title("Number of near-zero eigenvalues for cluster {} \n(based on {} eigenvalues, cutoff={})"
               .format(c,
                       nmodes,
                       cutoff2))
     plt.xlabel("Eigenvalue (1/s)")
     plt.xlim(-1./max_t, 1./max_t)
     plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
-    #plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
     ax = plt.gca()
     ax.set_yticks(pind)
     ax.set_yticklabels((process_names[name] for name in short_names),
@@ -567,4 +605,3 @@ for c in range(ncluster):
     plt.colorbar()
     plt.savefig('./time_hist_2D_n0_c{}.eps'.format(c))
     plt.close()
-

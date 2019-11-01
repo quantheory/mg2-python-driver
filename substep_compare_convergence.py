@@ -16,8 +16,10 @@ from mg2_constants import *
 
 import accumulator as acc
 
-HIST_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
-CLUSTER_FILE_NAME = "/g/g14/santos36/Data/MG2_data_collection.10_cluster_labels.0001-01-06-00000.nc"
+matplotlib.rcParams['lines.linewidth'] = 2.0
+
+HIST_FILE_NAME = "/home/santos/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
+CLUSTER_FILE_NAME = "/home/santos/Data/MG2_data_collection.10_cluster_labels.0001-01-06-00000.nc"
 
 hfile = nc4.Dataset(HIST_FILE_NAME, 'r')
 cfile = nc4.Dataset(CLUSTER_FILE_NAME, 'r')
@@ -374,9 +376,9 @@ def run_mg2_substepped(num_steps):
 
 ind = np.arange(len(short_names))
 
-#num_columns = 48602
-num_columns = 1024
-cluster = 3
+num_columns = 48602
+#num_columns = 1024
+cluster = 9
 max_power = 11
 
 plt.autoscale(tight=True)
@@ -408,7 +410,8 @@ auto_accr_steps = 1
 auto_steps = 1
 accr_steps = 1
 for column in range(num_columns):
-    print("On column: ", column)
+    if column % 10 == 0:
+        print("On column: ", column)
     t_loc[:,:] = t[0,:,column]
     q_loc[:,:] = q[0,:,column]
     qc_loc[:,:] = qc[0,:,column]
@@ -552,47 +555,51 @@ print("Coarse run mean twnt and dqr/dt: ", mean_twnt_coarse, mean_delqr_coarse)
 
 timesteps = 300. / (2 ** np.arange(max_power))
 
-plt.loglog(timesteps, mean_all_diffs, label='mean_all')
-plt.loglog(timesteps, mean_together_diffs, label='mean_together')
-plt.loglog(timesteps, mean_evap_diffs, label='mean_evap')
+plt.loglog(timesteps, mean_all_diffs, label='MG2')
+plt.loglog(timesteps, mean_together_diffs, label='Coupled Evap/Self-Col')
+plt.loglog(timesteps, mean_evap_diffs, label='Evaporation only')
 plt.loglog(timesteps, timesteps*mean_all_diffs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
+plt.title('Mean error in Cluster {}'.format(cluster))
 plt.xlabel('Timestep (s)')
-plt.ylabel('TWMT diff (g/kg/s)')
+plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='best')
 plt.savefig('substep_convergence_mean_c{}.eps'.format(cluster))
 plt.close()
 
-plt.loglog(timesteps, median_all_diffs, label='median_all')
-plt.loglog(timesteps, median_together_diffs, label='median_together')
-plt.loglog(timesteps, median_evap_diffs, label='median_evap')
+plt.loglog(timesteps, median_all_diffs, label='MG2')
+plt.loglog(timesteps, median_together_diffs, label='Coupled Evap/Self-Col')
+plt.loglog(timesteps, median_evap_diffs, label='Evaporation only')
 plt.loglog(timesteps, timesteps*median_all_diffs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
+plt.title('Median error in Cluster {}'.format(cluster))
 plt.xlabel('Timestep (s)')
-plt.ylabel('TWMT diff (g/kg/s)')
+plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='best')
 plt.savefig('substep_convergence_median_c{}.eps'.format(cluster))
 plt.close()
 
-plt.loglog(timesteps, max_all_diffs, label='max_all')
-plt.loglog(timesteps, max_together_diffs, label='max_together')
-plt.loglog(timesteps, max_evap_diffs, label='max_evap')
+plt.loglog(timesteps, max_all_diffs, label='MG2')
+plt.loglog(timesteps, max_together_diffs, label='Coupled Evap/Self-Col')
+plt.loglog(timesteps, max_evap_diffs, label='Evaporation only')
 plt.loglog(timesteps, timesteps*max_all_diffs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
+plt.title('Maximum error in Cluster {}'.format(cluster))
 plt.xlabel('Timestep (s)')
-plt.ylabel('TWMT diff (g/kg/s)')
+plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='best')
 plt.savefig('substep_convergence_max_c{}.eps'.format(cluster))
 plt.close()
 
-plt.loglog(timesteps, mean_all_dqrs, label='substep_all')
-plt.loglog(timesteps, mean_together_dqrs, label='substep_together')
-plt.loglog(timesteps, mean_evap_dqrs, label='substep_evap')
+plt.loglog(timesteps, mean_all_dqrs, label='MG2')
+plt.loglog(timesteps, mean_together_dqrs, label='Coupled Evap/Self-Col')
+plt.loglog(timesteps, mean_evap_dqrs, label='Evaporation only')
 plt.loglog(timesteps, timesteps*mean_all_dqrs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
+plt.title('Rain mass error in Cluster {}'.format(cluster))
 plt.xlabel('Timestep (s)')
 plt.ylabel('Rain tendency diff (g/kg/s)')
 plt.axis('tight')
