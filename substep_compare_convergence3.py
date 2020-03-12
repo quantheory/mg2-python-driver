@@ -364,6 +364,7 @@ def calc_twmt(diff1, diff2, deltat):
                  abs(diff_tends[iqr]) + abs(diff_tends[iqs])) / 2.
 
 flag = False
+ice_flag = False
 
 def run_mg2_substepped(num_steps):
     # Icky global usage.
@@ -371,11 +372,15 @@ def run_mg2_substepped(num_steps):
     timestep = 300./num_steps
     global flag
     flag = False
+    global ice_flag
+    ice_flag = False
     for m in range(num_steps):
         tends, drout, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
                                                               qr_loc, nr_loc, qs_loc, ns_loc)
         other_tends = tends["Total"] - tends["anadj"] - tends["cnact"] - tends["cauto"] - tends["caccr"]# - tends["rnagg"] - tends["revap"]
-        if abs(other_tends[iqi]) > 1.e-10 or abs(other_tends[iqs]) > 1.e-10 or abs(tends["revap"][iqr]) > 1.e-10:
+        if abs(other_tends[iqi]) > 1.e-10 or abs(other_tends[iqs]) > 1.e-10:
+            ice_flag = True
+        if abs(tends["revap"][iqr]) > 1.e-10:
             flag = True
         update_state(level, tends, timestep)
     #drout = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
@@ -385,8 +390,8 @@ def run_mg2_substepped(num_steps):
 
 ind = np.arange(len(short_names))
 
-num_columns = 48602
-#num_columns = 1024
+#num_columns = 48602
+num_columns = 1024
 cluster = 6
 max_power = 11
 
@@ -417,7 +422,7 @@ accr_dqr_acc = make_accs(max_power-1)
 
 coarse_qrs = []
 
-subsample_file = open('subsample_list.csv', 'w', encoding='ascii', newline='')
+subsample_file = open('subsample_list_icefilter.csv', 'w', encoding='ascii', newline='')
 subsample_writer = csv.writer(subsample_file)
 subsample_writer.writerow(['column', 'level'])
 
@@ -471,20 +476,18 @@ for column in range(num_columns):
         auto_steps = 1
         accr_steps = 1
         state_diff_ref = run_mg2_substepped(2**max_power)
-        if flag:
+        if ice_flag:
             continue
         mean_twnt_ref += calc_twmt(state_diff_ref, 0., 300.)
         mean_delqr_ref += state_diff_ref[iqr] / 300.
         state_diff_coarse = run_mg2_substepped(1)
         if flag:
-            print("Evap rate significant for coarse, but not fine, results.")
+            print("Evap rate significant for coarse results.")
             print("column, level: ", column, ",", level)
-            continue
         state_diff_coarse_ish = run_mg2_substepped(2)
         if flag:
             print("Evap rate significant for coarse-ish results.")
             print("column, level: ", column, ",", level)
-            continue
         number_grid_cells += 1
         subsample_writer.writerow([str(column), str(level)])
         mean_twnt_coarse += calc_twmt(state_diff_coarse, 0., 300.)
@@ -636,6 +639,8 @@ print("Reference mean twnt and dqr/dt: ", mean_twnt_ref, mean_delqr_ref)
 
 print("Coarse run mean twnt and dqr/dt: ", mean_twnt_coarse, mean_delqr_coarse)
 
+suffix = "_icefilter"
+
 timesteps = 300. / (2 ** np.arange(max_power))
 
 plt.loglog(timesteps, mean_all_diffs, label='MG2', color='b')
@@ -653,7 +658,7 @@ min_y = min(mean_all_diffs[-1], mean_auto_diffs[-1], mean_accr_diffs[-1],
 max_y = max(ref_line[0], mean_all_diffs[0])
 plt.axis([timesteps[-1], timesteps[0], min_y, 2.*max_y])
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_mean_c{}.eps'.format(cluster))
+plt.savefig('substep_convergence_mean_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, median_all_diffs, label='MG2', color='b')
@@ -668,7 +673,7 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_median_c{}.eps'.format(cluster))
+plt.savefig('substep_convergence_median_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, max_all_diffs, label='MG2', color='b')
@@ -683,7 +688,7 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_max_c{}.eps'.format(cluster))
+plt.savefig('substep_convergence_max_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, mean_all_dqrs, label='MG2', color='b')
@@ -698,12 +703,12 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Rain tendency diff (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_qr_c{}.eps'.format(cluster))
+plt.savefig('substep_convergence_qr_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.hist(coarse_qrs, bins=200)
 plt.xlabel('Final QR (g/kg)')
 plt.ylabel('Number of cases ({} total)'.format(number_grid_cells))
 plt.axis('tight')
-plt.savefig('post_300s_qr_c{}.eps'.format(cluster))
+plt.savefig('post_300s_qr_c{}{}.eps'.format(cluster,suffix))
 plt.close()

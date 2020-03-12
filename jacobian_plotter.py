@@ -23,6 +23,9 @@ end_column = 48601
 #num_files = 1
 #end_column = 4095
 
+timescale_type = 'eigenvalue'
+#timescale_type = 'depletion_time'
+
 splits = [(blocksize*i, blocksize*(i+1)-1) for i in range(num_files)]
 splits[-1] = (splits[-1][0], end_column)
 
@@ -34,6 +37,10 @@ efiles = []
 for name in EVALS_FILE_NAMES:
     efiles.append(nc4.Dataset(name, 'r'))
 cfile = nc4.Dataset(CLUSTER_FILE_NAME, 'r')
+
+if timescale_type == 'depletion_time':
+    HIST_FILE_NAME = "/home/santos/Data/MG2_data_collection.cam.h1.0001-01-06-00000.nc"
+    hfile = nc4.Dataset(HIST_FILE_NAME, 'r')
 
 nproc = len(efiles[0].dimensions['nproc'])
 ncluster = len(cfile.dimensions['ncluster'])
@@ -59,6 +66,20 @@ iqr = 6
 inr = 7
 iqs = 8
 ins = 9
+
+if timescale_type == 'depletion_time':
+    # Just a dumb way to get a 10-item list so we can change it.
+    hvars = list(range(10))
+    hvars[it] = hfile.variables["MG2IN_T"]
+    hvars[iq] = hfile.variables["MG2IN_Q"]
+    hvars[iqc] = hfile.variables["MG2IN_QC"]
+    hvars[inc] = hfile.variables["MG2IN_NC"]
+    hvars[iqi] = hfile.variables["MG2IN_QI"]
+    hvars[ini] = hfile.variables["MG2IN_NI"]
+    hvars[iqr] = hfile.variables["MG2IN_QR"]
+    hvars[inr] = hfile.variables["MG2IN_NR"]
+    hvars[iqs] = hfile.variables["MG2IN_QS"]
+    hvars[ins] = hfile.variables["MG2IN_NS"]
 
 def calc_twmd(vec):
     av = np.abs(vec)
@@ -111,10 +132,9 @@ process_names = {
 }
 
 # Need a way to translate processes in a different order.
-process_name_data = nc4.chartostring(efiles[0]["process_names"][:])
 name_map = np.zeros((nproc,), dtype='u4')
 for i in range(nproc):
-    name_string = process_name_data[i].decode("ascii")
+    name_string = efiles[0]["process_names"][i]
     for j in range(nproc):
         if name_string == short_names[j]:
             name_map[j] = i
@@ -128,6 +148,7 @@ cutoff2 = 0.5
 q_cutoff = 1.e-10
 # equivalent to number of large rain particles made of q_cutoff mass.
 n_cutoff = q_cutoff / (np.pi/6. * 1000. * (400.e-6)**3)
+print("Number cutoff (1/kg/s): ", n_cutoff)
 
 def process_is_relevant(tends):
     if calc_twmd(tends) >= q_cutoff:
@@ -156,27 +177,35 @@ for efile in efiles:
         column = efile["cell_coords"][ci,0]
         level = efile["cell_coords"][ci,1]
         tends = efile["process_rates"][ci,:,:]
-        # Actually use the eigenvalues
-        evals = efile["eigenvalues"][ci,:]["real"]
-        # Process tendency association method
-        #total_tends = efile["total_rates"][ci,:]
-        #associations = np.zeros((10, nproc))
-        #for j in range(nproc):
-        #    associations[:,j] = calc_twmd(tends[:,j]) / calc_twmd(total_tends)
-        # Regular association method
-        associations = efile["associations"][ci,:,:]
         c = label[0,level,column]
         cluster_cases[c] += 1
-        for i in range(10):
-            evalues_all[c].append(evals[i])
-            maxproc = np.argmax(associations[i,:])
-            if process_is_relevant(tends[:,maxproc]):
-                evalues_rel[c].append(evals[i])
-            for j in range(nproc):
-                if (associations[i,name_map[j]] >= cutoff2 and process_is_relevant(tends[:,name_map[j]])):
-                    evalues2[c][short_names[j]].append(np.real(evals[i]))
-                    for j2 in range(nproc):
-                        evalue_correlation[short_names[j]][short_names[j2]] += associations[i,name_map[j2]]
+        # Actually use the eigenvalues
+        if timescale_type == 'eigenvalue':
+            evals = efile["eigenvalues"][ci,:]["real"]
+            associations = efile["associations"][ci,:,:]
+            for i in range(10):
+                evalues_all[c].append(evals[i])
+                maxproc = np.argmax(associations[i,:])
+                if process_is_relevant(tends[:,maxproc]):
+                    evalues_rel[c].append(evals[i])
+                for j in range(nproc):
+                    if (associations[i,name_map[j]] >= cutoff2 and process_is_relevant(tends[:,name_map[j]])):
+                        evalues2[c][short_names[j]].append(np.real(evals[i]))
+                        for j2 in range(nproc):
+                            evalue_correlation[short_names[j]][short_names[j2]] += associations[i,name_map[j2]]
+        elif timescale_type == 'depletion_time':
+            for i in range(nproc):
+                if not process_is_relevant(tends[:,name_map[i]]):
+                    continue
+                timescale = 1.e100
+                for j in range(10):
+                    if tends[j,name_map[i]] < 0.:
+                        this_timescale = hvars[j][0, level, column] / tends[j,name_map[i]]
+                        if np.abs(this_timescale) < np.abs(timescale):
+                            timescale = this_timescale
+                evalues_all[c].append(1./timescale)
+                evalues_rel[c].append(1./timescale)
+                evalues2[c][short_names[i]].append(1./timescale)
 
 #Convert the correlation sum to an average.
 evalue_corr_array = np.zeros((nproc,nproc))
@@ -190,6 +219,11 @@ for i in range(nproc):
         evalue_corr_array[i,j] = evalue_correlation[short_names[i]][short_names[j]] / num_evalues
         if i == j:
             evalue_corr_array[i,j] -= 0.5
+
+if timescale_type == 'eigenvalue':
+    suffix = ''
+elif timescale_type == 'depletion_time':
+    suffix = '_depletion'
 
 # Number of bins for plotting purposes.
 nbins = 50
@@ -218,30 +252,30 @@ plt.gca().set_xscale("log")
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(1./max_t, 1./min_t)
 plt.ylabel("Number of eigenvalues")
-plt.savefig('./time_hist_all_values_pos.eps')
+plt.savefig('./time_hist_all_values_pos{}.eps'.format(suffix))
 plt.close()
 
 # Histogram of all negative eigenvalues.
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
+bins = -np.logspace(np.log10(1./min_t), np.log10(1./max_t), nbins+1)
 evalues_all_clusters = []
 evalues_all_rel = []
 evalues_all_assoc = []
 for c in range(ncluster):
-    evalues_all_clusters += [-t for t in evalues_all[c] if -t > 1./max_t and -t < 1./min_t]
-    evalues_all_rel += [-t for t in evalues_rel[c] if -t > 1./max_t and -t < 1./min_t]
+    evalues_all_clusters += [t for t in evalues_all[c] if t > -1./min_t and t < -1./max_t]
+    evalues_all_rel += [t for t in evalues_rel[c] if t > -1./min_t and t < -1./max_t]
     for name in short_names:
-        evalues_all_assoc += [-t for t in evalues2[c][name] if -t > 1./max_t and -t < 1./min_t]
-plt.hist(evalues_all_clusters, bins=bins)
-plt.hist(evalues_all_rel, bins=bins)
-plt.hist(evalues_all_assoc, bins=bins)
-plt.axvline(x=1./300., color='k', linewidth=2.)
+        evalues_all_assoc += [t for t in evalues2[c][name] if t > -1./min_t and t < -1./max_t]
+plt.hist(evalues_all_clusters, bins=bins, color='b', edgecolor='k')
+plt.hist(evalues_all_rel, bins=bins, color='g', edgecolor='k')
+plt.hist(evalues_all_assoc, bins=bins, color='r', edgecolor='k')
+plt.axvline(x=-1./300., color='k', linewidth=2.)
 plt.title("Number of negative eigenvalues \n(based on {} eigenvalues)"
           .format(len(evalues_all_clusters)))
-plt.gca().set_xscale("log")
+plt.gca().set_xscale("symlog", linthreshx=1./max_t)
 plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./min_t, 1./max_t)
+plt.xlim(-1./min_t, -1./max_t)
 plt.ylabel("Number of eigenvalues")
-plt.savefig('./time_hist_all_values_neg.eps')
+plt.savefig('./time_hist_all_values_neg{}.eps'.format(suffix))
 plt.close()
 
 # Histogram of all near-zero eigenvalues.
@@ -263,7 +297,7 @@ plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(-1./max_t, 1./max_t)
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
 plt.ylabel("Number of eigenvalues")
-plt.savefig('./time_hist_all_values_n0.eps')
+plt.savefig('./time_hist_all_values_n0{}.eps'.format(suffix))
 plt.close()
 
 # Now broken out by cluster.
@@ -297,27 +331,27 @@ ax2 = ax.twinx()
 ax2.set_yticks(cind)
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'bottom'})
-plt.savefig('./time_hist_cluster_2D_pos.eps')
+plt.savefig('./time_hist_cluster_2D_pos{}.eps'.format(suffix))
 plt.close()
 
 # Histogram of all negative eigenvalues.
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
+bins = -np.logspace(np.log10(1./min_t), np.log10(1./max_t), nbins+1)
 hist_values = np.zeros((ncluster, nbins))
 eig_count = []
 for c in range(ncluster):
-    hist_values[c,:], _ = np.histogram([-t for t in evalues_all[c] if -t > 1./max_t and -t < 1./min_t], bins=bins)
+    hist_values[c,:], _ = np.histogram([t for t in evalues_all[c] if -t > 1./max_t and -t < 1./min_t], bins=bins)
     row_norm = hist_values[c,:].sum()
     print("Cluster {} has {} negative eigenvalues.".format(c, row_norm))
     eig_count.append(int(row_norm))
     if row_norm != 0:
         hist_values[c,:] /= row_norm
 plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
-plt.axvline(x=1./300., color='k', linewidth=2.)
+plt.axvline(x=-1./300., color='k', linewidth=2.)
 plt.title("PDF of negative eigenvalues by cluster \n(based on {} eigenvalues)"
           .format(len(evalues_all_clusters)))
-plt.gca().set_xscale("log")
+plt.gca().set_xscale("symlog", linthreshx=1./max_t)
 plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./min_t, 1./max_t)
+plt.xlim(-1./min_t, -1./max_t)
 plt.ylabel("Cluster Index")
 ax = plt.gca()
 ax.set_yticks(cind)
@@ -330,7 +364,7 @@ ax2 = ax.twinx()
 ax2.set_yticks(cind)
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'bottom'})
-plt.savefig('./time_hist_cluster_2D_neg.eps')
+plt.savefig('./time_hist_cluster_2D_neg{}.eps'.format(suffix))
 plt.close()
 
 # Histogram of all near-zero eigenvalues.
@@ -362,7 +396,7 @@ ax2 = ax.twinx()
 ax2.set_yticks(cind)
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'bottom'})
-plt.savefig('./time_hist_cluster_2D_n0.eps')
+plt.savefig('./time_hist_cluster_2D_n0{}.eps'.format(suffix))
 plt.close()
 
 # Now broken up by process.
@@ -399,17 +433,17 @@ ax2 = ax.twinx()
 ax2.set_yticks(pind)
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'top'})
-plt.savefig('./time_hist_process_2D_pos.eps')
+plt.savefig('./time_hist_process_2D_pos{}.eps'.format(suffix))
 plt.close()
 
 # Histogram of all negative eigenvalues.
-bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
+bins = -np.logspace(np.log10(1./min_t), np.log10(1./max_t), nbins+1)
 hist_values = np.zeros((nproc, nbins))
 eig_count = []
 for i in range(nproc):
     neg_evalues = []
     for c in range(ncluster):
-        neg_evalues += [-t for t in evalues2[c][short_names[i]] if -t > 1./max_t and -t < 1./min_t]
+        neg_evalues += [t for t in evalues2[c][short_names[i]] if -t > 1./max_t and -t < 1./min_t]
     hist_values[i,:], _ = np.histogram(neg_evalues, bins=bins)
     row_norm = hist_values[i,:].sum()
     eig_count.append(int(row_norm))
@@ -417,11 +451,11 @@ for i in range(nproc):
     if row_norm != 0:
         hist_values[i,:] /= row_norm
 plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
-plt.axvline(x=1./300., color='k', linewidth=2.)
+plt.axvline(x=-1./300., color='k', linewidth=2.)
 plt.title("PDF of negative eigenvalues by process")
-plt.gca().set_xscale("log")
+plt.gca().set_xscale("symlog", linthreshx=1./max_t)
 plt.xlabel("Eigenvalue (1/s)")
-plt.xlim(1./min_t, 1./max_t)
+plt.xlim(-1./min_t, -1./max_t)
 ax = plt.gca()
 ax.set_yticks(pind)
 ax.set_yticklabels((process_names[name] for name in short_names),
@@ -436,7 +470,7 @@ ax2 = ax.twinx()
 ax2.set_yticks(pind)
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'top'})
-plt.savefig('./time_hist_process_2D_neg.eps')
+plt.savefig('./time_hist_process_2D_neg{}.eps'.format(suffix))
 plt.close()
 
 # Histogram of all near-zero eigenvalues.
@@ -472,7 +506,7 @@ ax2 = ax.twinx()
 ax2.set_yticks(pind)
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'top'})
-plt.savefig('./time_hist_process_2D_n0.eps')
+plt.savefig('./time_hist_process_2D_n0{}.eps'.format(suffix))
 plt.close()
 
 # Correlation array.
@@ -496,7 +530,7 @@ ax.tick_params('y', direction='out')
 plt.subplots_adjust(left=0.25)
 plt.ylabel("Primary process")
 plt.colorbar()
-plt.savefig('./process_association.eps')
+plt.savefig('./process_association{}.eps'.format(suffix))
 plt.close()
 
 
@@ -530,7 +564,7 @@ for c in range(ncluster):
     ax.tick_params('y', direction='out')
     plt.subplots_adjust(left=0.25)
     plt.colorbar()
-    plt.savefig('./time_hist_2D_pos_c{}.eps'.format(c))
+    plt.savefig('./time_hist_2D_pos_c{}{}.eps'.format(c, suffix))
     plt.close()
 
     neg_evalues2 = {}
@@ -567,7 +601,7 @@ for c in range(ncluster):
     plt.ylabel("Process")
     plt.clim(vmin=0., vmax=0.2)
     plt.colorbar()
-    plt.savefig('./time_hist_2D_neg_c{}.eps'.format(c))
+    plt.savefig('./time_hist_2D_neg_c{}{}.eps'.format(c, suffix))
     plt.close()
 
     n0_evalues2 = {}
@@ -603,5 +637,5 @@ for c in range(ncluster):
     plt.ylabel("Process")
     plt.clim(vmin=0., vmax=0.2)
     plt.colorbar()
-    plt.savefig('./time_hist_2D_n0_c{}.eps'.format(c))
+    plt.savefig('./time_hist_2D_n0_c{}{}.eps'.format(c, suffix))
     plt.close()

@@ -16,6 +16,7 @@ ncluster = len(cfile.dimensions['ncluster'])
 nproc = len(cfile.dimensions['nproc'])
 
 cluster_centers = np.abs(cfile.variables["cluster_centers"][:,:])
+mean_abs = cfile.variables["mean_abs"][:]
 process_names = [
     "Rain Evap.",
     "Snow Subl.",
@@ -72,3 +73,9 @@ plt.clim(0, max_val)
 plt.colorbar()
 plt.savefig('./cluster_centers_2D_scaled.eps')
 plt.close()
+
+for c in range(ncluster):
+    print("Rates for cluster: ", c)
+    for i in range(len(process_names)-1):
+        rate = cluster_centers[c,i] * mean_abs[i]
+        print("Process ", process_names[i], ": ", rate)
