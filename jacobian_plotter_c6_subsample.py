@@ -164,6 +164,7 @@ plt.autoscale(tight=True)
 evalues_all = [[] for i in range(ncluster)]
 evalues_subsample = [[] for i in range(ncluster)]
 evalues_icesample = [[] for i in range(ncluster)]
+evalues_iceinit = [[] for i in range(ncluster)]
 evalues_rel = [[] for i in range(ncluster)]
 evalues2 = [dict() for i in range(ncluster)]
 evalue_correlation = dict()
@@ -204,6 +205,21 @@ with open('subsample_list_icefilter.csv', 'r',
             icesample_set.add(tuple(int_row))
     assert not first_row, "icesample list is empty!"
 
+iceinit_set = set()
+with open('subsample_list_initicefilter.csv', 'r',
+          encoding='ascii', newline='') as iceinit_file:
+    iceinit_reader = csv.reader(iceinit_file)
+    first_row = True
+    for row in iceinit_reader:
+        if first_row:
+            assert row[0] == 'column' and row[1] == 'level', \
+                "Unexpected header for iceinit list!"
+            first_row = False
+        else:
+            int_row = [int(i) for i in row]
+            iceinit_set.add(tuple(int_row))
+    assert not first_row, "iceinit list is empty!"
+
 for efile in efiles:
     num_cell = len(efile.dimensions['num_cell'])
     for ci in range(num_cell):
@@ -223,6 +239,8 @@ for efile in efiles:
                     evalues_subsample[c].append(evals[i])
                 if (int(column), int(level)) in icesample_set:
                     evalues_icesample[c].append(evals[i])
+                if (int(column), int(level)) in iceinit_set:
+                    evalues_iceinit[c].append(evals[i])
                 maxproc = np.argmax(associations[i,:])
                 if process_is_relevant(tends[:,maxproc]):
                     evalues_rel[c].append(evals[i])
@@ -246,6 +264,8 @@ for efile in efiles:
                     evalues_subsample[c].append(evals[i])
                 if (column, level) in icesample_set:
                     evalues_icesample[c].append(evals[i])
+                if (column, level) in iceinit_set:
+                    evalues_iceinit[c].append(evals[i])
                 evalues_rel[c].append(1./timescale)
                 evalues2[c][short_names[i]].append(1./timescale)
 
@@ -299,17 +319,20 @@ bins = -np.logspace(np.log10(1./min_t), np.log10(1./max_t), nbins+1)
 evalues_all_clusters = []
 evalues_all_subsample = []
 evalues_all_icesample = []
+evalues_all_iceinit = []
 evalues_all_rel = []
 evalues_all_assoc = []
 for c in range(ncluster):
     evalues_all_clusters += [t for t in evalues_all[c] if t > -1./min_t and t < -1./max_t]
     evalues_all_subsample += [t for t in evalues_subsample[c] if t > -1./min_t and t < -1./max_t]
     evalues_all_icesample += [t for t in evalues_icesample[c] if t > -1./min_t and t < -1./max_t]
+    evalues_all_iceinit += [t for t in evalues_iceinit[c] if t > -1./min_t and t < -1./max_t]
     evalues_all_rel += [t for t in evalues_rel[c] if t > -1./min_t and t < -1./max_t]
     for name in short_names:
         evalues_all_assoc += [t for t in evalues2[c][name] if t > -1./min_t and t < -1./max_t]
 plt.hist(evalues_all_clusters, bins=bins, color='b', edgecolor='k')
 plt.hist(evalues_all_icesample, bins=bins, color='g', edgecolor='k')
+plt.hist(evalues_all_iceinit, bins=bins, color='y', edgecolor='k')
 plt.hist(evalues_all_subsample, bins=bins, color='r', edgecolor='k')
 #plt.hist(evalues_all_rel, bins=bins, color='g', edgecolor='k')
 #plt.hist(evalues_all_assoc, bins=bins, color='r', edgecolor='k')

@@ -411,7 +411,7 @@ subroutine micro_mg_tend ( &
      tnd_qsnow,          tnd_nsnow,          re_ice,             &
      prer_evap,                                                      &
      frzimm,             frzcnt,             frzdep, &
-     do_sed, do_inst)
+     do_sed, do_inst, col_evap_is_sequential)
 
   ! Constituent properties.
   use micro_mg_utils, only: &
@@ -632,6 +632,7 @@ subroutine micro_mg_tend ( &
 
   logical, intent(in), optional :: do_sed ! Do sedimentation? (default .true.)
   logical, intent(in), optional :: do_inst ! Do instantaneous processes? (default .true.)
+  logical, intent(in), optional :: col_evap_is_sequential ! Do self-collection sequentially before evaporation? (default .false.)
 
   ! local workspace
   ! all units mks unless otherwise stated
@@ -866,8 +867,8 @@ subroutine micro_mg_tend ( &
   real(r8) :: dumratio(mgncol)
   real(r8) :: dumlamc(mgncol), dumpgam(mgncol)
 
-  ! Processes that can be disabled.
-  logical :: do_sed_loc, do_inst_loc
+  ! Local versions of flags
+  logical :: do_sed_loc, do_inst_loc, col_evap_is_sequential_loc
 
   ! loop array variables
   ! "i" and "k" are column/level iterators for internal (MG) variables
@@ -901,6 +902,10 @@ subroutine micro_mg_tend ( &
   do_inst_loc = .true.
   if (present(do_inst)) then
      do_inst_loc = do_inst
+  end if
+  col_evap_is_sequential_loc = .false.
+  if (present(col_evap_is_sequential)) then
+     col_evap_is_sequential_loc = col_evap_is_sequential
   end if
 
   ! Process inputs
@@ -1695,9 +1700,14 @@ subroutine micro_mg_tend ( &
            dumnr2 = max(dumnr2 + dumnragg*deltat/(col_steps*evap_col_steps), 0._r8)
         end do
 
-        dumnr2 = dumnr(:,k)
+        if (.not. col_evap_is_sequential_loc) then
+           ! Need to reset dumnr2 so that we run evaporation in parallel.
+           dumnr2 = dumnr(:,k)
+        end if
+        subnr(:,m,k) = dumnr2
         call size_dist_param_basic(mg_rain_props, dumr(:,k), dumnr2, &
              dumlamr, dumn0r)
+        nragg(:,k) = nragg(:,k) + (dumnr2 - subnr(:,m,k)) / deltat
         do n = 1, evap_steps
            dumrho = p(:,k)/(r*dumt)
            dumarn = ar*(rhosu/dumrho)**0.54_r8
@@ -1711,26 +1721,35 @@ subroutine micro_mg_tend ( &
            pre(:,k) = pre(:,k) + dumpre / (evap_steps * evap_col_steps)
            dumnr2 = max(dumnr2 + (dumnr2/dumr(:,k))*dumpre*deltat/(evap_steps*evap_col_steps), 0._r8)
            dumr(:,k) = max(dumr(:,k) + dumpre*deltat/(evap_steps*evap_col_steps), 0._r8)
-           ! Not that dumq and dumt are grid-mean, not in-precip quantities.
+           ! Note that dumq and dumt are grid-mean, not in-precip quantities.
            dumq = dumq - precip_frac(:,k)*dumpre*deltat/(evap_steps*evap_col_steps)
            dumt = dumt + xxlv*precip_frac(:,k)*dumpre*deltat/(evap_steps*evap_col_steps)/cpp
+           subnr(:,m,k) = dumnr2
            call size_dist_param_basic(mg_rain_props, dumr(:,k), dumnr2, &
                 dumlamr, dumn0r)
+           nragg(:,k) = nragg(:,k) + (dumnr2 - subnr(:,m,k)) / deltat
            !subqr(:,n,k) = dumr(:,k)
            !subnr(:,n,k) = dumnr2
            !subdr(:,n,k) = 1./dumlamr
         end do
 
-        ! Joint conservation of rain number; adjust self-collection only for
-        ! consistency with existing checks, and since evaporation should not be
-        ! limited by number directly anyway.
-        where (-dumnragg2*deltat/evap_col_steps > dumnr2)
-           dumnragg2 = -dumnr2 * evap_col_steps / deltat
-           ! Note: might be better to use size_dist_param_basic to set min here.
-           dumnr(:,k) = 0._r8
-        elsewhere
-           dumnr(:,k) = dumnr2 + dumnragg2*deltat/evap_col_steps
-        end where
+        ! Only parallel split requires separate conservation logic.
+        ! Note that if parallel, dumnr2 does not contain the effect of
+        ! self-collection at this point, but if sequential, it does.
+        if (.not. col_evap_is_sequential_loc) then
+           ! Joint conservation of rain number; adjust self-collection only for
+           ! consistency with existing checks, and since evaporation should not be
+           ! limited by number directly anyway.
+           where (-dumnragg2*deltat/evap_col_steps > dumnr2)
+              dumnragg2 = -dumnr2 * evap_col_steps / deltat
+              ! Note: might be better to use size_dist_param_basic to set min here.
+              dumnr(:,k) = 0._r8
+           elsewhere
+              dumnr(:,k) = dumnr2 + dumnragg2*deltat/evap_col_steps
+           end where
+        else
+           dumnr(:,k) = dumnr2
+        end if
 
         nragg(:,k) = nragg(:,k) + dumnragg2 / evap_col_steps
 

@@ -19,6 +19,9 @@ from mg2_constants import *
 blocksize = 4096
 num_files = 12
 end_column = 48601
+#blocksize = 4096
+#num_files = 1
+#end_column = 4095
 
 splits = [(blocksize*i, blocksize*(i+1)-1) for i in range(num_files)]
 splits[-1] = (splits[-1][0], end_column)
@@ -31,7 +34,7 @@ for name in EVALS_FILE_NAMES:
     efiles.append(nc4.Dataset(name, 'r'))
 
 plt.autoscale(tight=True)
-cmap = plt.get_cmap('Reds')
+cmap = plt.get_cmap('Greys')
 
 total_evalues = 0
 for efile in efiles:
@@ -75,7 +78,7 @@ plt.pcolor(bins, bins, plot_data, edgecolors='k', cmap=cmap)
 circle_rad = np.log10(1./300.)-cutoff_exp
 circle_x = circle_rad * np.cos(np.linspace(0., 2.*np.pi, 1001))
 circle_y = circle_rad * np.sin(np.linspace(0., 2.*np.pi, 1001))
-plt.plot(circle_x, circle_y)
+plt.plot(circle_x, circle_y, color='b')
 converge_rad = 1./300.
 converge_x = converge_rad * (np.cos(np.linspace(0., 2.*np.pi, 1001)) - 1.)
 converge_y = converge_rad * np.sin(np.linspace(0., 2.*np.pi, 1001))
@@ -84,21 +87,21 @@ converge_angle = np.arctan2(converge_y, converge_x)
 plot_abs = np.maximum(np.log10(converge_abs) - cutoff_exp, 0.)
 plot_x = plot_abs * np.cos(converge_angle)
 plot_y = plot_abs * np.sin(converge_angle)
-plt.plot(plot_x, plot_y)
+plt.plot(plot_x, plot_y, color='g')
 plt.axvline(x=0., color='k', linewidth=2.)
 plt.axhline(y=0., color='k', linewidth=2.)
 plt.axis([-max_plotval, max_plotval, -max_plotval, max_plotval])
-ticks = np.arange(-max_plotval, max_plotval+1., 1)
+ticks = np.arange(-max_plotval, max_plotval+1., 2)
 # The "0.01" hack below is there to ensure that "0" outputs a 10 with a positive sign.
 tickvals = ["${}^{{{}}}$".format(int(np.sign(i+0.01)*10),int(abs(i)+cutoff_exp)) for i in ticks]
 ax = plt.gca()
 ax.set_xticks(ticks)
-ax.set_xticklabels(tickvals)
+ax.set_xticklabels(tickvals, fontsize=16)
 ax.set_yticks(ticks)
-ax.set_yticklabels(tickvals)
-plt.clim(vmin=0., vmax=1.e4)
+ax.set_yticklabels(tickvals, fontsize=16)
+plt.clim(vmin=0., vmax=8.e3)
 plt.colorbar()
-plt.savefig('./complex_eigenvalues.png')
+plt.savefig('./complex_eigenvalues.eps')
 plt.close()
 
 midpoint = nbins // 2
@@ -130,22 +133,26 @@ plt.bar(bin_centers, all_zeros,
 plt.bar(bin_centers, real_zeros,
         width=(bins[1]-bins[0]), color='b', label='Real zeros')
 plt.legend(loc='best')
-ticks = np.arange(-max_plotval, max_plotval+1., 1)
+ticks = np.arange(-max_plotval, max_plotval+1., 2)
 tickvals = ["${}^{{{}}}$".format(int(np.sign(i+0.01)*10),int(abs(i)+cutoff_exp)) for i in ticks]
 ax = plt.gca()
+ax.ticklabel_format(style='sci')
 ax.set_xlim(left=bins[0], right=bins[-1])
 ax.set_xticks(ticks)
-ax.set_xticklabels(tickvals)
-plt.savefig('./complex_vertint.png')
+ax.set_xticklabels(tickvals, fontsize=16)
+plt.yticks(fontsize=16)
+plt.savefig('./complex_vertint.eps')
 plt.close()
 
 plt.plot(bin_centers, real_zeros / all_zeros, color='k')
-ticks = np.arange(-max_plotval, max_plotval+1., 1)
+ticks = np.arange(-max_plotval, max_plotval+1., 2)
 tickvals = ["${}^{{{}}}$".format(int(np.sign(i+0.01)*10),int(abs(i)+cutoff_exp)) for i in ticks]
 ax = plt.gca()
+ax.ticklabel_format(style='sci')
 ax.set_xticks(ticks)
-ax.set_xticklabels(tickvals)
-plt.savefig('./complex_ratio.png')
+ax.set_xticklabels(tickvals, fontsize=16)
+plt.yticks(fontsize=16)
+plt.savefig('./complex_ratio.eps')
 plt.close()
 
 plt.bar(bin_centers, all_zeros,
@@ -153,20 +160,24 @@ plt.bar(bin_centers, all_zeros,
 plt.bar(bin_centers, real_zeros + near_real_zeros,
         width=(bins[1]-bins[0]), color='b', label='Real zeros')
 plt.legend(loc='best')
-ticks = np.arange(-max_plotval, max_plotval+1., 1)
+ticks = np.arange(-max_plotval, max_plotval+1., 2)
 tickvals = ["${}^{{{}}}$".format(int(np.sign(i+0.01)*10),int(abs(i)+cutoff_exp)) for i in ticks]
 ax = plt.gca()
+ax.ticklabel_format(style='sci')
 ax.set_xlim(left=bins[0], right=bins[-1])
 ax.set_xticks(ticks)
-ax.set_xticklabels(tickvals)
-plt.savefig('./complex_vertint_cutoff.png')
+ax.set_xticklabels(tickvals, fontsize=16)
+plt.yticks(fontsize=16)
+plt.savefig('./complex_vertint_cutoff.eps')
 plt.close()
 
 plt.plot(bin_centers, (real_zeros + near_real_zeros) / all_zeros, color='k')
-ticks = np.arange(-max_plotval, max_plotval+1., 1)
+ticks = np.arange(-max_plotval, max_plotval+1., 2)
 tickvals = ["${}^{{{}}}$".format(int(np.sign(i+0.01)*10),int(abs(i)+cutoff_exp)) for i in ticks]
 ax = plt.gca()
+ax.ticklabel_format(style='sci')
 ax.set_xticks(ticks)
-ax.set_xticklabels(tickvals)
-plt.savefig('./complex_ratio_cutoff.png')
+ax.set_xticklabels(tickvals, fontsize=16)
+plt.yticks(fontsize=16)
+plt.savefig('./complex_ratio_cutoff.eps')
 plt.close()

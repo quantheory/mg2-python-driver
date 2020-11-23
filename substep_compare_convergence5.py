@@ -364,6 +364,7 @@ def calc_twmt(diff1, diff2, deltat):
                  abs(diff_tends[iqr]) + abs(diff_tends[iqs])) / 2.
 
 flag = False
+ice_flag = False
 
 def run_mg2_substepped(num_steps):
     # Icky global usage.
@@ -371,17 +372,24 @@ def run_mg2_substepped(num_steps):
     timestep = 300./num_steps
     global flag
     flag = False
+    global ice_flag
+    ice_flag = False
+    prod_tendency = np.zeros((10,))
     for m in range(num_steps):
         tends, drout, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
                                                               qr_loc, nr_loc, qs_loc, ns_loc)
         other_tends = tends["Total"] - tends["anadj"] - tends["cnact"] - tends["cauto"] - tends["caccr"]# - tends["rnagg"] - tends["revap"]
-        if abs(other_tends[iqi]) > 1.e-10 or abs(other_tends[iqs]) > 1.e-10 or abs(tends["revap"][iqr]) > 1.e-10:
+        if abs(other_tends[iqi]) > 1.e-10 or abs(other_tends[iqs]) > 1.e-10:
+            ice_flag = True
+        if abs(tends["revap"][iqr]) > 1.e-10:
             flag = True
+        prod_tendency += tends["cauto"] + tends["caccr"]
         update_state(level, tends, timestep)
+    prod_tendency /= num_steps
     #drout = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
     state_diff = diff_states(level, column)
     reset_state(level, column)
-    return state_diff
+    return (state_diff, prod_tendency)
 
 ind = np.arange(len(short_names))
 
@@ -389,7 +397,6 @@ num_columns = 48602
 #num_columns = 1024
 cluster = 6
 max_power = 11
-richardson = True
 
 plt.autoscale(tight=True)
 
@@ -400,6 +407,7 @@ mean_delqr_coarse = 0.
 
 coarse_diff_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
 coarse_dqr_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
+coarse_prod_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
 
 make_accs = lambda n: [acc.Accumulator([acc.mean, acc.median, acc.max])
                        for i in range(n)]
@@ -416,9 +424,15 @@ apart_dqr_acc = make_accs(max_power-1)
 auto_dqr_acc = make_accs(max_power-1)
 accr_dqr_acc = make_accs(max_power-1)
 
+all_prod_acc = make_accs(max_power-1)
+together_prod_acc = make_accs(max_power-1)
+apart_prod_acc = make_accs(max_power-1)
+auto_prod_acc = make_accs(max_power-1)
+accr_prod_acc = make_accs(max_power-1)
+
 coarse_qrs = []
 
-subsample_file = open('subsample_list.csv', 'w', encoding='ascii', newline='')
+subsample_file = open('subsample_list_icefilter.csv', 'w', encoding='ascii', newline='')
 subsample_writer = csv.writer(subsample_file)
 subsample_writer.writerow(['column', 'level'])
 
@@ -471,34 +485,30 @@ for column in range(num_columns):
         auto_accr_steps = 1
         auto_steps = 1
         accr_steps = 1
-        state_diff_ref = run_mg2_substepped(2**max_power)
-        if flag:
+        state_diff_ref, prod_ref = run_mg2_substepped(2**max_power)
+        if ice_flag:
             continue
         mean_twnt_ref += calc_twmt(state_diff_ref, 0., 300.)
         mean_delqr_ref += state_diff_ref[iqr] / 300.
-        state_diff_coarse = run_mg2_substepped(1)
+        state_diff_coarse, prod_coarse = run_mg2_substepped(1)
         if flag:
-            print("Evap rate significant for coarse, but not fine, results.")
+            print("Evap rate significant for coarse results.")
             print("column, level: ", column, ",", level)
-            continue
-        state_diff_coarse_ish = run_mg2_substepped(2)
+        state_diff_coarse_ish, prod_coarse_ish = run_mg2_substepped(2)
         if flag:
             print("Evap rate significant for coarse-ish results.")
             print("column, level: ", column, ",", level)
-            continue
-        state_diff_ref2 = run_mg2_substepped(2**(max_power-1))
-        if richardson:
-            state_diff_ref = 2*state_diff_ref - state_diff_ref2
         number_grid_cells += 1
         subsample_writer.writerow([str(column), str(level)])
         mean_twnt_coarse += calc_twmt(state_diff_coarse, 0., 300.)
         mean_delqr_coarse += state_diff_coarse[iqr] / 300.
         coarse_qrs.append(1.e3*(state_diff_coarse[iqr] + qr_loc[0,level]))
         state_diffs_all = np.zeros((max_power-1, 10))
+        prods_all = np.zeros((max_power-1, 10))
         state_diffs_all[0,:] = state_diff_coarse_ish
-        for i in range(2, max_power-1):
-            state_diffs_all[i-1,:] = run_mg2_substepped(2**i)
-        state_diffs_all[-1,:] = state_diff_ref2
+        prods_all[0,:] = prod_coarse_ish
+        for i in range(2, max_power):
+            state_diffs_all[i-1,:], prods_all[i-1,:] = run_mg2_substepped(2**i)
         coarse_error = calc_twmt(state_diff_coarse, state_diff_ref, 300.)
         fine_error = calc_twmt(state_diffs_all[0,:], state_diff_ref, 300.)
         if coarse_error < fine_error:
@@ -508,26 +518,30 @@ for column in range(num_columns):
             print(state_diff_coarse)
             print(state_diffs_all[0,:])
         state_diffs_together = np.zeros((max_power-1, 10))
+        prods_together = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             auto_accr_steps = 2**i
-            state_diffs_together[i-1,:] = run_mg2_substepped(1)
+            state_diffs_together[i-1,:], prods_together[i-1,:] = run_mg2_substepped(1)
         auto_accr_steps = 1
         state_diffs_apart = np.zeros((max_power-1, 10))
+        prods_apart = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             auto_steps = 2**i
             accr_steps = 2**i
-            state_diffs_apart[i-1,:] = run_mg2_substepped(1)
+            state_diffs_apart[i-1,:], prods_apart[i-1,:] = run_mg2_substepped(1)
         auto_steps = 1
         accr_steps = 1
         state_diffs_auto = np.zeros((max_power-1, 10))
+        prods_auto = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             auto_steps = 2**i
-            state_diffs_auto[i-1,:] = run_mg2_substepped(1)
+            state_diffs_auto[i-1,:], prods_auto[i-1,:] = run_mg2_substepped(1)
         auto_steps = 1
         state_diffs_accr = np.zeros((max_power-1, 10))
+        prods_accr = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             accr_steps = 2**i
-            state_diffs_accr[i-1,:] = run_mg2_substepped(1)
+            state_diffs_accr[i-1,:], prods_accr[i-1,:] = run_mg2_substepped(1)
         accr_steps = 1
 
         coarse_diff_acc.push(calc_twmt(state_diff_coarse, state_diff_ref, 300.))
@@ -545,6 +559,14 @@ for column in range(num_columns):
             apart_dqr_acc[i].push(np.abs(state_diffs_apart[i,iqr] - state_diff_ref[iqr]) / 300.)
             auto_dqr_acc[i].push(np.abs(state_diffs_auto[i,iqr] - state_diff_ref[iqr]) / 300.)
             accr_dqr_acc[i].push(np.abs(state_diffs_accr[i,iqr] - state_diff_ref[iqr]) / 300.)
+
+        coarse_prod_acc.push(np.abs(prod_coarse[iqc] - prod_ref[iqc]))
+        for i in range(max_power-1):
+            all_prod_acc[i].push(np.abs(prods_all[i,iqc] - prod_ref[iqc]))
+            together_prod_acc[i].push(np.abs(prods_together[i,iqc] - prod_ref[iqc]))
+            apart_prod_acc[i].push(np.abs(prods_apart[i,iqc] - prod_ref[iqc]))
+            auto_prod_acc[i].push(np.abs(prods_auto[i,iqc] - prod_ref[iqc]))
+            accr_prod_acc[i].push(np.abs(prods_accr[i,iqc] - prod_ref[iqc]))
 
 subsample_file.close()
 
@@ -571,6 +593,12 @@ mean_together_dqrs = np.zeros((max_power,))
 mean_apart_dqrs = np.zeros((max_power,))
 mean_auto_dqrs = np.zeros((max_power,))
 mean_accr_dqrs = np.zeros((max_power,))
+
+mean_all_prods = np.zeros((max_power,))
+mean_together_prods = np.zeros((max_power,))
+mean_apart_prods = np.zeros((max_power,))
+mean_auto_prods = np.zeros((max_power,))
+mean_accr_prods = np.zeros((max_power,))
 
 mean_coarse_diff, median_coarse_diff, max_coarse_diff = coarse_diff_acc.output()
 mean_coarse_diff *= 1.e3
@@ -599,6 +627,14 @@ mean_together_dqrs[0] = mean_coarse_dqr
 mean_apart_dqrs[0] = mean_coarse_dqr
 mean_auto_dqrs[0] = mean_coarse_dqr
 mean_accr_dqrs[0] = mean_coarse_dqr
+
+mean_coarse_prod = coarse_prod_acc.output()[0]
+mean_coarse_prod *= 1.e3
+mean_all_prods[0] = mean_coarse_prod
+mean_together_prods[0] = mean_coarse_prod
+mean_apart_prods[0] = mean_coarse_prod
+mean_auto_prods[0] = mean_coarse_prod
+mean_accr_prods[0] = mean_coarse_prod
 
 mean_twnt_ref *= 1.e3 / number_grid_cells
 mean_delqr_ref *= 1.e3 / number_grid_cells
@@ -636,14 +672,22 @@ for i in range(1, max_power):
     mean_auto_dqrs[i] = accums[0] * 1.e3
     accums = accr_dqr_acc[i-1].output()
     mean_accr_dqrs[i] = accums[0] * 1.e3
+    accums = all_prod_acc[i-1].output()
+    mean_all_prods[i] = accums[0] * 1.e3
+    accums = together_prod_acc[i-1].output()
+    mean_together_prods[i] = accums[0] * 1.e3
+    accums = apart_prod_acc[i-1].output()
+    mean_apart_prods[i] = accums[0] * 1.e3
+    accums = auto_prod_acc[i-1].output()
+    mean_auto_prods[i] = accums[0] * 1.e3
+    accums = accr_prod_acc[i-1].output()
+    mean_accr_prods[i] = accums[0] * 1.e3
 
 print("Reference mean twnt and dqr/dt: ", mean_twnt_ref, mean_delqr_ref)
 
 print("Coarse run mean twnt and dqr/dt: ", mean_twnt_coarse, mean_delqr_coarse)
 
-suffix = ""
-if richardson:
-    suffix += "_richext"
+suffix = "_icefilter"
 
 timesteps = 300. / (2 ** np.arange(max_power))
 
@@ -662,7 +706,7 @@ min_y = min(mean_all_diffs[-1], mean_auto_diffs[-1], mean_accr_diffs[-1],
 max_y = max(ref_line[0], mean_all_diffs[0])
 plt.axis([timesteps[-1], timesteps[0], min_y, 2.*max_y])
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_mean_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('substep_convergence_mean_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, median_all_diffs, label='MG2', color='b')
@@ -677,7 +721,7 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_median_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('substep_convergence_median_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, max_all_diffs, label='MG2', color='b')
@@ -692,7 +736,7 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_max_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('substep_convergence_max_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, mean_all_dqrs, label='MG2', color='b')
@@ -707,12 +751,27 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Rain tendency diff (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_qr_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('substep_convergence_qr_c{}{}.eps'.format(cluster,suffix))
+plt.close()
+
+plt.loglog(timesteps, mean_all_prods, label='MG2', color='b')
+plt.loglog(timesteps, mean_auto_prods, label='Autoconversion only', color='y')
+plt.loglog(timesteps, mean_accr_prods, label='Accretion only', color='r')
+plt.loglog(timesteps, mean_together_prods, label='Coupled Auto/Accr', color='g')
+#plt.loglog(timesteps, mean_apart_prods, label='Auto/Accr Separately')
+plt.loglog(timesteps, timesteps*mean_all_prods[-4]/timesteps[-4], 'k--',
+           label='1st-order reference')
+plt.title('Mean rain mass production error in Cluster {} subsample'.format(cluster))
+plt.xlabel('Timestep (s)')
+plt.ylabel('Rain production tendency diff (g/kg/s)')
+plt.axis('tight')
+plt.legend(loc='lower right')
+plt.savefig('substep_convergence_prod_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.hist(coarse_qrs, bins=200)
 plt.xlabel('Final QR (g/kg)')
 plt.ylabel('Number of cases ({} total)'.format(number_grid_cells))
 plt.axis('tight')
-plt.savefig('post_300s_qr_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('post_300s_qr_c{}{}.eps'.format(cluster,suffix))
 plt.close()

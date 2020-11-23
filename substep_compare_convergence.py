@@ -188,7 +188,7 @@ def mg2_tendencies(level, t, q, qc, nc, qi, ni, qr, nr, qs, ns):
                            npccn_loc[0,level], rndst_loc[:,level:level+1,:], nacon_loc[:,level:level+1,:], precip_frac[0,level],
                            frzimm=frzimm_loc[0,level], frzcnt=frzcnt_loc[0,level],
                            frzdep=frzdep_loc[0,level], mgncol=1, nlev=1, do_sed=False,
-                           do_inst=False)
+                           do_inst=False, col_evap_is_sequential=col_evap_is_sequential)
     # Add total tendencies to a dictionary.
     tends = {}
     tends["Total"] = np.zeros((10,))
@@ -365,14 +365,15 @@ def run_mg2_substepped(num_steps):
     # Icky global usage.
     global timestep
     timestep = 300./num_steps
+    drout_initial = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
     for m in range(num_steps):
         tends, drout, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
                                                               qr_loc, nr_loc, qs_loc, ns_loc)
         update_state(level, tends, timestep)
-    #drout = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
+    drout_diff = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.) - drout_initial
     state_diff = diff_states(level, column)
     reset_state(level, column)
-    return state_diff
+    return (state_diff, drout_diff)
 
 ind = np.arange(len(short_names))
 
@@ -380,16 +381,21 @@ num_columns = 48602
 #num_columns = 1024
 cluster = 9
 max_power = 11
+richardson = True
 
 plt.autoscale(tight=True)
 
 mean_twnt_ref = 0.
-mean_delqr_ref = 0.
+mean_deldr_ref = 0.
+mean_deldr_ref_seq = 0.
 mean_twnt_coarse = 0.
-mean_delqr_coarse = 0.
+mean_deldr_coarse = 0.
 
 coarse_diff_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
-coarse_dqr_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
+coarse_ddr_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
+
+coarse_seq_diff_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
+coarse_seq_ddr_acc = acc.Accumulator([acc.mean, acc.median, acc.max])
 
 make_accs = lambda n: [acc.Accumulator([acc.mean, acc.median, acc.max])
                        for i in range(n)]
@@ -398,11 +404,23 @@ all_diff_acc = make_accs(max_power-1)
 together_diff_acc = make_accs(max_power-1)
 evap_diff_acc = make_accs(max_power-1)
 
-all_dqr_acc = make_accs(max_power-1)
-together_dqr_acc = make_accs(max_power-1)
-evap_dqr_acc = make_accs(max_power-1)
+all_seq_diff_acc = make_accs(max_power-1)
+together_seq_diff_acc = make_accs(max_power-1)
+evap_seq_diff_acc = make_accs(max_power-1)
+col_seq_diff_acc = make_accs(max_power-1)
+apart_seq_diff_acc = make_accs(max_power-1)
 
-coarse_qrs = []
+all_ddr_acc = make_accs(max_power-1)
+together_ddr_acc = make_accs(max_power-1)
+evap_ddr_acc = make_accs(max_power-1)
+
+all_seq_ddr_acc = make_accs(max_power-1)
+together_seq_ddr_acc = make_accs(max_power-1)
+evap_seq_ddr_acc = make_accs(max_power-1)
+col_seq_ddr_acc = make_accs(max_power-1)
+apart_seq_ddr_acc = make_accs(max_power-1)
+
+coarse_drs = []
 
 number_grid_cells = 0
 
@@ -454,80 +472,185 @@ for column in range(num_columns):
         evap_col_steps = 1
         evap_steps = 1
         col_steps = 1
-        state_diff_ref = run_mg2_substepped(2**max_power)
+        col_evap_is_sequential = False
+        state_diff_ref, dr_ref = run_mg2_substepped(2**max_power)
         mean_twnt_ref += calc_twmt(state_diff_ref, 0., 300.)
-        mean_delqr_ref += state_diff_ref[iqr] / 300.
-        state_diff_coarse = run_mg2_substepped(1)
+        mean_deldr_ref += dr_ref / 300.
+        state_diff_coarse, dr_coarse = run_mg2_substepped(1)
+        state_diff_ref2, dr_ref2 = run_mg2_substepped(2**(max_power-1))
+        if richardson:
+            state_diff_ref = 2*state_diff_ref - state_diff_ref2
+            dr_ref = 2*dr_ref - dr_ref2
         mean_twnt_coarse += calc_twmt(state_diff_coarse, 0., 300.)
-        mean_delqr_coarse += state_diff_coarse[iqr] / 300.
-        coarse_qrs.append(1.e3*(state_diff_coarse[iqr] + qr_loc[0,level]))
+        mean_deldr_coarse += dr_coarse / 300.
+        coarse_drs.append(1.e6*(qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.))
         state_diffs_all = np.zeros((max_power-1, 10))
-        for i in range(1, max_power):
-            state_diffs_all[i-1,:] = run_mg2_substepped(2**i)
+        dr_all = np.zeros((max_power-1,))
+        for i in range(1, max_power-1):
+            state_diffs_all[i-1,:], dr_all[i-1] = run_mg2_substepped(2**i)
+        state_diffs_all[-1,:] = state_diff_ref2
+        dr_all[-1] = dr_ref2
         state_diffs_together = np.zeros((max_power-1, 10))
+        dr_together = np.zeros((max_power-1,))
         for i in range(1, max_power):
             evap_col_steps = 2**i
-            state_diffs_together[i-1,:] = run_mg2_substepped(1)
+            state_diffs_together[i-1,:], dr_together[i-1] = run_mg2_substepped(1)
         evap_col_steps = 1
         state_diffs_evap = np.zeros((max_power-1, 10))
+        dr_evap = np.zeros((max_power-1,))
         for i in range(1, max_power):
             evap_steps = 2**i
-            state_diffs_evap[i-1,:] = run_mg2_substepped(1)
-        evap_steps = 300
-        state_diff_substep_evap = run_mg2_substepped(1)
+            state_diffs_evap[i-1,:], dr_evap[i-1] = run_mg2_substepped(1)
+        evap_col_steps = 1
+        evap_steps = 1
+        col_steps = 1
+        col_evap_is_sequential = True
+        state_diff_coarse_seq, dr_coarse_seq = run_mg2_substepped(1)
+        state_diffs_all_seq = np.zeros((max_power-1, 10))
+        dr_all_seq = np.zeros((max_power-1,))
+        for i in range(1, max_power):
+            state_diffs_all_seq[i-1,:], dr_all_seq[i-1] = run_mg2_substepped(2**i)
+        mean_deldr_ref_seq += dr_all_seq[-1] / 300.
+        state_diffs_together_seq = np.zeros((max_power-1, 10))
+        dr_together_seq = np.zeros((max_power-1,))
+        for i in range(1, max_power):
+            evap_col_steps = 2**i
+            state_diffs_together_seq[i-1,:], dr_together_seq[i-1] = run_mg2_substepped(1)
+        evap_col_steps = 1
+        state_diffs_evap_seq = np.zeros((max_power-1, 10))
+        dr_evap_seq = np.zeros((max_power-1,))
+        for i in range(1, max_power):
+            evap_steps = 2**i
+            state_diffs_evap_seq[i-1,:], dr_evap_seq[i-1] = run_mg2_substepped(1)
+        evap_steps = 1
+        state_diffs_col_seq = np.zeros((max_power-1, 10))
+        dr_col_seq = np.zeros((max_power-1,))
+        for i in range(1, max_power):
+            col_steps = 2**i
+            state_diffs_col_seq[i-1,:], dr_col_seq[i-1] = run_mg2_substepped(1)
+        col_steps = 1
+        state_diffs_apart_seq = np.zeros((max_power-1, 10))
+        dr_apart_seq = np.zeros((max_power-1,))
+        for i in range(1, max_power):
+            evap_steps = 2**i
+            col_steps = 2**i
+            state_diffs_apart_seq[i-1,:], dr_apart_seq[i-1] = run_mg2_substepped(1)
 
         coarse_diff_acc.push(calc_twmt(state_diff_coarse, state_diff_ref, 300.))
+        coarse_seq_diff_acc.push(calc_twmt(state_diff_coarse_seq, state_diff_ref, 300.))
         for i in range(max_power-1):
             all_diff_acc[i].push(calc_twmt(state_diffs_all[i,:], state_diff_ref, 300.))
             together_diff_acc[i].push(calc_twmt(state_diffs_together[i,:], state_diff_ref, 300.))
             evap_diff_acc[i].push(calc_twmt(state_diffs_evap[i,:], state_diff_ref, 300.))
+            all_seq_diff_acc[i].push(calc_twmt(state_diffs_all_seq[i,:], state_diff_ref, 300.))
+            together_seq_diff_acc[i].push(calc_twmt(state_diffs_together_seq[i,:], state_diff_ref, 300.))
+            evap_seq_diff_acc[i].push(calc_twmt(state_diffs_evap_seq[i,:], state_diff_ref, 300.))
+            col_seq_diff_acc[i].push(calc_twmt(state_diffs_col_seq[i,:], state_diff_ref, 300.))
+            apart_seq_diff_acc[i].push(calc_twmt(state_diffs_apart_seq[i,:], state_diff_ref, 300.))
 
-        coarse_dqr_acc.push(np.abs(state_diff_coarse[iqr] - state_diff_ref[iqr]) / 300.)
+        coarse_ddr_acc.push(np.abs(dr_coarse - dr_ref) / 300.)
+        coarse_seq_ddr_acc.push(np.abs(dr_coarse_seq - dr_ref) / 300.)
         for i in range(max_power-1):
-            all_dqr_acc[i].push(np.abs(state_diffs_all[i,iqr] - state_diff_ref[iqr]) / 300.)
-            together_dqr_acc[i].push(np.abs(state_diffs_together[i,iqr] - state_diff_ref[iqr]) / 300.)
-            evap_dqr_acc[i].push(np.abs(state_diffs_evap[i,iqr] - state_diff_ref[iqr]) / 300.)
+            all_ddr_acc[i].push(np.abs(dr_all[i] - dr_ref) / 300.)
+            together_ddr_acc[i].push(np.abs(dr_together[i] - dr_ref) / 300.)
+            evap_ddr_acc[i].push(np.abs(dr_evap[i] - dr_ref) / 300.)
+            all_seq_ddr_acc[i].push(np.abs(dr_all_seq[i] - dr_ref) / 300.)
+            together_seq_ddr_acc[i].push(np.abs(dr_together_seq[i] - dr_ref) / 300.)
+            evap_seq_ddr_acc[i].push(np.abs(dr_evap_seq[i] - dr_ref) / 300.)
+            col_seq_ddr_acc[i].push(np.abs(dr_col_seq[i] - dr_ref) / 300.)
+            apart_seq_ddr_acc[i].push(np.abs(dr_apart_seq[i] - dr_ref) / 300.)
 
 mean_all_diffs = np.zeros((max_power,))
 mean_together_diffs = np.zeros((max_power,))
 mean_evap_diffs = np.zeros((max_power,))
+mean_all_seq_diffs = np.zeros((max_power,))
+mean_together_seq_diffs = np.zeros((max_power,))
+mean_evap_seq_diffs = np.zeros((max_power,))
+mean_col_seq_diffs = np.zeros((max_power,))
+mean_apart_seq_diffs = np.zeros((max_power,))
 
 median_all_diffs = np.zeros((max_power,))
 median_together_diffs = np.zeros((max_power,))
 median_evap_diffs = np.zeros((max_power,))
+median_all_seq_diffs = np.zeros((max_power,))
+median_together_seq_diffs = np.zeros((max_power,))
+median_evap_seq_diffs = np.zeros((max_power,))
+median_col_seq_diffs = np.zeros((max_power,))
+median_apart_seq_diffs = np.zeros((max_power,))
 
 max_all_diffs = np.zeros((max_power,))
 max_together_diffs = np.zeros((max_power,))
 max_evap_diffs = np.zeros((max_power,))
+max_all_seq_diffs = np.zeros((max_power,))
+max_together_seq_diffs = np.zeros((max_power,))
+max_evap_seq_diffs = np.zeros((max_power,))
+max_col_seq_diffs = np.zeros((max_power,))
+max_apart_seq_diffs = np.zeros((max_power,))
 
-mean_all_dqrs = np.zeros((max_power,))
-mean_together_dqrs = np.zeros((max_power,))
-mean_evap_dqrs = np.zeros((max_power,))
+mean_all_ddrs = np.zeros((max_power,))
+mean_together_ddrs = np.zeros((max_power,))
+mean_evap_ddrs = np.zeros((max_power,))
+mean_all_seq_ddrs = np.zeros((max_power,))
+mean_together_seq_ddrs = np.zeros((max_power,))
+mean_evap_seq_ddrs = np.zeros((max_power,))
+mean_col_seq_ddrs = np.zeros((max_power,))
+mean_apart_seq_ddrs = np.zeros((max_power,))
 
 mean_coarse_diff, median_coarse_diff, max_coarse_diff = coarse_diff_acc.output()
 mean_coarse_diff *= 1.e3
 median_coarse_diff *= 1.e3
 max_coarse_diff *= 1.e3
+
+mean_coarse_seq_diff, median_coarse_seq_diff, max_coarse_seq_diff = coarse_seq_diff_acc.output()
+mean_coarse_seq_diff *= 1.e3
+median_coarse_seq_diff *= 1.e3
+max_coarse_seq_diff *= 1.e3
+
 mean_all_diffs[0] = mean_coarse_diff
 mean_together_diffs[0] = mean_coarse_diff
 mean_evap_diffs[0] = mean_coarse_diff
+mean_all_seq_diffs[0] = mean_coarse_seq_diff
+mean_together_seq_diffs[0] = mean_coarse_seq_diff
+mean_evap_seq_diffs[0] = mean_coarse_seq_diff
+mean_col_seq_diffs[0] = mean_coarse_seq_diff
+mean_apart_seq_diffs[0] = mean_coarse_seq_diff
 median_all_diffs[0] = median_coarse_diff
 median_together_diffs[0] = median_coarse_diff
 median_evap_diffs[0] = median_coarse_diff
+median_all_seq_diffs[0] = median_coarse_seq_diff
+median_together_seq_diffs[0] = median_coarse_seq_diff
+median_evap_seq_diffs[0] = median_coarse_seq_diff
+median_col_seq_diffs[0] = median_coarse_seq_diff
+median_apart_seq_diffs[0] = median_coarse_seq_diff
 max_all_diffs[0] = max_coarse_diff
 max_together_diffs[0] = max_coarse_diff
 max_evap_diffs[0] = max_coarse_diff
+max_all_seq_diffs[0] = max_coarse_seq_diff
+max_together_seq_diffs[0] = max_coarse_seq_diff
+max_evap_seq_diffs[0] = max_coarse_seq_diff
+max_col_seq_diffs[0] = max_coarse_seq_diff
+max_apart_seq_diffs[0] = max_coarse_seq_diff
 
-mean_coarse_dqr = coarse_dqr_acc.output()[0]
-mean_coarse_dqr *= 1.e3
-mean_all_dqrs[0] = mean_coarse_dqr
-mean_together_dqrs[0] = mean_coarse_dqr
-mean_evap_dqrs[0] = mean_coarse_dqr
+mean_coarse_ddr = coarse_ddr_acc.output()[0]
+mean_coarse_ddr *= 1.e6
+
+mean_coarse_seq_ddr = coarse_seq_ddr_acc.output()[0]
+mean_coarse_seq_ddr *= 1.e6
+
+mean_all_ddrs[0] = mean_coarse_ddr
+mean_together_ddrs[0] = mean_coarse_ddr
+mean_evap_ddrs[0] = mean_coarse_ddr
+mean_all_seq_ddrs[0] = mean_coarse_seq_ddr
+mean_together_seq_ddrs[0] = mean_coarse_seq_ddr
+mean_evap_seq_ddrs[0] = mean_coarse_seq_ddr
+mean_col_seq_ddrs[0] = mean_coarse_seq_ddr
+mean_apart_seq_ddrs[0] = mean_coarse_seq_ddr
 
 mean_twnt_ref *= 1.e3 / number_grid_cells
-mean_delqr_ref *= 1.e3 / number_grid_cells
+mean_deldr_ref *= 1.e6 / number_grid_cells
+mean_deldr_ref_seq *= 1.e6 / number_grid_cells
 mean_twnt_coarse *= 1.e3 / number_grid_cells
-mean_delqr_coarse *= 1.e3 / number_grid_cells
+mean_deldr_coarse *= 1.e6 / number_grid_cells
 
 for i in range(1, max_power):
     accums = all_diff_acc[i-1].output()
@@ -542,30 +665,82 @@ for i in range(1, max_power):
     mean_evap_diffs[i] = accums[0] * 1.e3
     median_evap_diffs[i] = accums[1] * 1.e3
     max_evap_diffs[i] = accums[2] * 1.e3
-    accums = all_dqr_acc[i-1].output()
-    mean_all_dqrs[i] = accums[0] * 1.e3
-    accums = together_dqr_acc[i-1].output()
-    mean_together_dqrs[i] = accums[0] * 1.e3
-    accums = evap_dqr_acc[i-1].output()
-    mean_evap_dqrs[i] = accums[0] * 1.e3
+    accums = all_seq_diff_acc[i-1].output()
+    mean_all_seq_diffs[i] = accums[0] * 1.e3
+    median_all_seq_diffs[i] = accums[1] * 1.e3
+    max_all_seq_diffs[i] = accums[2] * 1.e3
+    accums = together_seq_diff_acc[i-1].output()
+    mean_together_seq_diffs[i] = accums[0] * 1.e3
+    median_together_seq_diffs[i] = accums[1] * 1.e3
+    max_together_seq_diffs[i] = accums[2] * 1.e3
+    accums = evap_seq_diff_acc[i-1].output()
+    mean_evap_seq_diffs[i] = accums[0] * 1.e3
+    median_evap_seq_diffs[i] = accums[1] * 1.e3
+    max_evap_seq_diffs[i] = accums[2] * 1.e3
+    accums = col_seq_diff_acc[i-1].output()
+    mean_col_seq_diffs[i] = accums[0] * 1.e3
+    median_col_seq_diffs[i] = accums[1] * 1.e3
+    max_col_seq_diffs[i] = accums[2] * 1.e3
+    accums = apart_seq_diff_acc[i-1].output()
+    mean_apart_seq_diffs[i] = accums[0] * 1.e3
+    median_apart_seq_diffs[i] = accums[1] * 1.e3
+    max_apart_seq_diffs[i] = accums[2] * 1.e3
+    accums = all_ddr_acc[i-1].output()
+    mean_all_ddrs[i] = accums[0] * 1.e6
+    accums = together_ddr_acc[i-1].output()
+    mean_together_ddrs[i] = accums[0] * 1.e6
+    accums = evap_ddr_acc[i-1].output()
+    mean_evap_ddrs[i] = accums[0] * 1.e6
+    accums = all_seq_ddr_acc[i-1].output()
+    mean_all_seq_ddrs[i] = accums[0] * 1.e6
+    accums = together_seq_ddr_acc[i-1].output()
+    mean_together_seq_ddrs[i] = accums[0] * 1.e6
+    accums = evap_seq_ddr_acc[i-1].output()
+    mean_evap_seq_ddrs[i] = accums[0] * 1.e6
+    accums = col_seq_ddr_acc[i-1].output()
+    mean_col_seq_ddrs[i] = accums[0] * 1.e6
+    accums = apart_seq_ddr_acc[i-1].output()
+    mean_apart_seq_ddrs[i] = accums[0] * 1.e6
 
-print("Reference mean twnt and dqr/dt: ", mean_twnt_ref, mean_delqr_ref)
+print("Reference mean twnt and ddr/dt: ", mean_twnt_ref, mean_deldr_ref, mean_deldr_ref_seq)
 
-print("Coarse run mean twnt and dqr/dt: ", mean_twnt_coarse, mean_delqr_coarse)
+print("Coarse run mean twnt and ddr/dt: ", mean_twnt_coarse, mean_deldr_coarse)
+
+suffix = ""
+if richardson:
+    suffix += "_richext"
 
 timesteps = 300. / (2 ** np.arange(max_power))
 
-plt.loglog(timesteps, mean_all_diffs, label='MG2')
-plt.loglog(timesteps, mean_together_diffs, label='Coupled Evap/Self-Col')
-plt.loglog(timesteps, mean_evap_diffs, label='Evaporation only')
+plt.loglog(timesteps, mean_all_diffs, label='MG2', color='b')
+plt.loglog(timesteps, mean_together_diffs, label='Coupled Evap/Self-Col', color='g')
+plt.loglog(timesteps, mean_evap_diffs, label='Evaporation only', color='r')
+plt.loglog(timesteps, mean_all_seq_diffs, 'b--')
+plt.loglog(timesteps, mean_together_seq_diffs, 'g--')
+plt.loglog(timesteps, mean_evap_seq_diffs, 'r--')
+plt.loglog(timesteps, mean_col_seq_diffs, 'y--', label='Self-Col only')
+plt.loglog(timesteps, mean_apart_seq_diffs, 'c--', label='Separate Evap/Self-Col')
 plt.loglog(timesteps, timesteps*mean_all_diffs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
 plt.title('Mean error in Cluster {}'.format(cluster))
 plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
-plt.legend(loc='best')
-plt.savefig('substep_convergence_mean_c{}.eps'.format(cluster))
+plt.legend(loc='lower right')
+plt.savefig('substep_convergence_mean_seq_c{}{}.eps'.format(cluster, suffix))
+plt.close()
+
+plt.loglog(timesteps, mean_all_diffs, label='MG2', color='b')
+plt.loglog(timesteps, mean_together_diffs, label='Coupled Evap/Self-Col', color='g')
+plt.loglog(timesteps, mean_evap_diffs, label='Evaporation only', color='r')
+plt.loglog(timesteps, timesteps*mean_all_diffs[-4]/timesteps[-4], 'k--',
+           label='1st-order reference')
+plt.title('Mean error in Cluster {}'.format(cluster))
+plt.xlabel('Timestep (s)')
+plt.ylabel('Total water mass difference (g/kg/s)')
+plt.axis('tight')
+plt.legend(loc='lower right')
+plt.savefig('substep_convergence_mean_c{}{}.eps'.format(cluster, suffix))
 plt.close()
 
 plt.loglog(timesteps, median_all_diffs, label='MG2')
@@ -578,7 +753,7 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='best')
-plt.savefig('substep_convergence_median_c{}.eps'.format(cluster))
+plt.savefig('substep_convergence_median_c{}{}.eps'.format(cluster, suffix))
 plt.close()
 
 plt.loglog(timesteps, max_all_diffs, label='MG2')
@@ -591,25 +766,30 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='best')
-plt.savefig('substep_convergence_max_c{}.eps'.format(cluster))
+plt.savefig('substep_convergence_max_c{}{}.eps'.format(cluster, suffix))
 plt.close()
 
-plt.loglog(timesteps, mean_all_dqrs, label='MG2')
-plt.loglog(timesteps, mean_together_dqrs, label='Coupled Evap/Self-Col')
-plt.loglog(timesteps, mean_evap_dqrs, label='Evaporation only')
-plt.loglog(timesteps, timesteps*mean_all_dqrs[-4]/timesteps[-4], 'k--',
+plt.loglog(timesteps, mean_all_ddrs, label='MG2', color='b')
+plt.loglog(timesteps, mean_together_ddrs, label='Coupled Evap/Self-Col', color='g')
+plt.loglog(timesteps, mean_evap_ddrs, label='Evaporation only', color='r')
+plt.loglog(timesteps, mean_all_seq_ddrs, 'b--')
+plt.loglog(timesteps, mean_together_seq_ddrs, 'g--')
+plt.loglog(timesteps, mean_evap_seq_ddrs, 'r--')
+plt.loglog(timesteps, mean_col_seq_ddrs, 'y--', label='Self-Col only')
+plt.loglog(timesteps, mean_apart_seq_ddrs, 'c--', label='Separate Evap/Self-Col')
+plt.loglog(timesteps, timesteps*mean_all_ddrs[-4]/timesteps[-4], 'k--',
            label='1st-order reference')
-plt.title('Rain mass error in Cluster {}'.format(cluster))
+plt.title('Rain diameter error in Cluster {}'.format(cluster))
 plt.xlabel('Timestep (s)')
-plt.ylabel('Rain tendency diff (g/kg/s)')
+plt.ylabel('Rain diameter diff (micron/s)')
 plt.axis('tight')
 plt.legend(loc='best')
-plt.savefig('substep_convergence_qr_c{}.eps'.format(cluster))
+plt.savefig('substep_convergence_dr_c{}{}.eps'.format(cluster, suffix))
 plt.close()
 
-plt.hist(coarse_qrs, bins=200)
-plt.xlabel('Final QR (g/kg)')
+plt.hist(coarse_drs, bins=200)
+plt.xlabel('Final DR (mm)')
 plt.ylabel('Number of cases ({} total)'.format(number_grid_cells))
 plt.axis('tight')
-plt.savefig('post_300s_qr_c{}.eps'.format(cluster))
+plt.savefig('post_300s_dr_c{}{}.eps'.format(cluster, suffix))
 plt.close()

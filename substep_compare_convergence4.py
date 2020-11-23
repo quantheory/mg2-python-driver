@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-import csv
-
 import numpy as np
 import scipy.linalg as la
 import scipy.stats as stats
@@ -312,24 +310,24 @@ def mg2_tendencies(level, t, q, qc, nc, qi, ni, qr, nr, qs, ns):
     return (tends, drout2, subqr, subnr, subdr)
 
 def update_state(level, tends, deltat):
-    t_loc[0,level] += tends["Total"][it] * deltat
-    q_loc[0,level] += tends["Total"][iq] * deltat
+    t_loc[0,level] += tends[it] * deltat
+    q_loc[0,level] += tends[iq] * deltat
     q_loc[0,level] = max(1.e-12, q_loc[0,level])
-    qc_loc[0,level] += tends["Total"][iqc] * deltat
+    qc_loc[0,level] += tends[iqc] * deltat
     qc_loc[0,level] = max(0., qc_loc[0,level])
-    qi_loc[0,level] += tends["Total"][iqi] * deltat
+    qi_loc[0,level] += tends[iqi] * deltat
     qi_loc[0,level] = max(0., qi_loc[0,level])
-    qr_loc[0,level] += tends["Total"][iqr] * deltat
+    qr_loc[0,level] += tends[iqr] * deltat
     qr_loc[0,level] = max(0., qr_loc[0,level])
-    qs_loc[0,level] += tends["Total"][iqs] * deltat
+    qs_loc[0,level] += tends[iqs] * deltat
     qs_loc[0,level] = max(0., qs_loc[0,level])
-    nc_loc[0,level] += tends["Total"][inc] * deltat
+    nc_loc[0,level] += tends[inc] * deltat
     nc_loc[0,level] = max(1.e-12, nc_loc[0,level])
-    ni_loc[0,level] += tends["Total"][ini] * deltat
+    ni_loc[0,level] += tends[ini] * deltat
     ni_loc[0,level] = max(1.e-12, ni_loc[0,level])
-    nr_loc[0,level] += tends["Total"][inr] * deltat
+    nr_loc[0,level] += tends[inr] * deltat
     nr_loc[0,level] = max(1.e-12, nr_loc[0,level])
-    ns_loc[0,level] += tends["Total"][ins] * deltat
+    ns_loc[0,level] += tends[ins] * deltat
     ns_loc[0,level] = max(1.e-12, ns_loc[0,level])
 
 def reset_state(level, column):
@@ -364,32 +362,63 @@ def calc_twmt(diff1, diff2, deltat):
                  abs(diff_tends[iqr]) + abs(diff_tends[iqs])) / 2.
 
 flag = False
+ice_flag = False
 
-def run_mg2_substepped(num_steps):
+def run_mg2_substepped(num_steps, get_evap=False, replace_evap=None,
+                       replace_steps=None):
     # Icky global usage.
     global timestep
     timestep = 300./num_steps
     global flag
     flag = False
+    global ice_flag
+    ice_flag = False
+    if get_evap:
+        assert replace_evap is None
+        evap_tends = np.zeros((10, num_steps))
+    if replace_evap is not None:
+        assert replace_steps is not None
+        assert replace_steps % num_steps == 0
+        replace_tends = np.zeros((10, num_steps))
+        step_ratio = replace_steps // num_steps
+        for m in range(num_steps):
+            for i in range(step_ratio):
+                replace_tends[:,m] += replace_evap[:,m*step_ratio+i]
+        replace_tends /= step_ratio
     for m in range(num_steps):
         tends, drout, subqr, subnr, subdr = mg2_tendencies(level, t_loc, q_loc, qc_loc, nc_loc, qi_loc, ni_loc,
                                                               qr_loc, nr_loc, qs_loc, ns_loc)
         other_tends = tends["Total"] - tends["anadj"] - tends["cnact"] - tends["cauto"] - tends["caccr"]# - tends["rnagg"] - tends["revap"]
-        if abs(other_tends[iqi]) > 1.e-10 or abs(other_tends[iqs]) > 1.e-10 or abs(tends["revap"][iqr]) > 1.e-10:
+        if abs(other_tends[iqi]) > 1.e-10 or abs(other_tends[iqs]) > 1.e-10:
+            ice_flag = True
+        if abs(tends["revap"][iqr]) > 1.e-10:
             flag = True
-        update_state(level, tends, timestep)
+        if get_evap:
+            evap_tends[:,m] = tends["revap"] + tends["rnagg"]
+        if replace_evap is not None:
+            tends["Total"] -= tends["revap"] + tends["rnagg"]
+            tends["Total"] += replace_tends[:,m]
+        update_state(level, tends["Total"], timestep)
     #drout = (qr_loc[0,level]/(np.pi * 1000. * nr_loc[0,level]))**(1./3.)
+    #if replace_evap is not None:
+        #update_state(level, replace_evap, 300.)
     state_diff = diff_states(level, column)
     reset_state(level, column)
-    return state_diff
+    if replace_evap is None:
+        if get_evap:
+            #evap_tends /= num_steps
+            return (state_diff, evap_tends)
+        else:
+            return state_diff
+    else:
+        return state_diff
 
 ind = np.arange(len(short_names))
 
-num_columns = 48602
-#num_columns = 1024
+#num_columns = 48602
+num_columns = 1024
 cluster = 6
 max_power = 11
-richardson = True
 
 plt.autoscale(tight=True)
 
@@ -417,10 +446,6 @@ auto_dqr_acc = make_accs(max_power-1)
 accr_dqr_acc = make_accs(max_power-1)
 
 coarse_qrs = []
-
-subsample_file = open('subsample_list.csv', 'w', encoding='ascii', newline='')
-subsample_writer = csv.writer(subsample_file)
-subsample_writer.writerow(['column', 'level'])
 
 number_grid_cells = 0
 
@@ -471,34 +496,27 @@ for column in range(num_columns):
         auto_accr_steps = 1
         auto_steps = 1
         accr_steps = 1
-        state_diff_ref = run_mg2_substepped(2**max_power)
-        if flag:
+        state_diff_ref, evap_tends = run_mg2_substepped(2**max_power, get_evap=True)
+        if ice_flag:
             continue
         mean_twnt_ref += calc_twmt(state_diff_ref, 0., 300.)
         mean_delqr_ref += state_diff_ref[iqr] / 300.
-        state_diff_coarse = run_mg2_substepped(1)
+        state_diff_coarse = run_mg2_substepped(1, replace_evap=evap_tends, replace_steps=2**max_power)
         if flag:
-            print("Evap rate significant for coarse, but not fine, results.")
+            print("Evap rate significant for coarse results.")
             print("column, level: ", column, ",", level)
-            continue
-        state_diff_coarse_ish = run_mg2_substepped(2)
+        state_diff_coarse_ish = run_mg2_substepped(2, replace_evap=evap_tends, replace_steps=2**max_power)
         if flag:
             print("Evap rate significant for coarse-ish results.")
             print("column, level: ", column, ",", level)
-            continue
-        state_diff_ref2 = run_mg2_substepped(2**(max_power-1))
-        if richardson:
-            state_diff_ref = 2*state_diff_ref - state_diff_ref2
         number_grid_cells += 1
-        subsample_writer.writerow([str(column), str(level)])
         mean_twnt_coarse += calc_twmt(state_diff_coarse, 0., 300.)
         mean_delqr_coarse += state_diff_coarse[iqr] / 300.
         coarse_qrs.append(1.e3*(state_diff_coarse[iqr] + qr_loc[0,level]))
         state_diffs_all = np.zeros((max_power-1, 10))
         state_diffs_all[0,:] = state_diff_coarse_ish
-        for i in range(2, max_power-1):
-            state_diffs_all[i-1,:] = run_mg2_substepped(2**i)
-        state_diffs_all[-1,:] = state_diff_ref2
+        for i in range(2, max_power):
+            state_diffs_all[i-1,:] = run_mg2_substepped(2**i, replace_evap=evap_tends, replace_steps=2**max_power)
         coarse_error = calc_twmt(state_diff_coarse, state_diff_ref, 300.)
         fine_error = calc_twmt(state_diffs_all[0,:], state_diff_ref, 300.)
         if coarse_error < fine_error:
@@ -510,24 +528,24 @@ for column in range(num_columns):
         state_diffs_together = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             auto_accr_steps = 2**i
-            state_diffs_together[i-1,:] = run_mg2_substepped(1)
+            state_diffs_together[i-1,:] = run_mg2_substepped(1, replace_evap=evap_tends, replace_steps=2**max_power)
         auto_accr_steps = 1
         state_diffs_apart = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             auto_steps = 2**i
             accr_steps = 2**i
-            state_diffs_apart[i-1,:] = run_mg2_substepped(1)
+            state_diffs_apart[i-1,:] = run_mg2_substepped(1, replace_evap=evap_tends, replace_steps=2**max_power)
         auto_steps = 1
         accr_steps = 1
         state_diffs_auto = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             auto_steps = 2**i
-            state_diffs_auto[i-1,:] = run_mg2_substepped(1)
+            state_diffs_auto[i-1,:] = run_mg2_substepped(1, replace_evap=evap_tends, replace_steps=2**max_power)
         auto_steps = 1
         state_diffs_accr = np.zeros((max_power-1, 10))
         for i in range(1, max_power):
             accr_steps = 2**i
-            state_diffs_accr[i-1,:] = run_mg2_substepped(1)
+            state_diffs_accr[i-1,:] = run_mg2_substepped(1, replace_evap=evap_tends, replace_steps=2**max_power)
         accr_steps = 1
 
         coarse_diff_acc.push(calc_twmt(state_diff_coarse, state_diff_ref, 300.))
@@ -545,8 +563,6 @@ for column in range(num_columns):
             apart_dqr_acc[i].push(np.abs(state_diffs_apart[i,iqr] - state_diff_ref[iqr]) / 300.)
             auto_dqr_acc[i].push(np.abs(state_diffs_auto[i,iqr] - state_diff_ref[iqr]) / 300.)
             accr_dqr_acc[i].push(np.abs(state_diffs_accr[i,iqr] - state_diff_ref[iqr]) / 300.)
-
-subsample_file.close()
 
 mean_all_diffs = np.zeros((max_power,))
 mean_together_diffs = np.zeros((max_power,))
@@ -641,9 +657,7 @@ print("Reference mean twnt and dqr/dt: ", mean_twnt_ref, mean_delqr_ref)
 
 print("Coarse run mean twnt and dqr/dt: ", mean_twnt_coarse, mean_delqr_coarse)
 
-suffix = ""
-if richardson:
-    suffix += "_richext"
+suffix = "_icefilterevap"
 
 timesteps = 300. / (2 ** np.arange(max_power))
 
@@ -662,7 +676,7 @@ min_y = min(mean_all_diffs[-1], mean_auto_diffs[-1], mean_accr_diffs[-1],
 max_y = max(ref_line[0], mean_all_diffs[0])
 plt.axis([timesteps[-1], timesteps[0], min_y, 2.*max_y])
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_mean_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('substep_convergence_mean_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, median_all_diffs, label='MG2', color='b')
@@ -677,7 +691,7 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_median_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('substep_convergence_median_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, max_all_diffs, label='MG2', color='b')
@@ -692,7 +706,7 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Total water mass difference (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_max_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('substep_convergence_max_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.loglog(timesteps, mean_all_dqrs, label='MG2', color='b')
@@ -707,12 +721,12 @@ plt.xlabel('Timestep (s)')
 plt.ylabel('Rain tendency diff (g/kg/s)')
 plt.axis('tight')
 plt.legend(loc='lower right')
-plt.savefig('substep_convergence_qr_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('substep_convergence_qr_c{}{}.eps'.format(cluster,suffix))
 plt.close()
 
 plt.hist(coarse_qrs, bins=200)
 plt.xlabel('Final QR (g/kg)')
 plt.ylabel('Number of cases ({} total)'.format(number_grid_cells))
 plt.axis('tight')
-plt.savefig('post_300s_qr_c{}{}.eps'.format(cluster, suffix))
+plt.savefig('post_300s_qr_c{}{}.eps'.format(cluster,suffix))
 plt.close()

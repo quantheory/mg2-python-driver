@@ -231,7 +231,7 @@ nbins = 50
 for c in range(ncluster):
     print("Number of cases in cluster {} is {}.".format(c, cluster_cases[c]))
 
-cmap = plt.get_cmap('Reds')
+cmap = plt.get_cmap('Greys')
 
 # Histogram of all positive eigenvalues.
 bins = np.logspace(np.log10(1./max_t), np.log10(1./min_t), nbins+1)
@@ -271,7 +271,7 @@ plt.hist(evalues_all_assoc, bins=bins, color='r', edgecolor='k')
 plt.axvline(x=-1./300., color='k', linewidth=2.)
 plt.title("Number of negative eigenvalues \n(based on {} eigenvalues)"
           .format(len(evalues_all_clusters)))
-plt.gca().set_xscale("symlog", linthreshx=1./max_t)
+plt.gca().set_xscale("symlog", linthresh=1./max_t)
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(-1./min_t, -1./max_t)
 plt.ylabel("Number of eigenvalues")
@@ -310,26 +310,27 @@ eig_count = []
 for c in range(ncluster):
     hist_values[c,:], _ = np.histogram([t for t in evalues_all[c] if t > 1./max_t and t < 1./min_t], bins=bins)
     row_norm = hist_values[c,:].sum()
+    print("Cluster {} has {} positive eigenvalues.".format(c, row_norm))
     eig_count.append(int(row_norm))
+    row_max = hist_values[c,:].max()
     if row_norm != 0:
-        hist_values[c,:] /= row_norm
+        hist_values[c,:] /= row_max
 plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of positive eigenvalues by cluster \n(based on {} eigenvalues)"
-          .format(len(evalues_all_clusters)))
+plt.title("Distribution of positive eigenvalues by cluster")
 plt.gca().set_xscale("log")
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(1./max_t, 1./min_t)
 plt.ylabel("Cluster Index")
 ax = plt.gca()
-ax.set_yticks(cind)
+ax.set_yticks(cind[:-1])
 ax.set_yticklabels([str(i) for i in cind[:-1]],
                    fontdict={'verticalalignment': 'bottom'})
 ax.tick_params('y', direction='out')
-plt.clim(vmin=0., vmax=0.2)
+plt.clim(vmin=0., vmax=1.)
 plt.colorbar(pad=0.1)
 ax2 = ax.twinx()
 ax2.set_yticks(cind)
-ax2.set_yticklabels([str(i) for i in eig_count],
+ax2.set_yticklabels([str(i) for i in eig_count] + [""],
                     fontdict={'verticalalignment': 'bottom'})
 plt.savefig('./time_hist_cluster_2D_pos{}.eps'.format(suffix))
 plt.close()
@@ -343,26 +344,26 @@ for c in range(ncluster):
     row_norm = hist_values[c,:].sum()
     print("Cluster {} has {} negative eigenvalues.".format(c, row_norm))
     eig_count.append(int(row_norm))
+    row_max = hist_values[c,:].max()
     if row_norm != 0:
-        hist_values[c,:] /= row_norm
+        hist_values[c,:] /= row_max
 plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
 plt.axvline(x=-1./300., color='k', linewidth=2.)
-plt.title("PDF of negative eigenvalues by cluster \n(based on {} eigenvalues)"
-          .format(len(evalues_all_clusters)))
-plt.gca().set_xscale("symlog", linthreshx=1./max_t)
+plt.title("Distribution of negative eigenvalues by cluster")
+plt.gca().set_xscale("symlog", linthresh=1./max_t)
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(-1./min_t, -1./max_t)
 plt.ylabel("Cluster Index")
 ax = plt.gca()
-ax.set_yticks(cind)
+ax.set_yticks(cind[:-1])
 ax.set_yticklabels([str(i) for i in cind[:-1]],
                    fontdict={'verticalalignment': 'bottom'})
 ax.tick_params('y', direction='out')
-plt.clim(vmin=0., vmax=0.2)
+plt.clim(vmin=0., vmax=1.)
 plt.colorbar(pad=0.15)
 ax2 = ax.twinx()
 ax2.set_yticks(cind)
-ax2.set_yticklabels([str(i) for i in eig_count],
+ax2.set_yticklabels([str(i) for i in eig_count] + [""],
                     fontdict={'verticalalignment': 'bottom'})
 plt.savefig('./time_hist_cluster_2D_neg{}.eps'.format(suffix))
 plt.close()
@@ -376,25 +377,25 @@ for c in range(ncluster):
     row_norm = hist_values[c,:].sum()
     print("Cluster {} has {} near-zero eigenvalues.".format(c, row_norm))
     eig_count.append(int(row_norm))
+    row_max = hist_values[c,:].max()
     if row_norm != 0:
-        hist_values[c,:] /= row_norm
+        hist_values[c,:] /= row_max
 plt.pcolor(bins, cind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of near-zero eigenvalues by cluster \n(based on {} eigenvalues)"
-          .format(len(evalues_all_clusters)))
+plt.title("PDF of near-zero eigenvalues by cluster")
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(-1./max_t, 1./max_t)
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
 plt.ylabel("Cluster Index")
 ax = plt.gca()
-ax.set_yticks(cind)
+ax.set_yticks(cind[:-1])
 ax.set_yticklabels([str(i) for i in cind[:-1]],
                    fontdict={'verticalalignment': 'bottom'})
 ax.tick_params('y', direction='out')
-plt.clim(vmin=0., vmax=0.2)
+plt.clim(vmin=0., vmax=1.)
 plt.colorbar(pad=0.1)
 ax2 = ax.twinx()
 ax2.set_yticks(cind)
-ax2.set_yticklabels([str(i) for i in eig_count],
+ax2.set_yticklabels([str(i) for i in eig_count] + [""],
                     fontdict={'verticalalignment': 'bottom'})
 plt.savefig('./time_hist_cluster_2D_n0{}.eps'.format(suffix))
 plt.close()
@@ -411,26 +412,27 @@ for i in range(nproc):
     hist_values[i,:], _ = np.histogram(pos_evalues, bins=bins)
     row_norm = hist_values[i,:].sum()
     eig_count.append(int(row_norm))
+    row_max = hist_values[i,:].max()
     print("Process {} has {} positive eigenvalues.".format(process_names[short_names[i]], row_norm))
     if row_norm != 0:
-        hist_values[i,:] /= row_norm
+        hist_values[i,:] /= row_max
 plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of positive eigenvalues by process")
+plt.title("Distribution of positive eigenvalues by process")
 plt.gca().set_xscale("log")
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(1./max_t, 1./min_t)
 ax = plt.gca()
-ax.set_yticks(pind)
+ax.set_yticks(pind[:-1])
 ax.set_yticklabels((process_names[name] for name in short_names),
                    fontdict={'verticalalignment': 'top'},
                    size='small', wrap=True)
 ax.tick_params('y', direction='out')
 plt.subplots_adjust(left=0.25)
 plt.ylabel("Process")
-plt.clim(vmin=0., vmax=0.2)
-plt.colorbar(pad=0.14)
+plt.clim(vmin=0., vmax=1.)
+plt.colorbar(pad=0.16)
 ax2 = ax.twinx()
-ax2.set_yticks(pind)
+ax2.set_yticks(pind[:-1])
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'top'})
 plt.savefig('./time_hist_process_2D_pos{}.eps'.format(suffix))
@@ -445,29 +447,30 @@ for i in range(nproc):
     for c in range(ncluster):
         neg_evalues += [t for t in evalues2[c][short_names[i]] if -t > 1./max_t and -t < 1./min_t]
     hist_values[i,:], _ = np.histogram(neg_evalues, bins=bins)
-    row_norm = hist_values[i,:].sum()
-    eig_count.append(int(row_norm))
+    row_sum = hist_values[i,:].sum()
+    eig_count.append(int(row_sum))
+    row_max = hist_values[i,:].max()
     print("Process {} has {} negative eigenvalues.".format(process_names[short_names[i]], row_norm))
     if row_norm != 0:
-        hist_values[i,:] /= row_norm
+        hist_values[i,:] /= row_max
 plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
 plt.axvline(x=-1./300., color='k', linewidth=2.)
-plt.title("PDF of negative eigenvalues by process")
-plt.gca().set_xscale("symlog", linthreshx=1./max_t)
+plt.title("Distribution of negative eigenvalues by process")
+plt.gca().set_xscale("symlog", linthresh=1./max_t)
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(-1./min_t, -1./max_t)
 ax = plt.gca()
-ax.set_yticks(pind)
+ax.set_yticks(pind[:-1])
 ax.set_yticklabels((process_names[name] for name in short_names),
                    fontdict={'verticalalignment': 'top'},
                    size='small', wrap=True)
 ax.tick_params('y', direction='out')
 plt.subplots_adjust(left=0.25)
 plt.ylabel("Process")
-plt.clim(vmin=0., vmax=0.2)
+plt.clim(vmin=0., vmax=1.)
 plt.colorbar(pad=0.16)
 ax2 = ax.twinx()
-ax2.set_yticks(pind)
+ax2.set_yticks(pind[:-1])
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'top'})
 plt.savefig('./time_hist_process_2D_neg{}.eps'.format(suffix))
@@ -484,26 +487,27 @@ for i in range(nproc):
     hist_values[i,:], _ = np.histogram(n0_evalues, bins=bins)
     row_norm = hist_values[i,:].sum()
     eig_count.append(int(row_norm))
+    row_max = hist_values[i,:].max()
     print("Process {} has {} non-zero eigenvalues.".format(process_names[short_names[i]], row_norm))
     if row_norm != 0:
-        hist_values[i,:] /= row_norm
+        hist_values[i,:] /= row_max
 plt.pcolor(bins, pind, hist_values, edgecolors='k', cmap=cmap)
-plt.title("PDF of near-zero eigenvalues by process")
+plt.title("Distribution of near-zero eigenvalues by process")
 plt.xlabel("Eigenvalue (1/s)")
 plt.xlim(-1./max_t, 1./max_t)
 plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
 ax = plt.gca()
-ax.set_yticks(pind)
+ax.set_yticks(pind[:-1])
 ax.set_yticklabels((process_names[name] for name in short_names),
                    fontdict={'verticalalignment': 'top'},
                    size='small', wrap=True)
 ax.tick_params('y', direction='out')
 plt.subplots_adjust(left=0.25)
 plt.ylabel("Process")
-plt.clim(vmin=0., vmax=0.2)
+plt.clim(vmin=0., vmax=1.)
 plt.colorbar(pad=0.1)
 ax2 = ax.twinx()
-ax2.set_yticks(pind)
+ax2.set_yticks(pind[:-1])
 ax2.set_yticklabels([str(i) for i in eig_count],
                     fontdict={'verticalalignment': 'top'})
 plt.savefig('./time_hist_process_2D_n0{}.eps'.format(suffix))
@@ -516,19 +520,20 @@ print("=====================================")
 plt.pcolor(np.flipud(pind), pind, evalue_corr_array, edgecolors='k', cmap=cmap)
 plt.title("Degree of association between given eigenvalues by primary process")
 ax = plt.gca()
-ax.set_xticks(np.flipud(pind))
+ax.set_xticks(np.flipud(pind[1:]))
 ax.set_xticklabels((process_names[name] for name in short_names),
                    size='small', rotation='vertical', wrap=True)
 ax.tick_params('x', direction='out', pad=40)
 plt.subplots_adjust(bottom=0.25)
-plt.xlabel("Process with given cutoff")
-ax.set_yticks(pind)
+#plt.xlabel("Process with given cutoff")
+ax.set_yticks(pind[:-1])
 ax.set_yticklabels((process_names[name] for name in short_names),
                    fontdict={'verticalalignment': 'top'},
                    size='small', wrap=False)
 ax.tick_params('y', direction='out')
 plt.subplots_adjust(left=0.25)
 plt.ylabel("Primary process")
+plt.clim(vmin=0., vmax=0.4)
 plt.colorbar()
 plt.savefig('./process_association{}.eps'.format(suffix))
 plt.close()
@@ -557,7 +562,7 @@ for c in range(ncluster):
     plt.xlabel("Eigenvalue (1/s)")
     plt.xlim(1./max_t, 1./min_t)
     ax = plt.gca()
-    ax.set_yticks(pind)
+    ax.set_yticks(pind[:-1])
     ax.set_yticklabels((process_names[name] for name in short_names),
                        fontdict={'verticalalignment': 'top'},
                        size='small', wrap=True)
@@ -592,7 +597,7 @@ for c in range(ncluster):
     plt.xlabel("Eigenvalue (1/s)")
     plt.xlim(1./min_t, 1./max_t)
     ax = plt.gca()
-    ax.set_yticks(pind)
+    ax.set_yticks(pind[:-1])
     ax.set_yticklabels((process_names[name] for name in short_names),
                        fontdict={'verticalalignment': 'top'},
                        size='small', wrap=True)
@@ -628,7 +633,7 @@ for c in range(ncluster):
     plt.xlim(-1./max_t, 1./max_t)
     plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
     ax = plt.gca()
-    ax.set_yticks(pind)
+    ax.set_yticks(pind[:-1])
     ax.set_yticklabels((process_names[name] for name in short_names),
                        fontdict={'verticalalignment': 'top'},
                        size='small', wrap=True)
